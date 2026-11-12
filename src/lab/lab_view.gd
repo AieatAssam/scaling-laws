@@ -42,6 +42,9 @@ var _tween_to := Vector2.INF
 var _primed := false
 var _press := Vector2.INF      # where the current press started (view px), INF when no press is held
 var _press_dragged := false    # the press has moved past DRAG_SLOP, so release is not a tap
+var _chip: Button              # BREAKING chip: shown while run.news.chip is set (see News)
+var _toast: Label              # reward text after a catch
+var _toast_t := 0.0
 
 
 func _ready() -> void:
@@ -56,6 +59,7 @@ func _ready() -> void:
 	back.view = self
 	world.view = self
 	front.view = self
+	_build_chip()
 	Game.started.connect(_resync)
 	Game.new_run_started.connect(_resync)
 	Game.layer_reset.connect(_on_layer_reset)
@@ -88,6 +92,83 @@ func _process(delta: float) -> void:
 	_update_cover(delta)
 	_frame()
 	pixel_k = _k_for(shown_r.size)
+	_sync_chip(delta)
+
+
+## BREAKING chip: a gold button at the top right while a headline is up. Tapping it claims the reward; the Button
+## consumes the press, so the lab's tap-to-zoom and drag-to-pan never see it. Static when reduce motion is on.
+func _build_chip() -> void:
+	_chip = Button.new()
+	_chip.text = "BREAKING"
+	_chip.focus_mode = Control.FOCUS_NONE
+	_chip.custom_minimum_size = Vector2(120, PanelKit.TOUCH_H)
+	_chip.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 8)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = PanelKit.col(PanelKit.GOLD)
+	sb.set_corner_radius_all(4)
+	for state in ["normal", "hover", "pressed", "focus"]:
+		_chip.add_theme_stylebox_override(state, sb)
+	for col in ["font_color", "font_hover_color", "font_pressed_color"]:
+		_chip.add_theme_color_override(col, PanelKit.col(PanelKit.BG))
+	Tip.attach(_chip, Callable(self, "_chip_tip"))
+	_chip.pressed.connect(_on_chip_pressed)
+	_chip.visible = false
+	add_child(_chip)
+
+	_toast = Label.new()
+	_toast.theme_type_variation = &"MicroDim"
+	_toast.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 8)
+	_toast.grow_horizontal = Control.GROW_DIRECTION_BEGIN   # widens to the left as the text grows
+	_toast.offset_top = 8.0 + PanelKit.TOUCH_H + 4.0
+	_toast.offset_bottom = _toast.offset_top + 16.0
+	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast.visible = false
+	add_child(_toast)
+
+
+func _sync_chip(delta: float) -> void:
+	var chip: Dictionary = Game.state.run["news"]["chip"]
+	_chip.visible = not chip.is_empty()
+	if _chip.visible and not reduce:
+		_chip.modulate.a = 0.8 + 0.2 * sin(Time.get_ticks_msec() / 150.0)
+	else:
+		_chip.modulate.a = 1.0
+	_toast_t = maxf(0.0, _toast_t - delta)
+	_toast.visible = _toast_t > 0.0
+
+
+func _chip_tip() -> String:
+	var chip: Dictionary = Game.state.run["news"]["chip"]
+	if chip.is_empty():
+		return "BREAKING"
+	var d = Content.get_def("news", String(chip["id"]))
+	var what: String = {
+		"cash": "30-90 s of cash income",
+		"compute": "30-90 s of compute",
+		"double_cash": "x2 cash for 30 s",
+		"viral": "x7 cash for 15 s (rare)",
+	}.get(str(d.reward), "a reward")
+	return "%s\nTap for %s. Missing it costs nothing." % [str(d.title), what]
+
+
+func _on_chip_pressed() -> void:
+	var r := Game.catch_news()
+	if not r.get("ok", false):
+		return
+	var text := ""
+	match str(r["reward"]):
+		"cash":
+			text = "+%s cash (%.0f s of income)" % [(r["amount"] as BigNum).format(), float(r["seconds"])]
+		"compute":
+			text = "+%s compute (%.0f s of income)" % [(r["amount"] as BigNum).format(), float(r["seconds"])]
+		"double_cash":
+			text = "x2 cash for 30 s"
+		"viral":
+			text = "VIRAL MOMENT: x7 cash for 15 s"
+	_toast.text = text
+	_toast_t = 3.0
+	_toast.visible = true
+	front.confetti()
 
 
 ## Copies the run state into the mirror (on start, new run, and first frame). Snaps the camera.

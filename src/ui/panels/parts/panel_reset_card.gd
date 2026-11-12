@@ -43,7 +43,7 @@ func setup(k: int, on_result: Callable) -> PanelResetCard:
 	v.add_child(head)
 	_gain = PanelKit.label("", PanelKit.GOLD)
 	_holding = PanelKit.label("", PanelKit.TEXT)
-	_eta = PanelKit.label("", PanelKit.MUTED)
+	_eta = PanelKit.label("", PanelKit.MUTED, false)  # one line at 360 px: no wrap, see _eta_text
 	v.add_child(_gain)
 	v.add_child(_holding)
 	v.add_child(_eta)
@@ -98,10 +98,11 @@ func _tip() -> String:
 	return "\n".join(lines)
 
 
-## "Est.: worth it in ~12m, next +1 in ~3m" (at the current cash rate). "now" once worth it; "-" when there is no income.
+## "Worth it ~12m | +1 ~3m" (at the current cash rate; short so it stays on one line at 360 px). "now" once worth it;
+## "-" when there is no income.
 func _eta_text(e: Dictionary) -> String:
-	var worth := "worth it now" if e["worth_now"] else "worth it in " + _dur(float(e["worth_in"]))
-	return "Est.: %s, next +1 in %s" % [worth, _dur(float(e["next_in"]))]
+	var worth := "now" if e["worth_now"] else _dur(float(e["worth_in"]))
+	return "Worth it %s | +1 %s" % [worth, _dur(float(e["next_in"]))]
 
 
 ## "~12m" style, "<1m" under a minute, "-" when the rate is zero (INF).

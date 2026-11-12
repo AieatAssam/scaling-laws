@@ -1,67 +1,154 @@
 class_name StatsPanel
 extends PanelBase
-## Statistics overlay: completion across every system, this run and all time, the fastest cycle of each reset layer and
-## lifetime resets. Opened from Settings > Statistics (the shell's open_stats); Close or Back hides it. Reads only:
-## Records and the persist counters are kept elsewhere.
+## Statistics overlay: completion, this run, the reset layers, all time and training. Opened from the HUD button or
+## Settings > Statistics (the shell's open_stats); Close or Back hides it. Reads only: Records, the persist counters and
+## the live state. Every section is aligned rows (label left, value right) under an accent header and a thin rule.
+
+const TABLE_HEAD := ["Layer", "Resets", "Fastest", "Last", "Best gain", "Holding"]
 
 var _percent: Label
-var _parts := {}        # part id -> {count: Label, bar: ProgressBar}
-var _run: Label
-var _all: Label
-var _fastest: Label
-var _lifetime: Label
+var _overall: ProgressBar
+var _parts := {}   # part id -> {count: Label, bar: ProgressBar}
+var _v := {}       # row key -> value Label
+var _cells := {}   # layer k -> {layer, resets, fastest, last, gain: Label, icon: TextureRect, holding: Label}
 
 
 func _build() -> void:
+	result_line.hide()
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	page.add_child(top)
-	var head := Label.new()
-	head.text = "Statistics"
+	var head := PanelKit.label("Statistics", -1, false)
 	head.theme_type_variation = &"Heading"
-	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(head)
 	top.add_child(PanelKit.button("Close", hide, true))
 
-	page.add_child(PanelKit.label("Completion", PanelKit.GOLD))
-	_percent = PanelKit.label("", PanelKit.BRIGHT)
-	page.add_child(_percent)
+	var comp := _section("Completion")
+	_percent = PanelKit.label("", PanelKit.BRIGHT, false)
+	comp.add_child(_percent)
+	_overall = PanelKit.bar(PanelKit.GOLD)
+	comp.add_child(_overall)
 	for part in Records.completion(Game.state)["parts"]:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		page.add_child(row)
-		var name_lbl := PanelKit.label(str(part["label"]), PanelKit.TEXT, false)
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(name_lbl)
-		var count := PanelKit.label("", PanelKit.MUTED, false)
-		row.add_child(count)
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 2)
+		comp.add_child(box)
+		var line := _line(str(part["label"]))
+		box.add_child(line["box"])
 		var bar := PanelKit.bar(PanelKit.TEAL)
 		bar.custom_minimum_size = Vector2(0, 10)
-		page.add_child(bar)
-		_parts[part["id"]] = {"count": count, "bar": bar}
+		box.add_child(bar)
+		_parts[part["id"]] = {"count": line["value"], "bar": bar}
 
-	page.add_child(PanelKit.label("This run", PanelKit.GOLD))
-	_run = PanelKit.label("", PanelKit.TEXT)
-	page.add_child(_run)
+	var run := _section("This run")
+	_row(run, "run_time", "Time played")
+	_row(run, "run_resets", "Resets")
+	_row(run, "cash_rate", "Cash income")
+	_row(run, "compute_rate", "Compute income")
+	_row(run, "cash_mult", "Cash multiplier")
+	_row(run, "compute_mult", "Compute multiplier")
 
-	page.add_child(PanelKit.label("All time", PanelKit.GOLD))
-	_all = PanelKit.label("", PanelKit.TEXT)
-	page.add_child(_all)
+	_build_layers(_section("Reset layers"))
 
-	page.add_child(PanelKit.label("Fastest cycle per reset layer", PanelKit.GOLD))
-	_fastest = PanelKit.label("", PanelKit.TEXT)
-	page.add_child(_fastest)
+	var all := _section("All time")
+	_row(all, "runs", "Runs started")
+	_row(all, "resets", "Resets")
+	_row(all, "time", "Time played")
+	_row(all, "events", "Events resolved")
+	_row(all, "papers", "Papers read")
+	_row(all, "landmarks", "Landmarks")
+	_row(all, "top_tier", "Highest producer")
 
-	page.add_child(PanelKit.label("Lifetime resets", PanelKit.GOLD))
-	_lifetime = PanelKit.label("", PanelKit.TEXT)
-	page.add_child(_lifetime)
+	var train := _section("Training")
+	_row(train, "trainings", "Training runs")
+	_row(train, "failed", "Failed")
+	_row(train, "success", "Success rate")
+	_row(train, "best_gen", "Best this generation")
+	_row(train, "best_all", "Best ever")
+
+
+## One section: accent header over a thin rule, then its rows. Returns the box the rows go into.
+func _section(title: String) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 4)
+	page.add_child(box)
+	var h := PanelKit.label(title, -1, false)
+	h.theme_type_variation = &"Heading"
+	box.add_child(h)
+	var rule := ColorRect.new()
+	rule.color = PanelKit.col(PanelKit.EDGE)
+	rule.custom_minimum_size = Vector2(0, 1)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(rule)
+	return box
+
+
+## Label left, value right, on one line. Returns {box, value}.
+func _line(text: String) -> Dictionary:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	h.add_child(PanelKit.label(text, PanelKit.TEXT, false))
+	var v := PanelKit.label("", PanelKit.BRIGHT, false)
+	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	v.size_flags_horizontal = Control.SIZE_SHRINK_END
+	h.add_child(v)
+	return {"box": h, "value": v}
+
+
+func _row(box: Control, key: String, text: String) -> void:
+	var line := _line(text)
+	box.add_child(line["box"])
+	_v[key] = line["value"]
+
+
+## Per-layer table: layer, lifetime resets, fastest cycle, time since last reset, best gain, what it holds.
+func _build_layers(box: VBoxContainer) -> void:
+	var grid := GridContainer.new()
+	grid.columns = TABLE_HEAD.size()
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 4)
+	box.add_child(grid)
+	for i in TABLE_HEAD.size():
+		grid.add_child(_cell(TABLE_HEAD[i], true, i == 0))
+	for k in range(1, Records.LAYERS + 1):
+		var cell := {
+			"layer": _cell("", false, true), "resets": _cell("", false, false),
+			"fastest": _cell("", false, false), "last": _cell("", false, false), "gain": _cell("", false, false),
+			"icon": PanelKit.icon("cash", 1.0), "holding": _cell("", false, false),
+		}
+		_cells[k] = cell
+		grid.add_child(cell["layer"])
+		grid.add_child(cell["resets"])
+		grid.add_child(cell["fastest"])
+		grid.add_child(cell["last"])
+		grid.add_child(cell["gain"])
+		var hold := HBoxContainer.new()
+		hold.alignment = BoxContainer.ALIGNMENT_END
+		hold.add_theme_constant_override("separation", 3)
+		hold.add_child(cell["icon"])
+		hold.add_child(cell["holding"])
+		grid.add_child(hold)
+
+
+## A table cell in the micro font. Headers take the accent colour; left-aligned for the layer name.
+func _cell(text: String, accent: bool, left: bool) -> Label:
+	var l := Label.new()
+	l.theme_type_variation = &"MicroLabel"
+	l.text = text
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if left else HORIZONTAL_ALIGNMENT_RIGHT
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.add_theme_color_override("font_color", Fx.col(Fx.ACCENT) if accent else PanelKit.col(PanelKit.TEXT))
+	return l
 
 
 func _refresh() -> void:
 	var s: GameState = Game.state
 	var p := s.persist
+	var stats: Dictionary = p["stats"]
 	var c := Records.completion(s)
 	_percent.text = "%d%% complete" % roundi(float(c["percent"]))
+	_overall.max_value = 100.0
+	_overall.value = float(c["percent"])
 	for part in c["parts"]:
 		var row: Dictionary = _parts[part["id"]]
 		(row["count"] as Label).text = "%d/%d" % [part["done"], part["total"]]
@@ -70,27 +157,74 @@ func _refresh() -> void:
 		bar.value = float(part["done"])
 
 	var run_resets := 0
-	var run_lines := PackedStringArray()
 	for k in range(1, Records.LAYERS + 1):
 		run_resets += s.resets(k)
-		run_lines.append("%s ×%d" % [Records.layer_title(s, k), s.resets(k)])
-	_run.text = "Time played %s · Resets %d\n%s" % [Records.format_duration(Records.run_seconds(p)), run_resets,
-		", ".join(run_lines)]
+	_v["run_time"].text = Records.format_duration(Records.run_seconds(p))
+	_v["run_resets"].text = str(run_resets)
+	_v["cash_rate"].text = "%s/s" % Game.cash_per_second().format()
+	_v["compute_rate"].text = "%s/s" % Game.compute_per_second().format()
+	_v["cash_mult"].text = "x%.2f" % Rules.mult(s, "cash")
+	_v["compute_mult"].text = "x%.2f" % Rules.mult(s, "compute")
 
-	var stats: Dictionary = p["stats"]
-	_all.text = "Runs %d · Resets %d · Trainings %d · Events %d\nTime played %s" % [int(stats["runs"]),
-		int(stats["resets"]), int(stats["trainings"]), int(stats["events"]),
-		Records.format_duration(float(stats["time"]))]
+	_refresh_layers(s)
 
-	var fastest: Dictionary = p["records"]["fastest"]
-	var fast_lines := PackedStringArray()
-	for k in range(1, Records.LAYERS + 1):
-		var t := "not yet" if not fastest.has(str(k)) else Records.format_duration(float(fastest[str(k)]))
-		fast_lines.append("%s  %s" % [Records.layer_title(s, k), t])
-	_fastest.text = "\n".join(fast_lines)
+	_v["runs"].text = str(int(stats["runs"]))
+	_v["resets"].text = str(int(stats["resets"]))
+	_v["time"].text = Records.format_duration(float(stats["time"]))
+	_v["events"].text = str(int(stats.get("events", 0)))
+	_v["papers"].text = str(int(stats.get("papers", 0)))
+	_v["landmarks"].text = str(int(stats.get("landmarks", 0)))
+	_v["top_tier"].text = _top_tier(s)
 
+	var trains := int(stats.get("trainings", 0))
+	var failed := int(stats.get("failed", 0))
+	_v["trainings"].text = str(trains)
+	_v["failed"].text = str(failed)
+	_v["success"].text = PanelKit.pct(float(trains - failed) / trains) if trains > 0 else "-"
+	_v["best_gen"].text = "%.2f" % float(s.run["layers"][2]["best"])
+	_v["best_all"].text = "%.2f" % float(p["best_all"])
+
+
+func _refresh_layers(s: GameState) -> void:
+	var p := s.persist
+	var now := float(p["stats"]["time"])
 	var life: Array = p["lifetime_resets"]
-	var life_lines := PackedStringArray()
+	var fastest: Dictionary = p["records"]["fastest"]
+	var gains: Dictionary = p["records"].get("best_gain", {})
 	for k in range(1, Records.LAYERS + 1):
-		life_lines.append("%s ×%d" % [Records.layer_title(s, k), int(life[k - 1])])
-	_lifetime.text = "\n".join(life_lines)
+		var cell: Dictionary = _cells[k]
+		var prev := Sim.reset_preview(s, k)
+		var n := int(life[k - 1])
+		(cell["layer"] as Label).text = Records.layer_title(s, k).split(" ")[0]
+		(cell["resets"] as Label).text = str(n)
+		(cell["fastest"] as Label).text = Records.format_duration(float(fastest[str(k)])) if fastest.has(str(k)) else "-"
+		(cell["last"] as Label).text = "never" if n == 0 else "%s ago" % _ago(now - float(p["records"]["cycle_start"][k]))
+		(cell["gain"] as Label).text = (BigNum.from_float(float(gains[str(k)])).format()) if gains.has(str(k)) else "-"
+		var cur := str(prev["currency"])
+		if cell.get("cur", "") != cur:  # the layer's currency only changes when a save is loaded
+			cell["cur"] = cur
+			(cell["icon"] as TextureRect).texture = Fx.tex_fit("res://assets/icons/%s.png" % cur, Vector2i(16, 16))
+		(cell["holding"] as Label).text = (prev["holding"] as BigNum).format()
+
+
+## The producer tier with the highest order that has ever been reached.
+func _top_tier(s: GameState) -> String:
+	var best := ""
+	var best_order := -1
+	for d in s.db.get_all("producers"):
+		if s.persist["records"]["producers"].has(d.id) and int(d.order) > best_order:
+			best = str(d.title)
+			best_order = int(d.order)
+	return best if best != "" else "none yet"
+
+
+## Coarse age: "45s", "12m", "3h 05m", "5d".
+static func _ago(secs: float) -> String:
+	var t := int(maxf(secs, 0.0))
+	if t < 60:
+		return "%ds" % t
+	if t < 3600:
+		return "%dm" % (t / 60)
+	if t < 86400:
+		return "%dh %02dm" % [t / 3600, (t % 3600) / 60]
+	return "%dd" % (t / 86400)

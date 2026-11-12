@@ -311,3 +311,40 @@ It prints `OK` and exits 0, or prints `FAIL` lines and exits 1.
 `Desk` (`src/core/desk.gd`) owns the generation-scoped desk in `run.layers[2].desk`: `slots`, `timer`, and additive `bonus`. It unlocks after the first lifetime Model Generation. `Desk.tick(s, dt, events)` draws a weighted eligible paper every 1,200 seconds while fewer than three slots are occupied, including during offline simulation. `Desk.resolve(s, slot, choice)` consumes a card and increments persistent `stats.papers` and, for landmarks, `stats.landmarks`. `Desk.best_cash(s, card)` is the simulator and Auto-review policy. Model Generation and higher resets clear the desk; Funding does not. Save version 3 initializes the desk for older saves.
 
 Paper resources have `blurb`, `conditions`, `weight`, and `choices`. Choices have `label`, `effects`, and an optional `{id, value}` currency `cost`. Alongside event effects, `cash_seconds` pays the given seconds of current cash income and `generation_mult` adds to the generation's compute bonus (capped at 0.5). Landmark effects double their magnitudes, including the excess above 1 for multipliers. Paper timed effects replace other timed effects on the same key. `stat_gte` conditions compare a persistent statistic by `id` and `value`. `Game.resolve_paper(slot, choice)` emits `paper_resolved`; draws emit `paper_offered`.
+
+## Lab upgrades (static, pure: `src/core/upgrades.gd`)
+
+Run-scoped (layer 0), bought once per run with cash. Definitions: `content/upgrades/*.tres` (`UpgradeDef`: `cost`, `kind`, `target`, `source`, `value`, `conditions`). Kinds: `double`, `synergy` (+1% per unit, capped by `SYNERGY_CAP` = 1.0), `cost` (-10%), `revenue` (cash), `train_speed`. Effects reach the sim only through `Rules.mult_parts`.
+
+- `Upgrades.all(s)`, `owned_ids(s)`, `is_owned(s, id)`, `owned_defs(s)`
+- `Upgrades.blocker(s, id)` -> `""` or one of `"unknown upgrade"`, `"already bought"`, `"locked: needs N <Producer>"`, `"not enough cash"`
+- `Upgrades.buy(s, id)` -> `{ok, ...}`; `Upgrades.parts(s, key)` and `tier_mult` / `cost_mult` feed `Rules.mult_parts`
+- `Upgrades.automate(s, evs)`: buys the cheapest affordable upgrade when `auto_upgrade` is owned
+
+## Launches (static, pure: `src/core/launches.gd`)
+
+Timed boosts (`content/launches/*.tres`: `LaunchDef` with `cost_currency`, `cost_share`, `cooldown`, `conditions`, `effects`). Cost is `cost_share` of the paying currency. One timed mod per key: a new one replaces the old, it does not stack.
+
+- `Launches.cost(s, id)`, `cooldown_left(s, id)`, `blocker(s, id)` -> `""`, `"locked"`, `"cooling down"`, `"not enough <currency>"`, `"buy a producer first"`
+- `Launches.fire(s, id)` pays, applies effects, starts the cooldown, and counts `stats.launches`
+- `Launches.tick(s, dt)` counts down `run["launches"]` (id -> seconds left)
+- `Launches.automate(s, evs)`: fires every ready, affordable launch when `auto_launch` is owned
+
+The "buy a producer first" guard exists because a cash launch right after a reset (cash = `START_CASH`, nothing owned) can leave less than the first producer costs, which is a permanent stall with no income.
+
+## Breaking news (static, pure: `src/core/news.gd`)
+
+Random headlines (`content/news/*.tres`: `NewsDef` with `weight`, `reward` = `cash` | `compute` | `double_cash` | `viral`). Timing: first headline after `FIRST_SECONDS` (150 s), then `MIN_GAP` (90 s) plus an exponential with mean `MEAN_EXTRA` (150 s), so the mean gap is about 240 s. Shown for `CHIP_SECONDS` (15 s). Does not tick while a modal or the intro is up, or offline (`Game._process` passes `news_held`).
+
+- `News.tick(s, dt, evs, hold)`: counts the timer down and spawns a headline (weighted pick on `s.rng`); `run["news"]` = `{"timer", "chip": {id, left} or {}}`
+- `News.catch(s)` -> `{ok, id, title, reward, amount?, seconds?}`; one reward per tap; a miss costs nothing. Counts `stats.news`
+- Benchmarks `news_10`, `news_100`, `news_500` count caught headlines
+- `reduce_motion` makes the lab chip static instead of pulsing
+
+## Save version 5
+
+`SaveSystem.VERSION = 5`. `_v4_to_v5` adds `layers[0].upgrades`, `run.launches`, `run.news`, and `stats.launches` / `stats.news`. Upgrades are run-scoped, so a reset clears them.
+
+## Simulator hooks (tools/simulate.gd)
+
+The scripted player buys upgrades cheapest-first before producers, fires every ready launch after hiring, and catches every second breaking headline. The report line `new systems: upgrades bought N (run-scoped, rebought after wipes; M defs), launches fired ..., breaking news ... shown, ... caught` uses whole-run counters, not end state, because Singularity wipes layer 0.

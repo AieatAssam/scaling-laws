@@ -3,6 +3,7 @@ extends Control
 ## Compute producers. Shows owned tiers, the buyable tier and one locked teaser (silhouette, "???").
 ## Each row: room thumbnail, owned count, output/s, progress to the next milestone, and a buy button.
 ## The x1 / x10 / MAX selector sets how many each buy button buys.
+## Above the producers: launch cards (timed boosts with cooldowns). Below them: lab upgrades (bought once with cash).
 
 const AMOUNTS := [1, 10, -1]   # -1 = max affordable
 const THUMB_SMALL := Vector2(96, 64)     # phone: half density of the 2x room art
@@ -14,6 +15,13 @@ var _rows := {}                # id -> {row, thumb, name, sub, bar, next, cost, 
 var _result: Label
 var _picker: AmountPicker
 var _buyable := false
+var _launch_flow: HFlowContainer
+var _launch_hint: Label
+var _launches := {}            # id -> {card, btn, bar, status, def}
+var _upgrade_flow: HFlowContainer
+var _upgrade_hint: Label
+var _upgrade_owned: Label
+var _upgrades := {}            # id -> Button
 
 
 func _ready() -> void:
@@ -44,10 +52,12 @@ func _ready() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 6)
 	scroll.add_child(list)
+	_build_launches(list)
 	for d in Content.get_all("producers"):
 		_order.append(d.id)
 		var row := _row(d)
 		list.add_child(row)
+	_build_upgrades(list)
 
 	var tm := Timer.new()
 	tm.wait_time = 0.25
@@ -237,6 +247,167 @@ func _refresh() -> void:
 			buy.text = "Buy max (%d)" % n
 		if not buy.disabled:
 			_buyable = true
+	_refresh_launches(s)
+	_refresh_upgrades(s)
+
+
+## Launch cards sit at the top of the list. Each shows once its conditions pass, with a cooldown bar and status.
+func _build_launches(list: VBoxContainer) -> void:
+	var box := PanelKit.section(list, "Launches", "breakthroughs")
+	_launch_flow = HFlowContainer.new()
+	_launch_flow.add_theme_constant_override("h_separation", 6)
+	_launch_flow.add_theme_constant_override("v_separation", 6)
+	box.add_child(_launch_flow)
+	_launch_hint = PanelKit.label("Launches unlock as you grow.", PanelKit.DIM)
+	box.add_child(_launch_hint)
+	for d in Content.get_all("launches"):
+		var card := PanelKit.card()
+		card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		card.custom_minimum_size.x = 160
+		Tip.attach(card, Callable(self, "_launch_tip").bind(d.id))
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 3)
+		card.add_child(v)
+		var btn := PanelKit.button(str(d.title), _fire.bind(d.id))
+		v.add_child(btn)
+		var bar := PanelKit.bar(PanelKit.AMBER)
+		bar.custom_minimum_size = Vector2(0, 6)
+		bar.max_value = 1.0
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(bar)
+		var status := Label.new()
+		status.theme_type_variation = &"MicroDim"
+		status.clip_text = true
+		v.add_child(status)
+		_launch_flow.add_child(card)
+		_launches[d.id] = {"card": card, "btn": btn, "bar": bar, "status": status, "def": d}
+
+
+func _refresh_launches(s: GameState) -> void:
+	var any := false
+	for id in _launches:
+		var r: Dictionary = _launches[id]
+		var d = r["def"]
+		var shown := Rules.check_all(s, d.conditions)
+		(r["card"] as Control).visible = shown
+		if not shown:
+			continue
+		any = true
+		var left := Launches.cooldown_left(s, id)
+		var reason := Launches.blocker(s, id)
+		(r["bar"] as ProgressBar).value = 1.0 - clampf(left / float(d.cooldown), 0.0, 1.0)  # fills as the cooldown runs out
+		(r["status"] as Label).text = ("%s left" % PanelKit.hms(left)) if left > 0.0 else ("Ready" if reason == "" else reason)
+		(r["btn"] as Button).disabled = reason != ""
+	_launch_hint.visible = not any
+
+
+func _fire(id: String) -> void:
+	var r := Game.fire_launch(id)
+	_report(r, "Launched %s." % str(Content.get_def("launches", id).title))
+	_refresh()
+
+
+## Exact numbers for a launch: effects, cost, cooldown, and time left.
+func _launch_tip(id: String) -> String:
+	var s: GameState = Game.state
+	var d = Content.get_def("launches", id)
+	var lines: Array[String] = [str(d.title)]
+	for e in d.effects:
+		if e.get("type", "") == "timed_mod":
+			lines.append("Effect: %s x%.2f for %s." % [_key_label(str(e["key"])), float(e["value"]), PanelKit.hms(float(e["seconds"]))])
+	lines.append("Cost: %s %s (%.0f%% of %s)." % [Launches.cost(s, id).format(), d.cost_currency,
+		float(d.cost_share) * 100.0, d.cost_currency])
+	lines.append("Cooldown: %s." % PanelKit.hms(float(d.cooldown)))
+	var left := Launches.cooldown_left(s, id)
+	if left > 0.0:
+		lines.append("Ready in %s." % PanelKit.hms(left))
+	return "\n".join(lines)
+
+
+func _key_label(key: String) -> String:
+	match key:
+		"cash":
+			return "cash income"
+		"compute":
+			return "compute"
+		"train_speed":
+			return "training speed"
+	return key
+
+
+## Upgrades section at the bottom of the list: buttons for unlocked, unbought upgrades; bought ones are a count.
+func _build_upgrades(list: VBoxContainer) -> void:
+	var box := PanelKit.section(list, "Upgrades", "research")
+	_upgrade_owned = Label.new()
+	_upgrade_owned.theme_type_variation = &"MicroDim"
+	box.add_child(_upgrade_owned)
+	_upgrade_flow = HFlowContainer.new()
+	_upgrade_flow.add_theme_constant_override("h_separation", 6)
+	_upgrade_flow.add_theme_constant_override("v_separation", 6)
+	box.add_child(_upgrade_flow)
+	_upgrade_hint = PanelKit.label("", PanelKit.DIM)
+	box.add_child(_upgrade_hint)
+	for d in Content.get_all("upgrades"):
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(150, PanelKit.TOUCH_H)
+		b.clip_text = true
+		b.text = "%s  %s" % [str(d.title), BigNum.from_float(float(d.cost)).format()]
+		b.pressed.connect(_buy_upgrade.bind(d.id, b))
+		Tip.attach(b, Callable(self, "_upgrade_tip").bind(d.id))
+		_upgrade_flow.add_child(b)
+		_upgrades[d.id] = b
+
+
+func _refresh_upgrades(s: GameState) -> void:
+	var owned := Upgrades.owned_ids(s).size()
+	_upgrade_owned.text = "%d owned of %d" % [owned, _upgrades.size()]
+	var shown := 0
+	for id in _upgrades:
+		var b := _upgrades[id] as Button
+		var reason := Upgrades.blocker(s, id)
+		b.visible = not Upgrades.is_owned(s, id) and not reason.begins_with("locked")
+		if not b.visible:
+			continue
+		shown += 1
+		b.disabled = reason != ""
+		if reason == "":
+			_buyable = true
+	_upgrade_hint.text = "All upgrades bought." if owned >= _upgrades.size() else "Next upgrades unlock as you grow."
+	_upgrade_hint.visible = shown == 0
+
+
+func _buy_upgrade(id: String, btn: Button) -> void:
+	var r := Game.buy_upgrade(id)
+	_report(r, "Bought %s." % str(Content.get_def("upgrades", id).title))
+	if r.get("ok", false):
+		Fx.pop(btn)
+	_refresh()
+
+
+## Exact effect of an upgrade (its own factor, or the synergy at the current owned count), cost and status.
+func _upgrade_tip(id: String) -> String:
+	var s: GameState = Game.state
+	var d = Content.get_def("upgrades", id)
+	var lines: Array[String] = [str(d.title), str(d.description)]
+	var v := float(d.value)
+	match str(d.kind):
+		"double":
+			lines.append("Effect: %s output x%.2f." % [PanelText.title_of("producers", d.target), 1.0 + v])
+		"synergy":
+			var now := minf(Upgrades.SYNERGY_CAP, v * s.owned(str(d.source)))
+			lines.append("Effect: +%.0f%% %s output per %s owned, up to +%.0f%%. Now +%.0f%%." % [v * 100.0,
+				PanelText.title_of("producers", d.target), PanelText.title_of("producers", d.source),
+				Upgrades.SYNERGY_CAP * 100.0, now * 100.0])
+		"cost":
+			lines.append("Effect: %s costs -%.0f%%." % [PanelText.title_of("producers", d.target), v * 100.0])
+		"revenue":
+			lines.append("Effect: +%.0f%% cash from inference (compute to cash)." % (v * 100.0))
+		"train_speed":
+			lines.append("Effect: training runs take -%.0f%% seconds." % (v * 100.0))
+	lines.append("Cost: %s cash." % BigNum.from_float(float(d.cost)).format())
+	var reason := Upgrades.blocker(s, id)
+	lines.append(reason if reason != "" else "Ready to buy.")
+	return "\n".join(lines)
 
 
 func _buy(id: String, btn: Button) -> void:

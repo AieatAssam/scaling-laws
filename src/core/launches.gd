@@ -29,9 +29,20 @@ static func blocker(s: GameState, id: String) -> String:
 		return "locked"
 	if cooldown_left(s, id) > 0.0:
 		return "cooling down"
+	# A cash launch right after a reset (cash = START_CASH, no producer) would leave less than the first producer costs,
+	# and with no income that is a permanent stall. So cash launches wait for a producer.
+	if d.cost_currency == "cash" and not _owns_a_producer(s):
+		return "buy a producer first"
 	if s.cur(d.cost_currency).compare(cost(s, id)) < 0:
 		return "not enough %s" % d.cost_currency
 	return ""
+
+
+static func _owns_a_producer(s: GameState) -> bool:
+	for p in s.db.get_all("producers"):
+		if s.owned(p.id) > 0:
+			return true
+	return false
 
 
 static func fire(s: GameState, id: String) -> Dictionary:

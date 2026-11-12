@@ -11,6 +11,7 @@ func before_each() -> void:
 	s = Support.new_state(content, 5)
 	Support.set_cash_float(s, "cash", 1.0e12)
 	Support.set_cash_float(s, "compute", 1.0e12)
+	s.run["layers"][0]["owned"]["intern_laptop"] = 1  # a producer, so cash launches are not held back
 
 
 func test_unlocks_follow_the_progression() -> void:
@@ -22,6 +23,16 @@ func test_unlocks_follow_the_progression() -> void:
 	assert_eq(Launches.blocker(s, "price_cut"), "")
 	assert_eq(Launches.blocker(s, "hackathon"), "locked")
 	assert_eq(Launches.blocker(s, "keynote"), "locked")
+
+
+func test_cash_launch_waits_for_a_producer() -> void:
+	Support.satisfy(s, [{"type": "resets_gte", "layer": 1, "value": 1}, {"type": "stat_gte", "id": "trainings", "value": 1}])
+	s.run["layers"][0]["owned"].erase("intern_laptop")  # what a reset leaves behind: nothing owned
+	Support.set_cash_float(s, "cash", 20.0)
+	assert_eq(Launches.blocker(s, "price_cut"), "buy a producer first")
+	assert_eq(Launches.blocker(s, "ship_demo"), "", "compute launches do not need a producer")
+	Sim.buy_producer(s, "intern_laptop", 1)
+	assert_eq(Launches.blocker(s, "price_cut"), "")
 
 
 func test_fire_pays_its_share_and_applies_the_timed_mod() -> void:

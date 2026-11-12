@@ -46,6 +46,7 @@ var _cash: Dictionary = {}     # chip: {value: TickLabel, rate: Label}
 var _compute: Dictionary = {}
 var _extras := {}              # currency -> {box: Control, value: TickLabel}
 var _saved: Label
+var _stats_btn: Button             # HUD "Stats / 12%" button: one tap opens the Statistics overlay
 var _saved_t := 0.0
 var _rate_tick := 0.0
 var _ending_shown := false
@@ -160,6 +161,12 @@ func _build_hud() -> PanelContainer:
 		Tip.attach(ch["box"], Callable(self, "_extra_tip").bind(c))
 		flow.add_child(ch["box"])
 		_extras[c] = ch
+	_stats_btn = Button.new()
+	_stats_btn.theme_type_variation = &"MicroButton"
+	_stats_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_stats_btn.pressed.connect(open_stats)
+	Tip.attach(_stats_btn, "Statistics\nCompletion, this run, the reset layers and all time. Also in Settings.")
+	row.add_child(_stats_btn)
 	_saved = Label.new()
 	_saved.theme_type_variation = &"MicroDim"
 	_saved.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -454,6 +461,7 @@ func _process(delta: float) -> void:
 	_rate_tick += delta
 	if _rate_tick >= 0.25:
 		_rate_tick = 0.0
+		_stats_btn.text = "Stats\n%d%%" % roundi(float(Records.completion(Game.state)["percent"]))
 		(_cash["rate"] as Label).text = "+%s/s" % Game.cash_per_second().format()
 		(_compute["rate"] as Label).text = "+%s/s" % Game.compute_per_second().format()
 		_refresh_extras()

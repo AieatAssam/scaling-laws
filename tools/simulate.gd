@@ -90,6 +90,8 @@ var cross_post: Array = []                             # same, counted only once
 var snaps: Array = []                                  # phase snapshot lines (state before each first reset, and at 15 min)
 var snap_15 := false
 var picks: Array = []                                  # [seconds, run id, log10 stock, training mult, generation best, ops] per pick
+var upgrades_bought := 0                              # lab upgrades bought over the whole run (end state is wiped by Singularity)
+var news_spawned := 0                                  # breaking-news headlines shown; the scripted player catches every other one
 
 
 func _initialize() -> void:
@@ -207,6 +209,16 @@ func _next_dt() -> float:
 	var training: Dictionary = s.run["layers"][0]["training"]
 	if not training.is_empty():
 		dt = minf(dt, float(training["left"]))
+	# New systems: timed boosts and launch cooldowns end, the news timer fires, and the next upgrade becomes affordable.
+	for e in s.run["layers"][0]["timed"]:
+		dt = minf(dt, float(e["left"]))
+	for id in s.run["launches"]:
+		dt = minf(dt, float(s.run["launches"][id]))
+	dt = minf(dt, float(s.run["news"]["timer"]))
+	if rate > 0.0:
+		for d in content.get_all("upgrades"):
+			if Upgrades.blocker(s, d.id) == "not enough cash":
+				dt = minf(dt, (float(d.cost) - s.cur("cash").to_float()) / rate)
 	return clampf(dt, MIN_DT, MAX_DT)
 
 
@@ -217,8 +229,10 @@ func _policy() -> void:
 	_resolve_event()
 	while not Desk.state(s)["slots"].is_empty():
 		Desk.resolve(s, 0, Desk.best_cash(s, Desk.state(s)["slots"][0]))
+	_upgrades()
 	_buy_producers()
 	_hire()
+	_launches()
 	_research()
 	_automation()
 	_training()
@@ -237,6 +251,29 @@ func _buy_producers() -> void:
 		if not Sim.buy_producer(s, id, n)["ok"]:
 			return
 		_log("buy %d x %s" % [n, id])
+
+
+## Scripted player: buys affordable lab upgrades, cheapest first, before producers.
+func _upgrades() -> void:
+	while true:
+		var best := ""
+		var best_cost := INF
+		for d in content.get_all("upgrades"):
+			if d.cost < best_cost and Upgrades.blocker(s, d.id) == "":
+				best = d.id
+				best_cost = d.cost
+		if best == "":
+			return
+		Upgrades.buy(s, best)
+		upgrades_bought += 1
+		_log("upgrade %s" % best)
+
+
+## Scripted player: fires every launch that is ready and affordable.
+func _launches() -> void:
+	for d in content.get_all("launches"):
+		if Launches.blocker(s, d.id) == "" and Launches.fire(s, d.id)["ok"]:
+			_log("launch %s" % d.id)
 
 
 func _hire() -> void:
@@ -474,6 +511,11 @@ func _handle(evs: Array) -> void:
 				_unlock("benchmark %s (%s)" % [e["id"], e["badge"]], "bench:" + e["id"])
 			"event":
 				_log("event offered: %s" % e["id"])
+			"news":
+				# Every other headline is caught: deterministic, and about half, as the spec asks.
+				news_spawned += 1
+				if news_spawned % 2 == 0 and News.catch(s)["ok"]:
+					_log("news caught: %s" % e["id"])
 
 
 func _median(vals: Array) -> float:
@@ -519,6 +561,7 @@ func _observe() -> void:
 			_fmt(now()), Sim.cash_per_second(s).format(), Sim.compute_per_second(s).format(), owned_tiers,
 			s.resets(1), s.resets(2), s.resets(3), s.resets(4), int(s.run["stage"]),
 			(s.run["layers"][2]["life"] as BigNum).format(), s.cur("compute").format(), s.cur("energy").format()])
+		var _bp := Sim.best_producer(s)
 	var tier := 0
 	for d in content.get_all("producers"):
 		tier += 1
@@ -589,6 +632,9 @@ func _report() -> int:
 	print("")
 	print("== pacing report: seed %d, branch %s, ending target %s%s, horizon %.1f h, ended at %s" % [
 		seed_value, branch, tgt, ", lazy" if lazy else "", hours, _fmt(now())])
+	print("new systems: upgrades bought %d (run-scoped, rebought after wipes; %d defs), launches fired %d, breaking news %d shown, %d caught" % [
+		upgrades_bought, content.get_all("upgrades").size(),
+		int(s.persist["stats"]["launches"]), news_spawned, int(s.persist["stats"]["news"])])
 	print("first resets (game time); gain>=1 and gain>=2 are first reached, ignoring prerequisites:")
 	for k in range(1, 5):
 		var band: Array = BANDS[k]

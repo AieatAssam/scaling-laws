@@ -166,7 +166,8 @@ func _on_challenge_finished(id: String, success: bool) -> void:
 		Records.note(state.persist, "challenges", id)
 
 
-func _on_layer_reset(layer: int, _gain: int) -> void:
+func _on_layer_reset(layer: int, gain: int) -> void:
+	Records.note_gain(state.persist, layer, gain)
 	var r := Records.note_reset(state.persist, layer)
 	if r["record"]:
 		record_set.emit(layer, float(r["secs"]))

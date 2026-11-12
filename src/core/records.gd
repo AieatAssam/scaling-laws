@@ -6,6 +6,7 @@ extends RefCounted
 ##   run_start      game time at which this run began
 ##   producers, research, challenges, endings, outpaced   id -> true, every item ever achieved
 ##   agi_best       AGI stages reached (0..5), the best over all runs
+##   best_gain      layer key -> the largest gain of one reset of that layer (absent in older saves: shows as unknown)
 ## Game connects its signals to these functions; the Stats screen reads completion() and the times.
 ## A save from before records existed is migrated (SaveSystem._v3_to_v4) with cycle_start at the migration time, so the
 ## first reset of each layer after that sets its baseline time rather than a record.
@@ -18,8 +19,16 @@ static func default(now: float) -> Dictionary:
 	return {
 		"fastest": {}, "cycle_start": [now, now, now, now, now], "run_start": now,
 		"producers": {}, "research": {}, "challenges": {}, "endings": {}, "outpaced": {},
-		"agi_best": 0,
+		"agi_best": 0, "best_gain": {},
 	}
+
+
+## Largest gain of one reset of layer k so far.
+static func note_gain(persist: Dictionary, k: int, gain: float) -> void:
+	var r: Dictionary = persist["records"]
+	var best: Dictionary = r.get("best_gain", {})
+	r["best_gain"] = best
+	best[str(k)] = maxf(float(best.get(str(k), 0.0)), gain)
 
 
 ## Called on every layer reset (manual or automatic). Returns {layer, secs, first, record}. The first reset of a layer
