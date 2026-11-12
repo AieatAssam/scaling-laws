@@ -9,4 +9,4 @@ title = "Self-improvement"
 description = "One step on the road to AGI."
 icon = "agi"
 order = 3
-conditions = Array[Dictionary]([{"type": "compute_rate_gte", "value": 1000.0}])
+conditions = Array[Dictionary]([{"type": "compute_rate_gte", "value": 100000.0}])

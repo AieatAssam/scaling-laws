@@ -23,7 +23,7 @@ const GY := 232.0                      # top of the ground strip; floors stand o
 const WORKER := Vector2(16, 24)
 const WORKER_FEET := 228.0             # floor line inside the ground-floor room (GY - 4)
 const LEGACY := 24.0
-const LEGACY_STEP := 24.0              # legacy props stand in a row left of the building, nearest first
+const LEGACY_STEP := 24.0              # legacy props stand in columns left of the building, two high, nearest first
 const LED_POS := [Vector2(6, 8), Vector2(86, 8), Vector2(6, 52), Vector2(86, 52)]
 const SKY_ORIGIN := Vector2(-56, 100)  # garage and city backdrops: their horizon sits on GY
 const LAB_DOT := Vector2(408, 120)     # the building, shrunk to a dot from stage 2 on
@@ -41,9 +41,9 @@ const BACKDROPS := ["garage_sky", "city", "orbit", "swarm", "universe"]
 ## Camera per zoom stage: centre c and the art-pixel area s that must fit on screen. Stage 0 is framed from the build.
 const FOCUS := [
 	{"c": Vector2(104, 116), "s": Vector2(120, 120)},
-	{"c": Vector2(160, 175), "s": Vector2(340, 170)},
-	{"c": Vector2(535, 100), "s": Vector2(310, 160)},
-	{"c": Vector2(835, 70), "s": Vector2(300, 130)},
+	{"c": Vector2(160, 124), "s": Vector2(340, 170)},
+	{"c": Vector2(560, 100), "s": Vector2(300, 150)},
+	{"c": Vector2(832, 72), "s": Vector2(300, 130)},
 	{"c": Vector2(1048, 80), "s": Vector2(200, 130)},
 ]
 
@@ -104,6 +104,13 @@ static func floor_origin(f: int) -> Vector2:
 	return Vector2(float(floori(f / 3.0)) * FLOOR.x, GY - float(f % 3 + 1) * FLOOR.y)
 
 
-## Legacy prop j stands on the ground, nearest the building first.
+## Columns of legacy props needed for n props (two props per column). Keeps the framing narrow after many resets.
+static func legacy_cols(n: int) -> int:
+	return ceili(float(n) / 2.0)
+
+
+## Legacy prop j stands on the ground, nearest the building first; the second prop of a column sits on the first.
 static func legacy_pos(j: int) -> Vector2:
-	return Vector2(-8.0 - LEGACY_STEP * float(j + 1), GY - LEGACY - 2.0)
+	var col := j / 2
+	var row := j % 2
+	return Vector2(-8.0 - LEGACY_STEP * float(col + 1), GY - LEGACY - 2.0 - LEGACY * float(row))

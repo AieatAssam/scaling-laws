@@ -71,10 +71,7 @@ jobs:
           godot --headless --path . -s tools/smoke.gd 2>&1 | tee smoke.log
           grep -qx "OK" smoke.log
 
-      # TODO: the pacing simulator is still being retuned (its current run fails several gating checks).
-      # Remove continue-on-error once `--ending=aligned` passes on main.
-      - name: Pacing simulator (advisory)
-        continue-on-error: true
+      - name: Pacing simulator
         run: godot --headless --path . -s tools/simulate.gd -- --hours=336 --seed=1 --ending=aligned
 
       - name: Upload logs

@@ -9,4 +9,4 @@ title = "Aligned"
 description = "The model does what we meant, and we can prove it."
 icon = "aligned"
 order = 1
-conditions = Array[Dictionary]([{"type": "slider_gte", "value": 0.7}])
+conditions = Array[Dictionary]([{"type": "slider_gte", "value": 0.9}])

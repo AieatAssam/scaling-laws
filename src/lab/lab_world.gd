@@ -108,7 +108,8 @@ func _draw() -> void:
 	for j in view.legacy.size():
 		var p := LabData.legacy_pos(j)
 		LabData.draw_art(self, "res://assets/legacy/%s.png" % LabData.LEGACY_LAYERS[view.legacy[j]], p, Vector2(LabData.LEGACY, LabData.LEGACY))
-		draw_rect(Rect2(p.x - 2.0, LabData.GY - 2.0, LabData.LEGACY + 4.0, 2.0), LabData.C_WOOD)
+		if j % 2 == 0:  # one shelf per column, under the lower prop
+			draw_rect(Rect2(p.x - 2.0, LabData.GY - 2.0, LabData.LEGACY + 4.0, 2.0), LabData.C_WOOD)
 	if stage <= 1 and c[0] > 0 and view.fall_p(0) <= 0.0:
 		for w in _workers:
 			var stepping: bool = w["pause"] <= 0.0 and not view.reduce

@@ -7,6 +7,7 @@ extends Control
 const FADE_SECONDS := 0.9
 const STARS := 12
 const BIG := 2000.0
+const PLANET := Color(0.12, 0.176, 0.294)  # orbit art: the planet's body continues below its bottom edge
 
 var view: LabView
 var _from := ""
@@ -53,24 +54,26 @@ func _backdrop(bd: String, o: Vector2, a: float) -> void:
 	if t == null:
 		draw_rect(Rect2(-BIG, -BIG, BIG * 2.0, BIG * 2.0), LabData.fade(LabData.C_DARK, a))
 		return
-	if bd == "garage_sky" or bd == "city":
-		_extend(t, o, a)
-		return
-	draw_rect(Rect2(-BIG, -BIG, BIG * 2.0, BIG * 2.0), LabData.fade(LabData.C_NIGHT, a))
-	draw_texture(t, o, Color(1, 1, 1, a))
+	if bd != "garage_sky" and bd != "city":
+		draw_rect(Rect2(-BIG, -BIG, BIG * 2.0, BIG * 2.0), LabData.fade(LabData.C_NIGHT, a))
+	_extend(t, o, a, bd == "orbit")
 
 
 ## Draws the art at o and fills the 3x3 surround with its edge pixels stretched outwards.
-func _extend(t: Texture2D, o: Vector2, a: float) -> void:
+func _extend(t: Texture2D, o: Vector2, a: float, flat_below := false) -> void:
 	var w := float(t.get_width())
 	var h := float(t.get_height())
 	var xs := [[-BIG, o.x + BIG, 0.0, 1.0], [o.x, w, 0.0, w], [o.x + w, BIG, w - 1.0, 1.0]]
 	var ys := [[-BIG, o.y + BIG, 0.0, 1.0], [o.y, h, 0.0, h], [o.y + h, BIG, h - 1.0, 1.0]]
 	for xi in 3:
 		for yi in 3:
+			if flat_below and yi == 2:
+				continue
 			var dst := Rect2(xs[xi][0], ys[yi][0], xs[xi][1], ys[yi][1])
 			var src := Rect2(xs[xi][2], ys[yi][2], xs[xi][3], ys[yi][3])
 			draw_texture_rect_region(t, dst, src, Color(1, 1, 1, a))
+	if flat_below:
+		draw_rect(Rect2(-BIG, o.y + h, BIG * 2.0, BIG), LabData.fade(PLANET, a))
 
 
 func _ambient() -> void:

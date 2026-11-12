@@ -4,7 +4,8 @@ extends Control
 ## unit() is the view size of one art pixel, a whole number of physical pixels, so the art stays crisp.
 ## Drawing lives in LabBack (backdrops), LabWorld (lab, props, workers) and LabFront (effects, fades).
 
-const COLLAPSE_SECONDS := 1.8
+const COLLAPSE_SECONDS := 2.7  # the reset overlay is opaque for its first 1.2 s, so the fall starts after it
+const COLLAPSE_DELAY := 1.2
 const CAM_SECONDS := 0.7       # centre glide between framings with the same scale
 const COVER_IN := 0.18         # fade to the cover colour before a zoom change
 const COVER_OUT := 0.22        # fade back out after the snap
@@ -176,7 +177,7 @@ func counts() -> Array[int]:
 func fall_p(i: int) -> float:
 	if not collapsing:
 		return 0.0
-	var delay := float(11 - i) * 0.08
+	var delay := COLLAPSE_DELAY + float(11 - i) * 0.08
 	return clampf((collapse_t - delay) / 0.5, 0.0, 1.0)
 
 
@@ -206,7 +207,7 @@ func _target() -> Dictionary:
 			levels[col] = maxi(levels[col], f % 3 + 1)
 	var cols := 2 if levels[1] > 0 else 1
 	var tall := maxi(1, maxi(levels[0], levels[1]))
-	var x0 := -8.0 - LabData.LEGACY_STEP * float(legacy.size()) if legacy.size() > 0 else 0.0
+	var x0 := -8.0 - LabData.LEGACY_STEP * float(LabData.legacy_cols(legacy.size())) if legacy.size() > 0 else 0.0
 	var x1 := float(cols) * LabData.FLOOR.x
 	var top_y := LabData.GY - float(tall) * LabData.FLOOR.y - LabData.ROOF.y
 	var bot_y := LabData.GY + LabData.GROUND_H

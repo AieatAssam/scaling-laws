@@ -12,10 +12,16 @@ extends SceneTree
 ##
 ## Gating checks:
 ##   First reset of each layer (game time):  Funding 20–45 min, Generation 3–6 h, Paradigm 24–48 h,
-##     Singularity 3–8 d.  The AGI ending must come within 14 d (336 h).
+##     Singularity 3–8 d.  The AGI ending must come between 8 d (192 h) and 14 d (336 h).
 ##   Cycles: a layer's cycle runs from its life being zeroed (own reset or a higher one) to its own reset.
-##     Within an epoch (no higher reset), the average of cycles 2.. must be at most CYCLE_SPEEDUP of the first (plus one
+##     Epoch 0 (no higher reset yet): the average of cycles 2.. must be at most CYCLE_SPEEDUP of the first (plus one
 ##     step), when the first is longer than two steps. Averaging keeps single-step jitter from failing the check.
+##     Later epochs: cycles 2.. must earn at least LATER_EPOCH_MIN_RATE of their first cycle's gain per hour (the reset
+##     rule needs gain >= 2x holding, so cycle length grows by design), and each epoch's first
+##     cycle must beat epoch 0's first cycle of the same layer (kept bonuses pay off).
+##   Generation policy: once the research tree is bought, Model Generation resets are skipped (insights have no use).
+##   Aligned policy: the slider stays at 0.5 until the Singularity, then goes to 0.9 (the aligned ending needs 0.9).
+##   --probe: prints Generation and Paradigm reset decisions and compute/s crossings (diagnostics only, no gate).
 ##   Unlock gaps: an unlock is a first producer tier, staff role, research node, automation, benchmark, constraint,
 ##     rival, challenge, AGI stage, ending, first training, or first reset of a layer. Events are not unlocks.
 ##     A gap is limited by where it starts: 10 min before 1 h, 30 min before Generation, 3 h before Paradigm, 8 h after.
@@ -35,7 +41,7 @@ const GAP_LIMITS := [600.0, 1800.0, 10800.0, 28800.0]   # by gap start: <1 h, <G
 const STALL_LIMIT := 7200.0
 const STALL_FACTOR := 4.0      # gain stalled when it has not risen for this many times the time it took to reach it
 const CYCLE_SPEEDUP := 0.9    # epoch 0: cycles 2.. must be at most this fraction of cycle 1
-const LATER_EPOCH_MAX := 1.25 # epochs > 0: cycles 2.. must be at most this multiple of their first cycle (no slowdown)
+const LATER_EPOCH_MIN_RATE := 0.7 # epochs > 0: cycles 2.. must earn at least this fraction of the first cycle's gain per hour
 const ENDING_EARLIEST := 192.0 * HOUR   # 8 d: the AGI ending must not come sooner
 const SLIDER_TARGET := {"aligned": 0.9, "rushed": 0.3, "open_sourced": 0.5}
 const RESEARCH_COMMON := ["cluster_scheduler", "data_curation", "data_dedupe", "eval_harness", "mixed_precision", "inference_cache"]
@@ -77,6 +83,9 @@ var ending_t := -1.0
 var lazy_step_count := 0
 var peak_rate: Array = []                              # highest compute/s seen in each game day
 var next_trace := 0.0
+var probe := false                                     # --probe: log higher-layer reset decisions and rate crossings
+var cross_all: Array = []                              # first game time compute/s reached 10^p
+var cross_post: Array = []                             # same, counted only once Singularity has reset
 
 
 func _initialize() -> void:
@@ -86,6 +95,9 @@ func _initialize() -> void:
 	content = load("res://src/autoload/content.gd").new()
 	content.load_all()
 	s = GameState.new(content, seed_value)
+	for i in 31:
+		cross_all.append(-1.0)
+		cross_post.append(-1.0)
 	branch = ["dense", "moe", "ssm"][absi(seed_value) % 3]
 	_run()
 	quit(_report())
@@ -103,6 +115,8 @@ func _parse_args() -> bool:
 			lazy = true
 		elif a == "--verbose":
 			verbose = true
+		elif a == "--probe":
+			probe = true
 		else:
 			print("unknown argument: " + a)
 			return false
@@ -331,10 +345,18 @@ func _resets() -> void:
 			var p := Sim.reset_preview(s, k)
 			if not p["allowed"] or int(p["gain"]) < 1:
 				continue
-			# Highlighted (gain >= 2 and >= 2x holding), or gain has stopped rising.
+			# Highlighted (gain >= 2 and >= 2x holding), or gain has stopped rising. Once the research tree is
+			# bought, Model Generation insights have no use, so resetting it would only wipe the economy for them.
+			if k == 2 and _research_done():
+				continue
 			if not (p["highlight"] or _stalled(k)):
 				continue
 			var why := "highlight" if p["highlight"] else "stall"
+			if probe and k >= 1:
+				var dur := now() - float(cycle_start[k])
+				print("  probe %s reset #%d: epoch %d, duration %.3f h, gain %d, gain/h %.3f, holding %s, life %s, why %s" % [
+					LAYER_NAMES[k], cycles[k].size() + 1, _epoch(k), dur / HOUR, int(p["gain"]), int(p["gain"]) / maxf(dur / HOUR, 1e-9),
+					(p["holding"] as BigNum).format(), (s.run["layers"][k]["life"] as BigNum).format(), why])
 			var r := Sim.perform_reset(s, k)
 			if r["ok"]:
 				_on_reset(k, int(r["gain"]), why)
@@ -347,6 +369,13 @@ func _resets() -> void:
 func _stalled(k: int) -> bool:
 	var t_up: float = last_up[k]
 	return now() - t_up > STALL_FACTOR * (t_up - float(cycle_start[k]))
+
+
+func _research_done() -> bool:
+	for id in RESEARCH_COMMON + RESEARCH_BRANCH[branch]:
+		if not (id in s.run["layers"][2]["research"]):
+			return false
+	return true
 
 
 func _resolve_event() -> void:
@@ -389,7 +418,7 @@ func _score_choice(ch: Dictionary) -> float:
 func _on_reset(k: int, gain: int, why: String) -> void:
 	var t := now()
 	var tag := " (%s)" % why
-	cycles[k].append([t - float(cycle_start[k]), _epoch(k), t])
+	cycles[k].append([t - float(cycle_start[k]), _epoch(k), t, gain])
 	if first_reset[k] < 0.0:
 		first_reset[k] = t
 		gain_at_reset[k] = gain
@@ -447,6 +476,13 @@ func _observe() -> void:
 	while peak_rate.size() <= day:
 		peak_rate.append(0.0)
 	peak_rate[day] = maxf(float(peak_rate[day]), Sim.compute_per_second(s).to_float())
+	var lr := Sim.compute_per_second(s).to_float()
+	for p in cross_all.size():
+		if lr >= pow(10.0, p):
+			if cross_all[p] < 0.0:
+				cross_all[p] = now()
+			if s.resets(4) > 0 and cross_post[p] < 0.0:
+				cross_post[p] = now()
 	if now() >= next_trace:
 		next_trace = now() + TRACE_EVERY
 		var owned_tiers := 0
@@ -513,6 +549,14 @@ func _sanity() -> void:
 
 # ---------------------------------------------------------------- report
 
+func _crossings(arr: Array) -> String:
+	var parts: Array = []
+	for p in arr.size():
+		if float(arr[p]) >= 0.0:
+			parts.append("1e%d at %s" % [p, _fmt(float(arr[p])).strip_edges()])
+	return ", ".join(parts) if not parts.is_empty() else "none"
+
+
 func _report() -> int:
 	max_idle = maxf(max_idle, now() - last_action)
 	var tgt := ending_target
@@ -545,12 +589,15 @@ func _report() -> int:
 		var by_epoch := {}
 		var epochs: Array = []
 		var first_of := {}   # epoch -> length of that epoch's first cycle
+		var gains := {}      # epoch -> gain of each cycle
 		for c in list:
 			var e := int(c[1])
 			if not by_epoch.has(e):
 				by_epoch[e] = []
+				gains[e] = []
 				epochs.append(e)
 			by_epoch[e].append(float(c[0]))
+			gains[e].append(float(c[3]))
 		for ei in epochs.size():
 			var e: int = epochs[ei]
 			var d: Array = by_epoch[e]
@@ -573,10 +620,18 @@ func _report() -> int:
 					if later > CYCLE_SPEEDUP * d[0] + MAX_DT:
 						_problem("%s epoch %d: cycles 2.. average %s, not meaningfully faster than the first (%s)" % [
 							LAYER_NAMES[k], e, _cyc(later).strip_edges(), _cyc(d[0]).strip_edges()])
-				elif later > LATER_EPOCH_MAX * d[0]:
-					# Later epochs start with kept bonuses, so their first cycle is already fast: only require no slowdown.
-					_problem("%s epoch %d: cycles 2.. average %s, slower than %.2fx the first (%s)" % [
-						LAYER_NAMES[k], e, _cyc(later).strip_edges(), LATER_EPOCH_MAX, _cyc(d[0]).strip_edges()])
+				else:
+					# Later epochs: the reset rule needs gain >= 2x holding, so cycles lengthen by design as the holding
+					# grows. Duration is the wrong metric there; the payoff rate (currency per hour) must not collapse.
+					var g: Array = gains[e]
+					var gain_later := 0.0
+					for i in range(1, g.size()):
+						gain_later += float(g[i])
+					var rate_first: float = float(g[0]) / float(d[0])
+					var rate_later: float = gain_later / (later * float(d.size() - 1))
+					if rate_later < LATER_EPOCH_MIN_RATE * rate_first:
+						_problem("%s epoch %d: cycles 2.. earn %.2f/h, under %.2fx the first cycle's %.2f/h" % [
+							LAYER_NAMES[k], e, rate_later * HOUR, LATER_EPOCH_MIN_RATE, rate_first * HOUR])
 		# A later epoch's first cycle must beat epoch 0's first cycle of the same layer (kept bonuses pay off).
 		if first_of.has(0):
 			for e in first_of:
@@ -634,6 +689,9 @@ func _report() -> int:
 		peaks.append("d%d %s" % [i, BigNum.from_float(float(peak_rate[i])).format()])
 	print("peak compute/s by game day: " + ", ".join(peaks))
 	print("cash/s at end: %s   compute/s: %s" % [Sim.cash_per_second(s).format(), Sim.compute_per_second(s).format()])
+	if probe:
+		print("compute/s first reached, all time:  " + _crossings(cross_all))
+		print("compute/s first reached, after Singularity: " + _crossings(cross_post))
 	print("ending: %s" % ("none" if ending_id == "" else "%s at %s" % [ending_id, _fmt(ending_t).strip_edges()]))
 	if ending_id == "":
 		_problem("no AGI ending within %.1f h" % hours)
