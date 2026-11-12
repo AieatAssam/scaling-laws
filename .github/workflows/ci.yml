@@ -49,7 +49,7 @@ jobs:
       - name: Put Godot on PATH
         run: |
           echo "$HOME/godot-bin" >> "$GITHUB_PATH"
-          godot --version
+          "$HOME/godot-bin/godot" --version
 
       # The first --import pass logs font/theme load errors on a clean .godot/ and the second pass is clean.
       # Both passes must exit 0; the GUT step below is the real gate.

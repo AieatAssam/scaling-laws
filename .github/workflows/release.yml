@@ -65,7 +65,7 @@ jobs:
       - name: Put Godot on PATH
         run: |
           echo "$HOME/godot-bin" >> "$GITHUB_PATH"
-          godot --version
+          "$HOME/godot-bin/godot" --version
 
       - name: Resolve version and check it matches the project
         id: ver
