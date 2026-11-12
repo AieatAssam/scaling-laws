@@ -27,31 +27,31 @@ static func signed(v: Variant) -> String:
 	return ("+" if float(v) >= 0.0 else "") + num(v)
 
 
-## Condition text, e.g. "Compute ≥ 1000".
+## Condition text, e.g. "Compute >= 1000".
 static func condition(c: Dictionary) -> String:
 	match c["type"]:
 		"owned_gte":
 			return "%d× %s" % [int(c["value"]), title_of("producers", c["id"])]
 		"currency_gte":
-			return "%s ≥ %s" % [cur_name(c["id"]), num(c["value"])]
+			return "%s >= %s" % [cur_name(c["id"]), num(c["value"])]
 		"resets_gte":
 			return "%s done" % layer_title(int(c["layer"]))
 		"training_best_gte":
-			return "Best training score ≥ %s" % num(c["value"])
+			return "Best training score >= %s" % num(c["value"])
 		"staff_gte":
 			return "%d %s hired" % [int(c["value"]), title_of("staff", c["id"])]
 		"research_has":
 			return "Research: %s" % title_of("research", c["id"])
 		"slider_gte":
-			return "Alignment ≥ %s" % PanelKit.pct(float(c["value"]))
+			return "Alignment >= %s" % PanelKit.pct(float(c["value"]))
 		"time_played_gte":
-			return "Played ≥ %s" % PanelKit.hms(float(c["value"]))
+			return "Played >= %s" % PanelKit.hms(float(c["value"]))
 		"benchmark_unlocked":
 			return "Benchmark: %s" % title_of("benchmarks", c["id"])
 		"flag_set":
 			return "Flag: %s" % String(c["id"]).capitalize()
 		"debt_gte":
-			return "Debt ≥ %s" % num(c["value"])
+			return "Debt >= %s" % num(c["value"])
 	return str(c)
 
 

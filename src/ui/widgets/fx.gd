@@ -44,7 +44,8 @@ static func reduce_motion() -> bool:
 	return g != null and bool(g.state.persist["settings"].get("reduce_motion", false))
 
 
-## Texture at `path`, or a flat palette rect when the file is missing.
+## Texture at `path`, or a flat palette rect of logical size `size` when the file is missing.
+## Art may be 1x or 2x its logical size; size the TextureRect to the logical size, not the texture's.
 static func tex(path: String, size := Vector2i(16, 16)) -> Texture2D:
 	if ResourceLoader.exists(path):
 		return load(path)
@@ -53,10 +54,14 @@ static func tex(path: String, size := Vector2i(16, 16)) -> Texture2D:
 	return ImageTexture.create_from_image(img)
 
 
-## Nearest-neighbour upscale of a texture by an integer factor (keeps pixel art crisp).
-static func tex_x(path: String, factor: int) -> Texture2D:
-	var img := tex(path).get_image()
-	img.resize(img.get_width() * factor, img.get_height() * factor, Image.INTERPOLATE_NEAREST)
+## Texture at `path` resized (nearest, so pixel art stays crisp) to exactly the logical `size`. Use where a
+## Button icon shows the texture at its own size; 1x and 2x art both come out at `size`.
+static func tex_fit(path: String, size: Vector2i) -> Texture2D:
+	var t := tex(path, size)
+	if Vector2i(t.get_size()) == size:
+		return t
+	var img := t.get_image()
+	img.resize(size.x, size.y, Image.INTERPOLATE_NEAREST)
 	return ImageTexture.create_from_image(img)
 
 

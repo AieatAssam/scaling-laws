@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "icons"
+title = "Icon legend"
+icon = "research"
+order = 110
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_generation_1"}])
+hint = "What each icon and badge means."
+body = "## Resources\n[icon:compute] Compute: made by producers, spent on training runs.\n[icon:cash] Cash: earned from compute, spent on producers, staff and research.\n[icon:equity] Equity: from a Funding Round. Hires staff.\n[icon:insights] Insights: from Model Generation. Buys research.\n[icon:breakthroughs] Breakthroughs: from a Paradigm Shift.\n[icon:data] Data: builds after a Paradigm Shift. Training uses it.\n[icon:energy] Energy: builds after a Paradigm Shift. Training uses it.\n[icon:legacy] Legacy: from Singularity. Kept for good, buys perks.\n## Systems\n[icon:alignment] Alignment: the slider that trades safety for raw capability.\n[icon:capability] Capability: the extra compute that low alignment buys.\n[icon:training] Training runs.\n[icon:hiring] Hiring on the Funding tab.\n[icon:research] Research on the Models tab.\n[icon:automation] Automation on the Paradigm tab.\n[icon:benchmarks] Benchmarks.\n[icon:events] Events.\n[icon:rivals] Rival labs.\n[icon:regulation] Regulation challenges.\n[icon:agi] The road to AGI.\n[icon:settings] Settings.\n## Badges\n[badge:bronze] bronze, [badge:silver] silver, [badge:gold] gold, [badge:platinum] platinum, [badge:diamond] diamond, [badge:cosmic] cosmic. Rarer tiers come later in the list."

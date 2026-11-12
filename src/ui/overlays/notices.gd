@@ -29,8 +29,10 @@ func _ready() -> void:
 	row.add_theme_constant_override("separation", 6)
 	_toast.add_child(row)
 	_toast_icon = TextureRect.new()
-	_toast_icon.custom_minimum_size = Vector2(24, 24)
-	_toast_icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	_toast_icon.custom_minimum_size = Vector2(24, 24)   # logical size; the badge art may be 2x
+	_toast_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_toast_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_toast_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(_toast_icon)
 	_toast_title = Label.new()
 	_toast_title.theme_type_variation = &"MicroLabel"
@@ -89,7 +91,7 @@ func show_offline(s: Dictionary) -> void:
 
 func show_benchmark(id: String, badge: String) -> void:
 	var d = Content.get_def("benchmarks", id)
-	_toast_icon.texture = Fx.tex("res://assets/badges/%s.png" % badge, Vector2i(24, 24))
+	_toast_icon.texture = Fx.tex("res://assets/badges/%s.png" % badge, Vector2i(24, 24))  # fallback at logical size
 	_toast_title.text = "Benchmark: %s" % (d.title if d else id)
 	_toast.visible = true
 	_toast_t = 3.0

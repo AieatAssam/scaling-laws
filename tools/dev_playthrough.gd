@@ -8,7 +8,7 @@ extends SceneTree
 ## CHEAT (dev only): granting currencies, filling layer life, setting clocks and pending events directly, because
 ## the real game needs hours to reach these states. Everything else is a G().* action or a UI press.
 
-const SHOTS := "/private/tmp/claude-501/-Users-aieat-Documents-git-scaling-laws/97d2c999-b83a-4275-8ea3-0344c3a96850/scratchpad/play"
+const SHOTS := "/private/tmp/claude-501/-Users-aieat-Documents-git-scaling-laws/6e642b40-dda0-4e15-923f-dec4a0dac1b1/scratchpad/play"
 const SAVE := "user://dev_playthrough_save.json"
 const MAIN := "res://src/ui/main.tscn"
 const SIZES := {"desk": Vector2i(1280, 720), "phone": Vector2i(390, 844)}
@@ -30,6 +30,7 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(SHOTS)
 	S().delete(SAVE)
 	G().save_path = SAVE
+	G().state.persist["intro_seen"] = true  # skip the first-run intro
 	await _boot()
 
 	# Phase 0: fresh save, nothing bought. Desktop and phone.
@@ -59,6 +60,7 @@ func _run() -> void:
 	await _reset(3, "05_paradigm_shift")
 	await _reset(4, "06_singularity")
 	await _shots_all("07_all_layers")
+	await _tooltip_phase()
 
 	# Phase 4: event popup. Pending event on layer 0, then the popup shows it.
 	G().state.run["layers"][0]["pending"] = _first_id("events")
@@ -293,6 +295,189 @@ func _ending(id: String) -> void:
 	node.call("_new_run")
 	await _settle()
 	_check(_ending_node() == null, "ending %s frees itself after a new legacy" % id)
+
+
+# ---------------------------------------------------------------- tooltips
+
+## Hover and long-press through real input events; tooltip shots and checks at both sizes.
+func _tooltip_phase() -> void:
+	G().running = false
+	_cheat("cash", 1e6)
+	_cheat("compute", 1e4)
+	var id := _first_id("producers")
+	for key in SIZES:
+		DisplayServer.window_set_size(SIZES[key])
+		await _settle()
+
+		await _hover(_main.get("_cash")["box"])
+		_check(_tip_showing() and _tip_text().contains("Cash"), "%s: HUD cash chip shows a tip" % key)
+		_check(_inside_view(), "%s: HUD tip inside the visible rect" % key)
+		await _shot("tip_hud_%s" % key)
+
+		_main.call("_select", "producers")
+		await _settle()
+		var row: Control = _panel("producers").get("_rows")[id]["row"]
+		await _reveal(row)
+		await _hover(row)
+		_check(_tip_showing() and _tip_title() == str(C().get_def("producers", id).title), "%s: producer row shows its tip" % key)
+		_check(_inside_view(), "%s: producer tip inside the visible rect" % key)
+		await _shot("tip_producer_%s" % key)
+
+		G().state.set_cur("compute", BigNum.from_float(137.0))
+		_main.call("_select", "training")
+		await _settle()
+		var opt: Control = _panel("training").get("_opts")[0.25]["btn"]
+		await _reveal(opt)
+		await _hover(opt)
+		_check(_text_has(_panel("training"), "Needs 400.00 compute to train on 25%"), "%s: disabled training option says what it needs" % key)
+		_check(_tip_showing() and _inside_view(), "%s: disabled training tip shows inside the view" % key)
+		await _shot("tip_training_disabled_%s" % key)
+		G().state.set_cur("compute", BigNum.from_float(1e4))
+		await create_timer(0.3).timeout  # the panel's refresh timer re-enables the option
+		await _hover(opt)
+		_check(_tip_showing() and _tip_text().contains("Minimum spend"), "%s: enabled training tip explains the run" % key)
+		await _shot("tip_training_enabled_%s" % key)
+
+		_main.call("_select", "generation")
+		await _settle()
+		var tree = _panel("generation").get("_tree")
+		var rbuy: Control = tree.get("_rows")[_first_id("research")]["buy"]
+		await _reveal(rbuy)
+		await _hover(rbuy)
+		_check(_tip_showing() and _tip_text().contains("Cost"), "%s: research node shows its tip" % key)
+		await _shot("tip_research_%s" % key)
+
+		_main.call("_select", "benchmarks")
+		await _settle()
+		var brow: Dictionary = _panel("benchmarks").get("_rows")[_first_id("benchmarks")]
+		var slot: Control = (brow["badge"] as Control).get_parent()
+		await _reveal(slot)
+		await _hover(slot)
+		_check(_tip_showing(), "%s: benchmark badge shows its tip" % key)
+		await _shot("tip_benchmark_%s" % key)
+		await _leave()
+
+	# Long-press on Buy opens the tip and releasing it buys nothing; a quick tap still buys.
+	_main.call("_select", "producers")
+	await _settle()
+	var buy: Button = _panel("producers").get("_rows")[id]["buy"]
+	await _reveal(buy)
+	var at := _center(buy)
+	var before: int = G().state.owned(id)
+	_touch(at, true)
+	await create_timer(0.6).timeout
+	await _settle()
+	_check(_tip_showing(), "long-press on Buy opens the tip")
+	_touch(at, false)
+	await _settle()
+	_check(G().state.owned(id) == before, "releasing a long-press on Buy does not buy")
+	_check(not _tip_showing(), "releasing a long-press hides the tip")
+	_touch(at, true)
+	await create_timer(0.05).timeout
+	_touch(at, false)
+	await _settle()
+	_check(G().state.owned(id) > before, "quick tap on Buy still buys")
+
+	# Reduce motion: the tip appears at full opacity at once. Motion on: it fades in.
+	await _leave()
+	G().set_setting("reduce_motion", true)
+	await _hover_until_shown(_main.get("_cash")["box"])
+	_check(_tip_alpha() == 1.0, "reduce motion: tip is opaque immediately")
+	await _leave()
+	G().set_setting("reduce_motion", false)
+	await _hover_until_shown(_main.get("_cash")["box"])
+	_check(_tip_alpha() < 1.0, "motion on: tip fades in")
+	await _leave()
+	DisplayServer.window_set_size(SIZES["desk"])
+	await _settle()
+
+
+func _panel(id: String) -> Node:
+	return _main.get("_panels")[id]
+
+
+func _tip() -> Tip:
+	for c in _main.get_children():
+		if c is Tip:
+			return c
+	return null
+
+
+func _tip_showing() -> bool:
+	var t := _tip()
+	return t != null and (t.get("_panel") as Control).visible
+
+
+func _tip_title() -> String:
+	return (_tip().get("_title") as Label).text
+
+
+func _tip_text() -> String:
+	var t := _tip()
+	return "%s\n%s" % [(t.get("_title") as Label).text, (t.get("_body") as Label).text]
+
+
+func _tip_alpha() -> float:
+	return (_tip().get("_panel") as Control).modulate.a
+
+
+## The tip's panel must sit fully inside the visible rect (canvas coordinates, same space as the panel).
+func _inside_view() -> bool:
+	var r := (_tip().get("_panel") as Control).get_global_rect()
+	return root.get_visible_rect().encloses(r)
+
+
+## Window position of a control's centre, for input events.
+func _center(c: Control) -> Vector2:
+	return root.get_final_transform() * (c.get_global_transform_with_canvas() * (c.size * 0.5))
+
+
+func _move(p: Vector2) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.position = p
+	ev.global_position = p
+	Input.parse_input_event(ev)
+
+
+func _touch(p: Vector2, pressed: bool) -> void:
+	var ev := InputEventScreenTouch.new()
+	ev.index = 0
+	ev.position = p
+	ev.pressed = pressed
+	Input.parse_input_event(ev)
+
+
+func _leave() -> void:
+	_move(Vector2(-50, -50))
+	await _settle()
+
+
+func _hover_until_shown(c: Control) -> void:
+	# Leave first so a tip still open for another control is closed and cannot satisfy the wait.
+	_move(Vector2(-50, -50))
+	await process_frame
+	await process_frame
+	_move(_center(c))
+	for i in 120:
+		if _tip_showing():
+			return
+		await process_frame
+	print("DEV DIAG: hover missed at %s, hovered=%s" % [str(_center(c)), str(root.gui_get_hovered_control())])
+
+
+func _hover(c: Control) -> void:
+	await _hover_until_shown(c)
+	await _settle()
+
+
+## Scrolls the enclosing ScrollContainer so the control is on screen before it is hovered.
+func _reveal(c: Control) -> void:
+	var n: Node = c.get_parent()
+	while n != null and not (n is ScrollContainer):
+		n = n.get_parent()
+	if n != null:
+		(n as ScrollContainer).ensure_control_visible(c)
+	await _settle()
 
 
 # ---------------------------------------------------------------- offline, save and reset

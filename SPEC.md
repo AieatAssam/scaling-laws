@@ -72,21 +72,23 @@ docs/API.md    the core API the UI codes against (written by the core agent)
 
 ## Asset manifest (final paths; sizes in px; transparent bg unless noted)
 
-- `assets/rooms/<producer_id>.png` ×12 — 96x64. Tiers 1–6 are building interiors (opaque room
+- `assets/rooms/<producer_id>.png` ×12 — 192x128. Tiers 1–6 are building interiors (opaque room
   interior, fills the frame); tiers 7–12 are exterior/space set-pieces on transparent bg.
-- `assets/shell/floor.png` 104x72 — one building-floor frame (walls/slab with transparent 96x64
-  hole in the middle); `assets/shell/roof.png` 104x16; `assets/shell/ground.png` 104x16 (opaque).
-- `assets/workers/{researcher,engineer,ops}.png` — 16x24 standing sprite.
-- `assets/icons/<id>.png` 16x16 — compute, cash, equity, insights, breakthroughs, legacy, data,
+- `assets/shell/floor.png` 208x144 — one building-floor frame (walls/slab with transparent 192x128
+  hole in the middle, 8 px border); `assets/shell/roof.png` 208x32; `assets/shell/ground.png` 208x32 (opaque).
+- `assets/workers/{researcher,engineer,ops}.png` — 32x48 standing sprite.
+- `assets/icons/<id>.png` 32x32 — compute, cash, equity, insights, breakthroughs, legacy, data,
   energy, alignment, capability, training, hiring, research, benchmarks, events, rivals,
   regulation, automation, settings, agi.
-- `assets/events/<category>.png` 96x64 — rival_launch, regulation, poaching, incident,
+- `assets/events/<category>.png` 192x128 — rival_launch, regulation, poaching, incident,
   breakthrough, media, funding, outage.
-- `assets/badges/{bronze,silver,gold,platinum,diamond,cosmic}.png` 24x24.
-- `assets/backdrops/{garage_sky,city,orbit,swarm,universe}.png` 320x180 (opaque).
-- `assets/legacy/{funding,generation,paradigm,singularity}.png` 24x24 — the prop kept after a
+- `assets/badges/{bronze,silver,gold,platinum,diamond,cosmic}.png` 48x48.
+- `assets/backdrops/{garage_sky,city,orbit,swarm,universe}.png` 640x360 (opaque).
+- `assets/legacy/{funding,generation,paradigm,singularity}.png` 48x48 — the prop kept after a
   reset of that layer (e.g. framed term sheet, old model weights drive, chalkboard, monolith).
-- `assets/endings/{aligned,rushed,open_sourced}.png` 160x90 (opaque).
+- `assets/endings/{aligned,rushed,open_sourced}.png` 320x180 (opaque).
+- `assets/intro/{01_idea,02_pizza_box,03_phone_call,04_garage_deal,05_open_for_business}.png` 320x180
+  (opaque) — the first-run intro beats, shown by `src/ui/intro.tscn` (`Intro.BEATS` lists them).
 
 Code that loads art must use these exact paths. Until the art lands, missing textures fall back to
 a flat palette-coloured rect (dev only; a test asserts every manifest file exists at the end).

@@ -29,6 +29,7 @@ func _run() -> void:
 	await get_tree().process_frame
 	DirAccess.make_dir_recursive_absolute(SHOTS)
 	Game.save_path = "user://dev_panels_save.json"   # never touch the player's save
+	Game.state.persist["intro_seen"] = true          # skip the first-run intro
 	Game.running = false
 	Game.ending_reached.connect(func(id: String) -> void: _endings_seen.append(id))
 	Game.challenge_abandoned.connect(func(_id: String) -> void: _challenges_abandoned += 1)

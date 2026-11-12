@@ -1,10 +1,35 @@
 #!/usr/bin/env python3
 """process.py <raw.png> <out.png> --size WxH [--opaque] [--preview DIR]
+                [--grid GWxGH] [--cell N] [--scale K] [--outline] [--clean]
+                [--canvas WxH] [--stretch] [--speck3] [--frame N]
 
-Turns a codex-generated pixel-art PNG (magenta #FF00FF key, fake big pixels) into a
-game-ready PNG: detects the pixel grid, samples one colour per cell, crops to the
-content, fits to WxH (aspect kept, transparent pad; --opaque = exact resize), keys
-magenta to alpha, and quantises to art/palette.hex. Run with tools/art/.venv/bin/python.
+Turns a codex-generated pixel-art PNG (magenta #FF00FF key) into a game-ready PNG.
+
+Known-grid mode (recommended): give --grid (art pixels, default = SIZE/SCALE) and/or --cell
+(raw px per art pixel). The generator was asked for an exact grid, so cells are sampled at
+the known period with an edge-aligned offset search. One palette colour per cell (mode over
+the cell interior, key pixels excluded), no resampling blur. --scale K then pixel-doubles
+(K x K blocks) the art to reach SIZE.
+
+Detection mode (no --grid/--cell): the old freehand-grid fallback: finds the model's own
+lattice, else box-samples. Use only for raws without a known grid.
+
+Clean-up (both modes): --clean removes shade specks (a cell whose 4 neighbours agree and
+are a near shade of it) for opaque sprites; --outline adds a 1 px #0B0E1A outline around
+transparent sprites (fits the art into the size minus 1 px on each side, so nothing clips).
+Output is exactly SIZE, palette colours plus full transparency only, nearest sampling only.
+Run with tools/art/.venv/bin/python.
+
+Extra steps (all nearest, all palette-only):
+  --canvas WxH  nearest-resample the raw to the canvas the prompt asked for, when they differ
+                (the model returns e.g. 1672x941 for a 1280x720 request).
+  --stretch     no lattice: map the whole raw onto exactly SIZE cells, aspect ignored. For wide
+                strips (roof/ground 208x32) that the aspect-preserving path letterboxes.
+                Cell with >= half key -> transparent, else mode of its non-key pixels.
+  --speck3      opaque only: a cell whose 3x3 window holds <= 2 of its own colour and some other
+                colour >= 5 times takes that majority colour (kills 1-cell speckle on backdrops).
+  --frame N     floor frame: transparent cells outside the N-px border are filled from the nearest
+                opaque edge cell (edges extend to the canvas), then the inner hole is forced transparent.
 """
 import argparse
 import os
@@ -17,9 +42,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PALETTE_PATH = os.path.join(HERE, "..", "..", "art", "palette.hex")
 KEY = np.array([255, 0, 255])
 KEY_TOL = 120          # RGB distance from #FF00FF that counts as background (covers pink fringe)
-EDGE_TOL = 30          # per-channel-sum change that counts as a cell edge
+FRINGE_FRAC = 0.35     # a cell is transparent if >= this fraction of it is key (drops mixed fringe cells)
+EDGE_TOL = 30          # per-channel-sum change that counts as a cell edge (detection mode)
 LATTICE_MIN_R = 0.85   # below this the edges are not a regular lattice (model drew freehand)
 EDGE_FRAC = 0.2        # fraction of rows/cols that must show an edge at a position
+LATTICE_MIN_CONTRAST = 0.03  # boundary-vs-interior palette-change rate; below this there is no lattice (room probe: 0.04)
+SPECK_DIST = 90       # RGB distance: a lone cell this close to its 4 neighbours' colour is noise
+OUTLINE = (11, 14, 26)  # palette[0], #0B0E1A
 
 
 def load_palette():
@@ -41,9 +70,12 @@ def palette_index(rgb, pal):
     return idx
 
 
-def block_mode(idx_block, pal):
+def block_mode(idx_block, pal, valid=None):
     """Most common palette colour in a block (pixel-art sampling, no blending)."""
-    counts = np.bincount(idx_block.ravel(), minlength=len(pal))
+    v = idx_block.ravel() if valid is None else idx_block[valid]
+    if v.size == 0:
+        return None
+    counts = np.bincount(v, minlength=len(pal))
     return pal[counts.argmax()]
 
 
@@ -59,6 +91,261 @@ def content_bbox(bg):
         sys.exit("no sprite content found (everything keyed as background)")
     return rows[0], rows[-1] + 1, cols[0], cols[-1] + 1
 
+
+# ---------- known-grid mode ----------
+
+def find_lattice(change, n, g, fixed_p=None):
+    """Best cell period p and start s along one axis. change[i] = palette-change fraction between
+    px i and i+1 over non-key pairs (NaN if none). Score = change rate on cell boundaries minus
+    the rate elsewhere: a flat or noisy image scores ~0. The model draws its own cell count, which
+    can differ from the requested grid g, so p is searched over plausible counts (0.7g..1.8g)."""
+    cands = [fixed_p] if fixed_p else np.arange(n / (1.8 * g), n / (0.7 * g), 0.05)
+    best = (n / g, 0.0, -np.inf)
+    for p in cands:
+        for s in np.arange(0, p, 0.5):
+            bi = np.round(s + np.arange(-1, n / p + 2) * p).astype(int) - 1
+            bi = np.unique(bi[(bi >= 0) & (bi < n - 1)])
+            if bi.size == 0 or bi.size >= n - 1:
+                continue
+            mask = np.zeros(n - 1, bool)
+            mask[bi] = True
+            on, off = np.nanmean(change[mask]), np.nanmean(change[~mask])
+            score = on - off - 1e-4 * s
+            if score > best[2]:
+                best = (p, s, score)
+    return best
+
+
+def cell_bounds(p, s, n):
+    """[start, end) pixel ranges of cells at s + k*p that overlap the image [0, n)."""
+    b = s + np.arange(-1, int(n / p) + 3) * p
+    out = []
+    for lo, hi in zip(b[:-1], b[1:]):
+        if (lo + hi) / 2 < 0 or (lo + hi) / 2 > n:
+            continue
+        out.append((max(0, int(round(lo))), min(n, int(round(hi)))))
+    return [(a, b_) for a, b_ in out if b_ > a]
+
+
+def sample_known(rgb, bg, idx, pal, gw, gh, cell):
+    """Sample the image as a regular cell lattice, then map the cell grid to exactly gh x gw by
+    cell-level mode. Returns (colours[gh,gw,3], keyed[gh,gw], info). Never resamples pixels."""
+    H, W = rgb.shape[:2]
+    vx = ~bg[:, 1:] & ~bg[:, :-1]
+    vy = ~bg[1:, :] & ~bg[:-1, :]
+    cx = np.where(vx.sum(0) > 0, ((idx[:, 1:] != idx[:, :-1]) & vx).sum(0) / np.maximum(vx.sum(0), 1), np.nan)
+    cy = np.where(vy.sum(1) > 0, ((idx[1:, :] != idx[:-1, :]) & vy).sum(1) / np.maximum(vy.sum(1), 1), np.nan)
+    px, sx, scx = find_lattice(cx, W, gw, fixed_p=cell)
+    py, sy, scy = find_lattice(cy, H, gh, fixed_p=cell)
+    if min(scx, scy) < LATTICE_MIN_CONTRAST:  # no real lattice: sample the requested grid directly
+        print(f"warning: no regular cell lattice (contrast {scx:.2f}/{scy:.2f}); box-sampling the {gw}x{gh} grid")
+        px, sx, py, sy = W / gw, 0.0, H / gh, 0.0
+    xr, yr = cell_bounds(px, sx, W), cell_bounds(py, sy, H)
+    ny, nx = len(yr), len(xr)
+    cidx = np.full((ny, nx), -1)
+    for j, (y0, y1) in enumerate(yr):
+        m_y = max(1, int((y1 - y0) * 0.15))
+        for i, (x0, x1) in enumerate(xr):
+            if bg[y0:y1, x0:x1].mean() >= FRINGE_FRAC:
+                continue
+            m_x = max(1, int((x1 - x0) * 0.15))
+            iy0, iy1, ix0, ix1 = y0 + m_y, y1 - m_y, x0 + m_x, x1 - m_x
+            if iy1 <= iy0 or ix1 <= ix0:
+                iy0, iy1, ix0, ix1 = y0, y1, x0, x1
+            inner_bg = bg[iy0:iy1, ix0:ix1]
+            inner = idx[iy0:iy1, ix0:ix1]
+            v = inner[~inner_bg]
+            if v.size:
+                cidx[j, i] = np.bincount(v, minlength=len(pal)).argmax()
+    info = f"cells {nx}x{ny} (cell {px:.2f}x{py:.2f}px, contrast {scx:.2f}/{scy:.2f})"
+    cidx = map_cells(cidx, gh, gw)
+    return pal[np.maximum(cidx, 0)], cidx < 0, info
+
+
+def map_cells(cidx, gh, gw):
+    """Cell grid (ny x nx, -1 = key) -> exactly gh x gw by mode over the cells each target covers."""
+    ny, nx = cidx.shape
+    if (ny, nx) == (gh, gw):
+        return cidx
+    print(f"note: model drew {nx}x{ny} cells, target grid {gw}x{gh}: cell-level mode mapping")
+    ye, xe = np.linspace(0, ny, gh + 1), np.linspace(0, nx, gw + 1)
+    out = np.full((gh, gw), -1)
+    for j in range(gh):
+        ya, yb = int(ye[j]), max(int(ye[j]) + 1, int(ye[j + 1]))
+        for i in range(gw):
+            xa, xb = int(xe[i]), max(int(xe[i]) + 1, int(xe[i + 1]))
+            blk = cidx[ya:yb, xa:xb].ravel()
+            if (blk < 0).mean() >= 0.5:
+                continue
+            out[j, i] = np.bincount(blk[blk >= 0]).argmax()
+    return out
+
+
+def clean_specks(cols, keyed, pal):
+    """Replace a cell by its neighbours' colour when all 4 neighbours agree and are a near shade."""
+    if cols.shape[0] < 3 or cols.shape[1] < 3:
+        return cols, 0
+    out = cols.copy()
+    n = 0
+    H, W = keyed.shape
+    for j in range(1, H - 1):
+        for i in range(1, W - 1):
+            if keyed[j, i]:
+                continue
+            nb = [(j - 1, i), (j + 1, i), (j, i - 1), (j, i + 1)]
+            if any(keyed[y, x] for y, x in nb):
+                continue
+            c0 = cols[nb[0]]
+            if all(np.array_equal(cols[y, x], c0) for y, x in nb[1:]) and \
+                    not np.array_equal(cols[j, i], c0) and \
+                    np.linalg.norm(cols[j, i] - c0) <= SPECK_DIST:
+                out[j, i] = c0
+                n += 1
+    return out, n
+
+
+def fit_known(cols, keyed, tw, th, transparent):
+    """Fit the sampled grid into exactly th x tw art pixels. Never upscales: pads or nearest-shrinks."""
+    if transparent:
+        solid = ~keyed
+        rows, colsk = np.where(solid.any(axis=1))[0], np.where(solid.any(axis=0))[0]
+        if len(rows) == 0:
+            sys.exit("no sprite content found in the cell grid")
+        cols, keyed = cols[rows[0]:rows[-1] + 1, colsk[0]:colsk[-1] + 1], keyed[rows[0]:rows[-1] + 1, colsk[0]:colsk[-1] + 1]
+    ch, cw = keyed.shape
+    if cw > tw or ch > th:
+        scale = min(tw / cw, th / ch)
+        nw, nh = max(1, int(cw * scale)), max(1, int(ch * scale))
+        print(f"warning: content {cw}x{ch} larger than {tw}x{th}; nearest-shrunk to {nw}x{nh}")
+        yi = np.minimum((np.arange(nh) + 0.5) * ch / nh, ch - 1).astype(int)
+        xi = np.minimum((np.arange(nw) + 0.5) * cw / nw, cw - 1).astype(int)
+        cols, keyed, ch, cw = cols[yi][:, xi], keyed[yi][:, xi], nh, nw
+    out_c = np.zeros((th, tw, 3))
+    out_k = np.ones((th, tw), bool)
+    ox, oy = (tw - cw) // 2, (th - ch) // 2  # centred pad
+    out_c[oy:oy + ch, ox:ox + cw] = cols
+    out_k[oy:oy + ch, ox:ox + cw] = keyed
+    return out_c, ~out_k
+
+
+def resample_canvas(img, cw, ch):
+    """Nearest resample of the raw to the requested canvas (no-op when it already matches)."""
+    if img.shape[1] == cw and img.shape[0] == ch:
+        return img
+    print(f"note: raw {img.shape[1]}x{img.shape[0]} -> canvas {cw}x{ch} (nearest)")
+    return np.asarray(Image.fromarray(img).resize((cw, ch), Image.Resampling.NEAREST))
+
+
+def stretch_grid(img, pal, a, W, H):
+    """Whole raw -> exactly H x W cells, aspect ignored, no lattice search. Returns (colours, opaque)."""
+    rgb = img[..., :3]
+    bg = np.zeros(img.shape[:2], bool) if a.opaque else key_mask(rgb)
+    if not a.opaque:  # keyed input: crop to the content first, else the margin wastes the strip
+        y0, y1, x0, x1 = content_bbox(bg)
+        rgb, bg = rgb[y0:y1, x0:x1], bg[y0:y1, x0:x1]
+        print(f"stretch: content crop x{x0}-{x1} y{y0}-{y1}")
+    idx = palette_index(rgb, pal)
+    h, w = rgb.shape[:2]
+    ys, xs = np.linspace(0, h, H + 1).astype(int), np.linspace(0, w, W + 1).astype(int)
+    cols = np.zeros((H, W, 3))
+    keyed = np.zeros((H, W), bool)
+    for j in range(H):
+        y0, y1 = ys[j], max(ys[j + 1], ys[j] + 1)
+        for i in range(W):
+            x0, x1 = xs[i], max(xs[i + 1], xs[i] + 1)
+            kb = bg[y0:y1, x0:x1]
+            keyed[j, i] = kb.mean() >= 0.5
+            v = idx[y0:y1, x0:x1][~kb]
+            if v.size:
+                cols[j, i] = pal[np.bincount(v, minlength=len(pal)).argmax()]
+    print(f"stretch: raw {w}x{h} -> {W}x{H} cells, {int(keyed.sum())} keyed")
+    if a.clean:
+        cols, n = clean_specks(cols, keyed, pal)
+        print(f"clean: {n} speck cell(s) fixed")
+    return cols, ~keyed
+
+
+def speck3(cols, opaque):
+    """3x3 majority on opaque cells (see module docstring). Same rule as the backdrop post-fix."""
+    k = (cols[..., 0].astype(np.int64) * 65536 + cols[..., 1].astype(np.int64) * 256 + cols[..., 2].astype(np.int64))
+    H, W = k.shape
+    o = k.copy()
+    n = 0
+    for y in range(H):
+        for x in range(W):
+            if not opaque[y, x]:
+                continue
+            win = k[max(0, y - 1):y + 2, max(0, x - 1):x + 2].ravel()
+            vals, cnt = np.unique(win, return_counts=True)
+            if (win == k[y, x]).sum() <= 2 and cnt.max() >= 5:
+                o[y, x] = vals[cnt.argmax()]
+                n += 1
+    out = np.stack([o // 65536, (o // 256) % 256, o % 256], -1).astype(float)
+    print(f"speck3: {n} cell(s) fixed")
+    return out, opaque
+
+
+def frame_fix(cols, opaque, border):
+    """Floor frame: extend the frame's outer edge to the canvas, then force the inner hole transparent."""
+    H, W = opaque.shape
+    ys, xs = np.where(opaque)
+    y0, y1, x0, x1 = ys.min(), ys.max(), xs.min(), xs.max()
+    yy, xx = np.mgrid[0:H, 0:W]
+    hole = (xx >= border) & (xx < W - border) & (yy >= border) & (yy < H - border)
+    fill = ~opaque & ~hole
+    cy, cx = np.clip(yy, y0, y1)[fill], np.clip(xx, x0, x1)[fill]
+    out_c, out_o = cols.copy(), opaque.copy()
+    out_c[fill] = cols[cy, cx]
+    out_o[fill] = opaque[cy, cx]
+    out_o[hole] = False
+    print(f"frame: bbox x{x0}-{x1} y{y0}-{y1}, hole {W - 2 * border}x{H - 2 * border} forced transparent")
+    return out_c, out_o
+
+
+def add_outline(cols, opaque):
+    """1 px dark outline on transparent cells that touch the sprite (4-neighbourhood)."""
+    pad = np.pad(opaque, 1)
+    touch = pad[:-2, 1:-1] | pad[2:, 1:-1] | pad[1:-1, :-2] | pad[1:-1, 2:]
+    out_c = cols.copy()
+    out_c[touch & ~opaque] = OUTLINE
+    return out_c, opaque | touch
+
+
+def known_grid(img, pal, a, W, H, scale):
+    gw, gh = (int(v) for v in a.grid.lower().split("x")) if a.grid else (W // scale, H // scale)
+    if W % scale or H % scale:
+        sys.exit("--size must be divisible by --scale")
+    rgb = img[..., :3]
+    bg = np.zeros(img.shape[:2], bool) if a.opaque else key_mask(rgb)
+    idx = palette_index(rgb, pal)
+    # cell size: --cell if given, else raw size / grid (sample_known decides)
+    cols, keyed, info = sample_known(rgb, bg, idx, pal, gw, gh, a.cell)
+    print(f"known grid {gw}x{gh}: {info}")
+    if a.clean:
+        cols, n = clean_specks(cols, keyed, pal)
+        print(f"clean: {n} speck cell(s) fixed")
+    tw, th = W // scale, H // scale
+    if a.opaque:
+        if (gw, gh) != (tw, th):
+            print(f"warning: opaque grid {gw}x{gh} != target {tw}x{th}; nearest-resampled")
+        return fit_known(cols, keyed, tw, th, transparent=False)  # (colours, opaque mask)
+    if a.outline:
+        cols_in, op_in = fit_known(cols, keyed, tw - 2, th - 2, transparent=True)
+        return add_outline(*_pad2(cols_in, op_in))
+    return fit_known(cols, keyed, tw, th, transparent=True)
+
+
+def _pad2(cols, opaque):
+    return np.pad(cols, ((1, 1), (1, 1), (0, 0))), np.pad(opaque, 1)
+
+
+def scale_up(cols, opaque, scale):
+    if scale == 1:
+        return cols, opaque
+    return np.repeat(np.repeat(cols, scale, 0), scale, 1), np.repeat(np.repeat(opaque, scale, 0), scale, 1)
+
+
+# ---------- detection mode (fallback for raws without a known grid) ----------
 
 def edge_positions(rgb, axis):
     """Pixel indices where a new cell starts, along axis (1 = x, 0 = y)."""
@@ -159,18 +446,7 @@ def resample(grid, th, tw):
     return grid[yi][:, xi]
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("raw")
-    ap.add_argument("out")
-    ap.add_argument("--size", required=True, help="WxH target, e.g. 96x64")
-    ap.add_argument("--opaque", action="store_true")
-    ap.add_argument("--preview", help="dir to write a x6 nearest preview into")
-    a = ap.parse_args()
-    W, H = (int(v) for v in a.size.lower().split("x"))
-
-    img = np.asarray(Image.open(a.raw).convert("RGB"))
-    pal = load_palette()
+def detect_grid(img, pal, a, W, H):
     bg_full = np.zeros(img.shape[:2], bool) if a.opaque else key_mask(img)
     y0, y1, x0, x1 = (0, img.shape[0], 0, img.shape[1]) if a.opaque else content_bbox(bg_full)
     rgb, bg = img[y0:y1, x0:x1], bg_full[y0:y1, x0:x1]
@@ -203,16 +479,64 @@ def main():
     else:
         out_rgb = resample(cols, H, W)
         out_a = np.ones((H, W), bool)
-
-    # quantise every opaque pixel to the nearest palette colour
     d = ((out_rgb[..., None, :] - pal[None, None, :, :]) ** 2).sum(-1)
-    q = pal[d.argmin(-1)].astype(np.uint8)
-    q[~out_a] = pal[0].astype(np.uint8)  # transparent pixels: palette colour, alpha 0
+    q = pal[d.argmin(-1)]
+    return q, out_a
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("raw")
+    ap.add_argument("out")
+    ap.add_argument("--size", required=True, help="WxH target, e.g. 192x128")
+    ap.add_argument("--opaque", action="store_true")
+    ap.add_argument("--preview", help="dir to write a x6 nearest preview into")
+    ap.add_argument("--grid", help="art pixels WxH the model drew (default SIZE/SCALE); enables known-grid mode")
+    ap.add_argument("--cell", type=float, help="raw px per art pixel (enables known-grid mode)")
+    ap.add_argument("--scale", type=int, default=1, help="integer pixel-doubling of the art after sampling")
+    ap.add_argument("--outline", action="store_true", help="1 px #0B0E1A outline (transparent sprites)")
+    ap.add_argument("--clean", action="store_true", help="remove shade specks (known-grid and stretch modes)")
+    ap.add_argument("--canvas", help="WxH the raw should be; nearest-resampled first if it differs")
+    ap.add_argument("--stretch", action="store_true", help="map the whole raw onto SIZE cells, aspect ignored (strips)")
+    ap.add_argument("--speck3", action="store_true", help="3x3 majority speck filter (opaque only, backdrops)")
+    ap.add_argument("--frame", type=int, help="floor frame: N-px border, extend edges, force the inner hole transparent")
+    a = ap.parse_args()
+    W, H = (int(v) for v in a.size.lower().split("x"))
+    if a.scale < 1 or W % a.scale or H % a.scale:
+        sys.exit("--size must be divisible by --scale")
+    if a.stretch and a.scale != 1:
+        sys.exit("--stretch does not combine with --scale")
+    if a.speck3 and not a.opaque:
+        sys.exit("--speck3 is for opaque images (--opaque)")
+
+    img = np.asarray(Image.open(a.raw).convert("RGB"))
+    if a.canvas:
+        cw, ch = (int(v) for v in a.canvas.lower().split("x"))
+        img = resample_canvas(img, cw, ch)
+    pal = load_palette()
+    if a.stretch:
+        cols, opaque = stretch_grid(img, pal, a, W, H)
+        q, out_a = cols.astype(np.uint8), opaque
+    elif a.grid or a.cell:
+        cols, opaque = known_grid(img, pal, a, W, H, a.scale)
+        if a.speck3:
+            cols, opaque = speck3(cols, opaque)
+        if a.frame:
+            cols, opaque = frame_fix(cols, opaque, a.frame)
+        cols, opaque = scale_up(cols, opaque, a.scale)
+        q, out_a = cols.astype(np.uint8), opaque
+    else:
+        if a.scale != 1:
+            sys.exit("--scale needs --grid or --cell")
+        q, out_a = detect_grid(img, pal, a, W, H)
+        q = q.astype(np.uint8)
+
     rgba = np.dstack([q, (out_a * 255).astype(np.uint8)])
+    rgba[~out_a, :3] = np.array(pal[0], np.uint8)  # transparent pixels: palette colour, alpha 0
     res = Image.fromarray(rgba, "RGBA")
 
     # self-check: exact size, only palette colours, alpha only 0 or 255
-    assert res.size == (W, H)
+    assert res.size == (W, H), f"size {res.size} != {W}x{H}"
     alpha = rgba[..., 3]
     assert set(np.unique(alpha)) <= {0, 255}
     vis = rgba[alpha == 255][:, :3]

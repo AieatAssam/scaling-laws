@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "paradigm"
+title = "Paradigm Shift"
+icon = "breakthroughs"
+order = 60
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_generation_1"}])
+hint = "Data, energy and automation."
+body = "## What it does\nA Paradigm Shift turns the cash you earned since your last shift into breakthroughs. Gain = floor(square root of (cash earned ÷ threshold)). Gain 1 needs {threshold:3} cash earned.\n## Wipes and keeps\nAlso wipes insights, research and the best training score. Keeps breakthroughs, data, energy and automation.\n## Data and energy\nAfter the shift, data builds at {DATA_RATE} a second and energy at {ENERGY_RATE} a second, up to {ENERGY_CAP} energy. Training runs use {TRAIN_ENERGY} energy and {TRAIN_DATA} data.\n## Automation\nAutomation buys producers, funds rounds, ships generations and trains models for you. Each one unlocks on the Paradigm tab."

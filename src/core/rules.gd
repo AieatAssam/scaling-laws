@@ -74,21 +74,34 @@ static func apply(s: GameState, e: Dictionary) -> void:
 
 ## Product of every multiplier for `key` (cash, compute, training).
 static func mult(s: GameState, key: String) -> float:
+	var m := 1.0
+	for p in mult_parts(s, key):
+		m *= float(p["value"])
+	return m
+
+
+## Each factor that makes up mult(s, key): {id, name, value}. Same order and inputs as mult().
+static func mult_parts(s: GameState, key: String) -> Array:
 	var L0: Dictionary = s.run["layers"][0]
-	var m: float = float(s.persist["perm_mult"].get(key, 1.0)) * float(L0["run_mult"].get(key, 1.0))
+	var out: Array = []
+	out.append({"id": "perm", "name": "Legacy perks", "value": float(s.persist["perm_mult"].get(key, 1.0))})
+	out.append({"id": "run", "name": "Run upgrades", "value": float(L0["run_mult"].get(key, 1.0))})
 	for t in L0["timed"]:
 		if t["key"] == key:
-			m *= float(t["value"])
+			out.append({"id": "timed", "name": "Timed boost", "value": float(t["value"])})
 	for r in owned_research(s):
 		for e in r.effects:
 			if e["key"] == key:
-				m *= float(e["value"])
+				out.append({"id": r.id, "name": r.title, "value": float(e["value"])})
 	for st in s.db.get_all("staff"):
 		if st.bonus_key == key:
-			m *= 1.0 + float(st.bonus_per_hire) * int(s.run["layers"][1]["staff"].get(st.id, 0))
+			var n := int(s.run["layers"][1]["staff"].get(st.id, 0))
+			out.append({"id": st.id, "name": st.title, "value": 1.0 + float(st.bonus_per_hire) * n})
 	if key == "compute":
-		m *= capability(s) * debt_factor(s) * training_bonus(s)
-	return m
+		out.append({"id": "capability", "name": "Alignment", "value": capability(s)})
+		out.append({"id": "debt", "name": "Debt", "value": debt_factor(s)})
+		out.append({"id": "training", "name": "Training score", "value": training_bonus(s)})
+	return out
 
 
 static func owned_research(s: GameState) -> Array:

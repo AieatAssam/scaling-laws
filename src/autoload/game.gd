@@ -45,7 +45,8 @@ func start() -> void:
 	if not d.is_empty():
 		state = GameState.from_dict(Content, d)
 		var away: float = Time.get_unix_time_from_system() - float(state.persist["saved_at"])
-		if away > 1.0:
+		# A player who quit mid-intro has no progress to catch up on; the intro must not sit over an offline dialog.
+		if away > 1.0 and bool(state.persist.get("intro_seen", true)):
 			var summary := Sim.offline(state, away)
 			_dispatch(summary["events"])
 			offline_progress.emit(summary)

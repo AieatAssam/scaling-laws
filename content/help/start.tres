@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "start"
+title = "Getting started"
+icon = "compute"
+order = 10
+conditions = Array[Dictionary]([])
+hint = "The loop, the tabs and your first reset."
+body = "## The loop\nProducers make compute every second. Buy them with cash, and they make more.\nEach run and each reset starts you with {START_CASH} cash, so the first producer is always affordable.\n## Your first reset\nA reset cashes in what you have built, wipes most of it and keeps a little. The Funding Round is the first one.\n## Around the screen\n- The top bar shows cash and compute. The small line under each is its rate per second.\n- Tap a tab to open it. A gold dot means something there can be done now.\n- The ? on a panel header opens this help on that panel's topic.\n- The lab keeps working while you are away. See Offline progress."

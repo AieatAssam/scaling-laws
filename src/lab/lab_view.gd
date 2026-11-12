@@ -2,6 +2,7 @@ class_name LabView
 extends Control
 ## Animated lab cutaway. Mirrors the run state and frames the camera. Everything is drawn in art pixels:
 ## unit() is the view size of one art pixel, a whole number of physical pixels, so the art stays crisp.
+## Art may be 2x its logical size (LabData.density()); then pixel_k is a multiple of 2 so each texel is whole too.
 ## Drawing lives in LabBack (backdrops), LabWorld (lab, props, workers) and LabFront (effects, fades).
 
 const COLLAPSE_SECONDS := 2.7  # the reset overlay is opaque for its first 1.2 s, so the fall starts after it
@@ -141,12 +142,17 @@ func _load_legacy() -> Array[int]:
 	return out
 
 
-## Largest whole number of physical pixels per art pixel whose physical size fits the art area s.
+## Largest whole number of physical pixels per art pixel whose physical size fits the art area s. With 2x art
+## the count is a multiple of the texel density (2), so every texel is a whole physical pixel; 1 stays allowed.
 func _k_for(s: Vector2) -> int:
 	var phys := size * px
 	if phys.x < 1.0 or phys.y < 1.0 or s.x <= 0.0 or s.y <= 0.0:
 		return 1
-	return maxi(1, floori(minf(phys.x / s.x, phys.y / s.y)))
+	var k := maxi(1, floori(minf(phys.x / s.x, phys.y / s.y)))
+	var d := LabData.density()
+	if d > 1 and k >= d:
+		k -= k % d
+	return k
 
 
 ## View pixels per art pixel (the transform the lab layers draw with).

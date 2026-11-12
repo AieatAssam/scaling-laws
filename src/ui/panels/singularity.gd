@@ -33,6 +33,7 @@ func _build() -> void:
 		PanelKit.MUTED))
 	for key in LEGACY_KEYS:
 		var c := PanelKit.card()
+		Tip.attach(c, Callable(self, "_perk_tip").bind(key))
 		lb.add_child(c)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 4)
@@ -64,6 +65,7 @@ func _build() -> void:
 	for d in Content.get_all("challenges"):
 		var id: String = d.id
 		var c := PanelKit.card()
+		Tip.attach(c, Callable(self, "_challenge_tip").bind(id))
 		cb.add_child(c)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 4)
@@ -81,6 +83,7 @@ func _build() -> void:
 	rb.add_child(PanelKit.label("Rival labs launch on the Singularity clock. Their progress only moves with events.", PanelKit.MUTED))
 	for d in Content.get_all("rivals"):
 		var c := PanelKit.card()
+		Tip.attach(c, Callable(self, "_rival_tip").bind(d.id))
 		rb.add_child(c)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 4)
@@ -95,6 +98,7 @@ func _build() -> void:
 	_stage_defs = Content.get_all("agi_stages")
 	for d in _stage_defs:
 		var c := PanelKit.card()
+		Tip.attach(c, Callable(self, "_stage_tip").bind(d.id))
 		ab.add_child(c)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 4)
@@ -115,6 +119,47 @@ func _build() -> void:
 	_new_run = action_button("Start a new legacy", false,
 		func() -> Dictionary: return Game.new_run(), "New run started. Legacy kept.")
 	eb.add_child(_new_run)
+
+
+## Legacy perk: what it multiplies, how often it has been bought, and what the next one costs.
+func _perk_tip(key: String) -> String:
+	var s: GameState = Game.state
+	var n := int(s.persist["legacy_perks"].get(key, 0))
+	var lines: Array[String] = [
+		"Legacy perk: %s" % LEGACY_KEYS[key],
+		"Multiplies %s ×%s forever. Bought %d, now ×%.2f." % [
+			key, PanelText.num(Sim.LEGACY_MULT), n, float(s.persist["perm_mult"].get(key, 1.0))],
+		"Each purchase of the same perk costs double. Next: %s legacy." % Sim.legacy_cost(s, key).format(),
+	]
+	var reason := Sim.legacy_blocker(s, key)
+	if reason != "":
+		lines.append(reason)
+	return "\n".join(lines)
+
+
+func _challenge_tip(id: String) -> String:
+	var d = _challenges[id]["def"]
+	var lines: Array[String] = [
+		d.title,
+		d.description,
+		"Goal: %s" % PanelText.conditions(d.goal),
+		"Reward: %s" % PanelText.effects(d.reward),
+		"Penalty: %s" % PanelText.effects(d.penalty),
+		"Time: %s" % PanelKit.hms(float(d.duration)),
+	]
+	return "\n".join(lines)
+
+
+func _rival_tip(id: String) -> String:
+	var d = _rivals[id]["def"]
+	return "%s\n%s\n%s" % [d.title, d.description, (_rivals[id]["status"] as Label).text]
+
+
+func _stage_tip(id: String) -> String:
+	for i in _stage_defs.size():
+		if _stage_defs[i].id == id:
+			return "%s\n%s\n%s" % [_stage_defs[i].title, _stage_defs[i].description, _stages[i].text]
+	return ""
 
 
 func is_unlocked() -> bool:

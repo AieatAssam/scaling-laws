@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "benchmarks"
+title = "Benchmarks"
+icon = "benchmarks"
+order = 90
+conditions = Array[Dictionary]([])
+hint = "Achievements that pay out for good."
+body = "## How they unlock\nEach benchmark unlocks once, when its conditions hold: compute, cash, producers owned, resets, time played and more. Once unlocked, it stays unlocked.\n## Effects\nEach benchmark gives a permanent bonus that survives every reset. Bonuses stack.\n## Badges\nA badge shows how hard a benchmark was to earn. The tiers run from bronze up to cosmic; see the icon legend."

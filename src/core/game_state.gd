@@ -27,6 +27,7 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0},
 		"lifetime_resets": [0, 0, 0, 0],
 		"settings": {"reduce_motion": false},
+		"intro_seen": false,
 		"saved_at": 0.0,
 	}
 	run = fresh_run()
@@ -107,6 +108,8 @@ static func from_dict(content_db, d: Dictionary) -> GameState:
 	s.run = d["run"]
 	if not s.persist.has("lifetime_resets"):  # saves older than the counter: this run's resets are the best guess
 		s.persist["lifetime_resets"] = s.run["resets_done"].duplicate()
+	if not s.persist.has("intro_seen"):  # saves from before the intro existed: the player has been playing, so it counts as seen
+		s.persist["intro_seen"] = true
 	s.rng.state = String(d["rng"]).to_int()
 	var layers: Array = []
 	for L in s.run["layers"]:

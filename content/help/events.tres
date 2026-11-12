@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "events"
+title = "Events"
+icon = "events"
+order = 80
+conditions = Array[Dictionary]([{"type": "time_played_gte", "value": 300.0}])
+hint = "Rivals, regulation and poaching, and how to answer them."
+body = "## When they happen\nEvery {EVENT_INTERVAL} seconds of play there is a {EVENT_CHANCE:pct} chance of an event. Events never happen while you are away.\n## Choices\nAn event opens a popup with two or more answers. Each answer has a trade-off, and the popup shows its effects before you pick.\n## Alignment matters\nNeglected alignment makes later events worse. Keep the slider up if you want the gentler versions."

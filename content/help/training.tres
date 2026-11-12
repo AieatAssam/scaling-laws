@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "training"
+title = "Training runs"
+icon = "training"
+order = 30
+conditions = Array[Dictionary]([])
+hint = "Spending compute on a model, and what the score does."
+body = "## What a run does\nA run spends a share of your compute for {TRAIN_SECONDS} seconds. Its score grows with the log of the compute spent, times your training multiplier, rolled up or down by 5%. A failed run scores nothing.\nThe chance to fail starts at {FAIL_BASE:pct} and grows with the share you spend.\nA run needs at least {MIN_TRAIN_SPEND} compute.\n## Your options now\n[training]\n## Score and bonuses\nYour best score in this generation multiplies training. Your all-time best adds a smaller bonus that survives resets.\n## Energy and data\nOnce a Paradigm Shift is done, each run also uses {TRAIN_ENERGY} energy and {TRAIN_DATA} data."

@@ -38,6 +38,7 @@ const TIER_POS := [
 
 ## Backdrop per stage (index = stage). Stage 0 is chosen by the view (garage or city).
 const BACKDROPS := ["garage_sky", "city", "orbit", "swarm", "universe"]
+const BACKDROP := Vector2(320, 180)   # logical backdrop size; the art may hold 2x texels
 ## Camera per zoom stage: centre c and the art-pixel area s that must fit on screen. Stage 0 is framed from the build.
 const FOCUS := [
 	{"c": Vector2(104, 116), "s": Vector2(120, 120)},
@@ -71,6 +72,7 @@ static var DOT_COLOR := [
 ]
 
 static var _cache := {}
+static var _density := 0       # 0 until density() first runs
 
 
 static func fade(c: Color, a: float) -> Color:
@@ -85,6 +87,28 @@ static func tex(path: String) -> Texture2D:
 
 static func room_path(i: int) -> String:
 	return "res://assets/rooms/%s.png" % IDS[i]
+
+
+## Texels per logical art pixel: the smallest density over the lab art that exists (1 for 1x files, 2 once
+## every file is 2x). Missing art does not count. Cached, since the art does not change while the lab runs.
+static func density() -> int:
+	if _density == 0:
+		var sized: Array = [[FLOOR_PNG, FLOOR], [ROOF_PNG, ROOF], [GROUND_PNG, Vector2(FLOOR.x, GROUND_H)]]
+		for i in IDS.size():
+			sized.append([room_path(i), ROOM])
+		for r in ROLES:
+			sized.append(["res://assets/workers/%s.png" % r, WORKER])
+		for k in LEGACY_LAYERS:
+			sized.append(["res://assets/legacy/%s.png" % k, Vector2(LEGACY, LEGACY)])
+		for b in BACKDROPS:
+			sized.append(["res://assets/backdrops/%s.png" % b, BACKDROP])
+		var d := 99
+		for entry in sized:
+			var t := tex(entry[0])
+			if t != null:
+				d = mini(d, maxi(1, floori(float(t.get_width()) / (entry[1] as Vector2).x)))
+		_density = 1 if d == 99 else d
+	return _density
 
 
 ## Draws an art texture at an art-space rect. Missing art falls back to a palette rect (dev only).

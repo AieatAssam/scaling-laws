@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "singularity"
+title = "Singularity"
+icon = "legacy"
+order = 70
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_paradigm_1"}])
+hint = "Legacy, rivals and the road to AGI."
+body = "## What it does\nSingularity turns the cash you earned since your last singularity into legacy. Gain = floor(square root of (cash earned ÷ threshold)). Gain 1 needs {threshold:4} cash earned. Legacy is kept for good and buys perks.\n## Wipes and keeps\nAlso wipes breakthroughs, data and energy. Keeps legacy and its perks, the AGI stage, rival progress and challenges.\n## Rivals and regulation\nRival labs launch on a schedule and push back on your lead. Regulation challenges set limits on a run. Start one from its card.\n## AGI and endings\nThe AGI road has stages. Finish it and the run ends in one of three endings: aligned, rushed or open-sourced."

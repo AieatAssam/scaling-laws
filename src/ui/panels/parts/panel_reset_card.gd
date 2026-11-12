@@ -30,6 +30,7 @@ func setup(k: int, on_result: Callable) -> PanelResetCard:
 	layer = k
 	_on_result = on_result
 	PanelKit.style_card(self)
+	Tip.attach(self, Callable(self, "_tip"))
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	add_child(v)
@@ -37,6 +38,7 @@ func setup(k: int, on_result: Callable) -> PanelResetCard:
 	head.add_theme_constant_override("separation", 6)
 	head.add_child(PanelKit.icon(LAYER_ART[k], 1.5, PanelKit.LEGACY))
 	head.add_child(PanelKit.label(PanelText.layer_title(k), PanelKit.BRIGHT))
+	head.add_child(PanelHelp.button(LAYER_ART[k]))
 	v.add_child(head)
 	_gain = PanelKit.label("", PanelKit.GOLD)
 	_holding = PanelKit.label("", PanelKit.TEXT)
@@ -73,6 +75,22 @@ func refresh() -> void:
 	_button.disabled = not allowed
 	_dialog.title = "Run %s?" % PanelText.layer_title(layer)
 	_dialog.dialog_text = "You gain +%d %s. %s" % [gain, cur, WIPES[layer]]
+
+
+## Full explanation of this reset: gain, holding, what it wipes, and why it is or isn't allowed now.
+func _tip() -> String:
+	var p: Dictionary = Sim.reset_preview(Game.state, layer)
+	var cur: String = PanelText.cur_name(str(p["currency"]))
+	var lines: Array[String] = [
+		"Run %s" % PanelText.layer_title(layer),
+		"Gain on reset: +%d %s. You hold %s." % [int(p["gain"]), cur, (p["holding"] as BigNum).format()],
+		WIPES[layer],
+	]
+	if not p["allowed"]:
+		lines.append(str(p["reason"]))
+	elif p["highlight"]:
+		lines.append("Worth it: the gain is at least double what you hold.")
+	return "\n".join(lines)
 
 
 func _do_reset() -> void:

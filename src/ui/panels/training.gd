@@ -15,6 +15,7 @@ var _log: Array[String] = []
 
 func _build() -> void:
 	var run_box := PanelKit.section(page, "Training run", "training")
+	run_box.get_child(0).add_child(PanelHelp.button("training"))
 	_status = PanelKit.label("")
 	run_box.add_child(_status)
 	_bar = PanelKit.bar(PanelKit.CYAN)
@@ -30,9 +31,16 @@ func _build() -> void:
 		var btn := PanelKit.button("", Callable(), false)
 		btn.pressed.connect(func() -> void: _start(f))
 		v.add_child(btn)
+		var blocker := PanelKit.label("", PanelKit.GOLD)
+		blocker.visible = false
+		v.add_child(blocker)
+		var bar := PanelKit.bar(PanelKit.TEAL)
+		bar.visible = false
+		v.add_child(bar)
 		var line := PanelKit.label("", PanelKit.MUTED)
 		v.add_child(line)
-		_opts[f] = {"btn": btn, "line": line}
+		Tip.attach(c, Callable(self, "_tip").bind(f))
+		_opts[f] = {"btn": btn, "line": line, "blocker": blocker, "bar": bar}
 	_energy = PanelKit.label("", PanelKit.MUTED)
 	run_box.add_child(_energy)
 
@@ -53,7 +61,48 @@ func is_unlocked() -> bool:
 
 
 func wants_attention() -> bool:
-	return Game.state.run["layers"][0]["training"].is_empty() and bool(Game.training_preview(0.25)["ok"])
+	if not Game.state.run["layers"][0]["training"].is_empty():
+		return false
+	for f in FRACS:
+		if Game.training_preview(f)["ok"]:
+			return true
+	return false
+
+
+## Why option `f` is blocked right now, or "" when it can run. Compute short, energy/data short, or a run already going.
+func _blocker(f: float, p: Dictionary) -> String:
+	var s: GameState = Game.state
+	if not (s.run["layers"][0]["training"] as Dictionary).is_empty():
+		return "Already training. Wait for this run to finish."
+	var min_c: BigNum = p["min_compute"]
+	if s.cur("compute").compare(min_c) < 0:
+		return "Needs %s compute to train on %s — you have %s." % [
+			min_c.format(), PanelKit.pct(f), s.cur("compute").format()]
+	if not p["ok"]:
+		return "Needs %d energy and %d data — you have %s energy and %s data." % [
+			int(Sim.TRAIN_ENERGY), int(Sim.TRAIN_DATA), s.cur("energy").format(), s.cur("data").format()]
+	return ""
+
+
+## Full explanation of one training option: spend, fail chance, predicted score and what a bigger run buys.
+func _tip(f: float) -> String:
+	var s: GameState = Game.state
+	var p: Dictionary = Game.training_preview(f)
+	var fac: Dictionary = p["factors"]
+	var total := float(fac["total"])
+	var lines: Array[String] = []
+	lines.append("Train on %s of compute" % PanelKit.pct(f))
+	lines.append("Spends %s of your %s compute up front, for a %ds run." % [
+		(p["spend"] as BigNum).format(), s.cur("compute").format(), int(Sim.TRAIN_SECONDS)])
+	lines.append("Score = log10(spend) × multiplier ×%.2f, rolled ±5%%. Predicted now: %.2f." % [
+		total, float(p["predicted_score"])])
+	lines.append("Fail chance %s. A failed run scores nothing and the spend is lost." % PanelKit.pct(float(p["fail_chance"])))
+	lines.append("Each doubling of spend adds %.2f to the score. Bigger runs score more but fail more often." % (log(2.0) / log(10.0) * total))
+	lines.append("Minimum spend is %d compute, so this needs %s compute." % [
+		int(Sim.MIN_TRAIN_SPEND), (p["min_compute"] as BigNum).format()])
+	if s.resets(3) > 0:
+		lines.append("Also costs %d energy and %d data." % [int(Sim.TRAIN_ENERGY), int(Sim.TRAIN_DATA)])
+	return "\n".join(lines)
 
 
 func _start(frac: float) -> void:
@@ -86,10 +135,19 @@ func _refresh() -> void:
 		var o: Dictionary = _opts[f]
 		o.btn.text = "Train on %s" % PanelKit.pct(f)
 		o.btn.disabled = not p["ok"]
+		var why := _blocker(f, p)
+		var blocker: Label = o.blocker
+		blocker.text = why
+		blocker.visible = why != ""
+		# Compute progress toward the minimum this option needs; hidden once enough is held.
+		var min_c: BigNum = p["min_compute"]
+		var cur := s.cur("compute")
+		var bar: ProgressBar = o.bar
+		bar.visible = cur.compare(min_c) < 0
+		bar.max_value = 1.0
+		bar.value = 0.0 if cur.is_zero() else clampf(pow(10.0, cur.log10() - min_c.log10()), 0.0, 1.0)
 		var text := "Spend %s · %s chance to fail · predicted score %.2f" % [
 			(p["spend"] as BigNum).format(), PanelKit.pct(float(p["fail_chance"])), float(p["predicted_score"])]
-		if not p["ok"]:
-			text += "\n" + str(p["reason"])
 		o.line.text = text
 	var fac: Dictionary = Sim.training_factors(s)
 	_factors.text = "Multiplier: data ×%.2f · architecture ×%.2f · researchers ×%.2f · total ×%.2f" % [

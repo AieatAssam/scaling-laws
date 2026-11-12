@@ -18,6 +18,7 @@ func _build() -> void:
 	var a := PanelKit.section(page, "Alignment", "alignment")
 	_slider_info = PanelKit.label("", PanelKit.TEXT)
 	a.add_child(_slider_info)
+	Tip.attach(_slider_info, Callable(self, "_slider_tip"))
 	_slider = HSlider.new()
 	_slider.min_value = 0.0
 	_slider.max_value = 1.0
@@ -55,6 +56,21 @@ func wants_attention() -> bool:
 		if Sim.research_blocker(s, d.id) == "":
 			return true
 	return false
+
+
+## Alignment: what the slider trades. Attached to the label, because pressing the slider track changes its value.
+func _slider_tip() -> String:
+	var s: GameState = Game.state
+	var sl := float(s.run["slider"])
+	if s.resets(2) == 0:
+		return "Alignment\nUnlocks after your first Model Generation.\nLow alignment buys raw capability (more compute) and adds debt."
+	var lines: Array[String] = [
+		"Alignment %s" % PanelKit.pct(sl),
+		"Compute ×%.2f from capability: lower alignment, higher multiplier." % Rules.capability(s),
+		"Debt ×%.2f on compute (debt %.1f): compute is divided by this." % [Rules.debt_factor(s), float(s.run["layers"][0]["debt"])],
+		"Below %s alignment, debt grows every tick. Above it, debt stops growing." % PanelKit.pct(Sim.SLIDER_SAFE),
+	]
+	return "\n".join(lines)
 
 
 func _on_slider(v: float) -> void:

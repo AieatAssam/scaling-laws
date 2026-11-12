@@ -18,6 +18,7 @@ func _build() -> void:
 	for d in Content.get_all("staff"):
 		var role: String = d.id
 		var c := PanelKit.card()
+		Tip.attach(c, Callable(self, "_staff_tip").bind(role))
 		box.add_child(c)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 4)
@@ -51,6 +52,24 @@ func wants_attention() -> bool:
 		if Sim.hire_blocker(s, role, 1) == "":
 			return true
 	return false
+
+
+## Staff role: what the hire does, what it costs, and what it adds right now.
+func _staff_tip(role: String) -> String:
+	var s: GameState = Game.state
+	var d = Content.get_def("staff", role)
+	var hired := int(s.run["layers"][1]["staff"].get(role, 0))
+	var lines: Array[String] = [
+		d.title,
+		d.description,
+		"Each hire adds +%s %s. Now %d hired, ×%.2f in total." % [
+			PanelKit.pct(float(d.bonus_per_hire)), d.bonus_key, hired, 1.0 + float(d.bonus_per_hire) * hired],
+		"Cost: %s equity for 1, %s for 5." % [Sim.staff_cost(s, role, 1).format(), Sim.staff_cost(s, role, 5).format()],
+	]
+	var why := Sim.hire_blocker(s, role, 1)
+	if why != "":
+		lines.append(why)
+	return "\n".join(lines)
 
 
 func _refresh() -> void:

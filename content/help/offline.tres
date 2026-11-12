@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "offline"
+title = "Offline progress"
+icon = "cash"
+order = 100
+conditions = Array[Dictionary]([])
+hint = "What the lab does while the game is closed."
+body = "## While you are away\nThe lab keeps running at {OFFLINE_EFF:pct} efficiency, for up to {OFFLINE_CAP:h}.\n## On your return\nA summary shows what was earned while you were away. Random events do not happen while you are away, so none are waiting for you."

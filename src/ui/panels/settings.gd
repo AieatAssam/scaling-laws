@@ -32,6 +32,7 @@ func _ready() -> void:
 	_motion = CheckBox.new()
 	_motion.text = "Reduce motion"
 	_motion.custom_minimum_size.y = 28
+	Tip.attach(_motion, "Reduce motion\nNo fades or pops; tooltips appear instantly. Saved with your game.")
 	_motion.toggled.connect(func(on: bool) -> void: Game.set_setting("reduce_motion", on))
 	page.add_child(_motion)
 
@@ -51,6 +52,7 @@ func _ready() -> void:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.clip_text = true
 		b.pressed.connect(Game.set_setting.bind("ui_scale", s))
+		Tip.attach(b, "UI scale %sx\nScales the whole interface. Use a larger scale on small phones." % s)
 		scale_row.add_child(b)
 		_scale_buttons[s] = b
 
@@ -58,6 +60,7 @@ func _ready() -> void:
 	save_btn.text = "Save now"
 	save_btn.custom_minimum_size = Vector2(0, 28)
 	save_btn.pressed.connect(_save_now)
+	Tip.attach(save_btn, "Save now\nWrites progress to disk immediately. The game also autosaves every 30 s.")
 	page.add_child(save_btn)
 	_result = Label.new()
 	_result.theme_type_variation = &"MicroDim"
@@ -69,19 +72,29 @@ func _ready() -> void:
 	_stats.theme_type_variation = &"MicroDim"
 	_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	page.add_child(_stats)
+	var intro_btn := PanelKit.button("Replay intro", _replay_intro, true)
+	Tip.attach(intro_btn, "Replay intro\nPlays the opening story again. The game pauses until it ends.")
+	page.add_child(intro_btn)
 
 	page.add_child(PanelKit.label("Save data", PanelKit.GOLD))
 	var io_row := VBoxContainer.new()
 	io_row.add_theme_constant_override("separation", 6)
 	page.add_child(io_row)
-	io_row.add_child(PanelKit.button("Copy save", _export, true))
-	io_row.add_child(PanelKit.button("Hard reset", _confirm_reset, true))
+	var copy_btn := PanelKit.button("Copy save", _export, true)
+	Tip.attach(copy_btn, "Copy save\nCopies your save as text to the clipboard, for backup or another device.")
+	io_row.add_child(copy_btn)
+	var reset_btn := PanelKit.button("Hard reset", _confirm_reset, true)
+	Tip.attach(reset_btn, "Hard reset\nErases all progress, legacy included. Cannot be undone.")
+	io_row.add_child(reset_btn)
 	_paste = LineEdit.new()
 	_paste.placeholder_text = "Paste save here"
 	_paste.custom_minimum_size.y = PanelKit.TOUCH_H
 	_paste.clear_button_enabled = true
+	Tip.attach(_paste, "Paste a save copied earlier, then import it.")
 	page.add_child(_paste)
-	page.add_child(PanelKit.button("Import pasted save", _import, true))
+	var import_btn := PanelKit.button("Import pasted save", _import, true)
+	Tip.attach(import_btn, "Import pasted save\nReplaces current progress with the pasted save, then reloads the game.")
+	page.add_child(import_btn)
 
 	_reset_dialog = ConfirmationDialog.new()
 	_reset_dialog.dialog_text = "Erase all progress, legacy included? This cannot be undone."
@@ -145,6 +158,13 @@ func _import() -> void:
 	Game.save_now()
 	_paste.text = ""
 	get_tree().call_deferred("reload_current_scene")
+
+
+## Asks the shell to play the intro again (main.gd play_intro). Replaying does not change the flag.
+func _replay_intro() -> void:
+	var main := get_tree().current_scene
+	if main != null and main.has_method("play_intro"):
+		main.call("play_intro")
 
 
 func _confirm_reset() -> void:

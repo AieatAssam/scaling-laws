@@ -26,6 +26,7 @@ func build(on_result: Callable) -> void:
 		for d in groups[b]:
 			var id: String = d.id
 			var c := PanelKit.card()
+			Tip.attach(c, Callable(self, "_tip").bind(id))
 			box.add_child(c)
 			var v := VBoxContainer.new()
 			v.add_theme_constant_override("separation", 4)
@@ -62,6 +63,24 @@ func refresh() -> void:
 		row.status.text = "Owned." if owned else reason
 		row.buy.text = "Owned" if owned else "Buy for %s insights" % PanelText.num(row.cost)
 		row.buy.disabled = owned or reason != ""
+
+
+## Node tooltip: what it does, what it costs, what it needs, and whether it is blocked right now.
+func _tip(id: String) -> String:
+	var s: GameState = Game.state
+	var d = Content.get_def("research", id)
+	var lines: Array[String] = [d.title, d.description]
+	lines.append("Cost %s insights. Branch: %s." % [PanelText.num(d.cost), BRANCH_NAMES.get(d.branch, "General")])
+	for e in d.effects:
+		lines.append("Multiplies %s ×%s." % [e["key"], PanelText.num(e["value"])])
+	if id in s.run["layers"][2]["research"]:
+		lines.append("Owned.")
+	else:
+		var reason: String = Sim.research_blocker(s, id)
+		if reason.begins_with("requires "):
+			reason = "Needs " + PanelText.title_of("research", reason.substr(9))
+		lines.append(reason if reason != "" else "Available now.")
+	return "\n".join(lines)
 
 
 func _buy(id: String) -> void:

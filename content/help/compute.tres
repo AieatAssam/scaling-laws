@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "compute"
+title = "Compute and Cash"
+icon = "compute"
+order = 20
+conditions = Array[Dictionary]([])
+hint = "Where cash and compute come from."
+body = "## Compute\nProducers make compute every second. The price of each one rises by ×{COST_GROWTH} for every copy you already own.\nMilestones at 25, 50, 100 and 200 owned double that producer's output.\n## Cash\nCash rises by {REVENUE} for every compute made each second, before multipliers. Compute is not used up to earn cash; the two simply run side by side.\n## Spending\nCash buys producers, staff and research. Compute is spent on training runs.\n## Multipliers\nLegacy perks, run upgrades, timed boosts, research, staff and training scores all stack on top. Hover a number in the top bar to see which ones apply right now."

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "generation"
+title = "Model Generation"
+icon = "insights"
+order = 50
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_funding_1"}])
+hint = "Models, research and the alignment slider."
+body = "## What it does\nModel Generation turns the cash you earned since your last generation into insights. Gain = floor(square root of (cash earned ÷ threshold)). Gain 1 needs {threshold:2} cash earned.\n## Wipes and keeps\nAlso wipes equity and staff. Keeps insights, research and the best training score.\n## Research\nArchitecture branches exclude each other. Picking one locks the others in its branch.\n## Alignment slider\nLower alignment buys raw capability: the less you hold back, the more compute your producers make. Below {SLIDER_SAFE:pct} alignment, debt builds up each second. Debt lowers compute, and any reset clears it."

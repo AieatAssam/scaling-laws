@@ -104,17 +104,21 @@ static func best_producer(s: GameState) -> String:
 
 # ---------------------------------------------------------------- economy
 
+## Output of producer `id` per second before the compute multiplier (milestone doublings included).
+static func producer_raw_rate(s: GameState, id: String) -> BigNum:
+	var d = s.db.get_def("producers", id)
+	var n := s.owned(id)
+	var m := 1
+	for ms in MILESTONES:
+		if n >= ms:
+			m *= 2
+	return _big(float(d.base_output) * n * m)
+
+
 static func raw_rate(s: GameState) -> BigNum:
 	var total := BigNum.new()
 	for d in producers(s):
-		var n := s.owned(d.id)
-		if n == 0:
-			continue
-		var m := 1
-		for ms in MILESTONES:
-			if n >= ms:
-				m *= 2
-		total = total.add(_big(float(d.base_output) * n * m))
+		total = total.add(producer_raw_rate(s, d.id))
 	return total
 
 
@@ -310,6 +314,8 @@ static func training_preview(s: GameState, frac: float) -> Dictionary:
 	var p := {
 		"ok": false, "reason": "", "spend": spend, "seconds": TRAIN_SECONDS,
 		"fail_chance": FAIL_BASE + FAIL_PER_FRAC * frac,
+		# Smallest compute stock at which this fraction meets MIN_TRAIN_SPEND.
+		"min_compute": _big(MIN_TRAIN_SPEND / frac) if frac > 0.0 else BigNum.new(),
 		# Expected score without the ±5% roll: log10(spend) × total training multiplier.
 		"predicted_score": 0.0 if spend.is_zero() else spend.log10() * float(factors["total"]),
 		"factors": factors,

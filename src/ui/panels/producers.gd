@@ -5,7 +5,7 @@ extends Control
 ## The x1 / x10 / MAX selector sets how many each buy button buys.
 
 const AMOUNTS := [1, 10, -1]   # -1 = max affordable
-const THUMB := Vector2(48, 32)  # 96x64 room art, downscaled 2x (nearest)
+const THUMB := Vector2(48, 32)  # logical size: room art (96x64 logical, 1x or 2x files) shown at half size (nearest)
 
 var _order: Array = []         # producer ids in tier order
 var _rows := {}                # id -> {row, thumb, name, sub, bar, next, cost, buy}
@@ -47,6 +47,7 @@ func _ready() -> void:
 		b.custom_minimum_size = Vector2(0, PanelKit.TOUCH_H)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(_set_amount.bind(a))
+		Tip.attach(b, "Buy %s per tap.\nApplies to every Buy button below. MAX buys as many as you can afford." % ("the most" if a < 0 else str(a)))
 		sel.add_child(b)
 		_amount_btns[a] = b
 	(_amount_btns[1] as Button).button_pressed = true
@@ -75,6 +76,7 @@ func _ready() -> void:
 func _row(d) -> PanelContainer:
 	var id: String = d.id
 	var card := PanelKit.card()
+	Tip.attach(card, Callable(self, "_tip").bind(id))
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 4)
 	card.add_child(v)
@@ -135,6 +137,41 @@ func _row(d) -> PanelContainer:
 	return card
 
 
+## Tooltip for a producer row: output, share of production, next milestone, cost of the next 1 / 10 / max.
+func _tip(id: String) -> String:
+	var s: GameState = Game.state
+	var d = Content.get_def("producers", id)
+	var title := PanelText.title_of("producers", id)
+	if not Sim.producer_available(s, id):
+		return "%s\nLocked. Needs %s first." % [title, PanelText.title_of("producers", _order[maxi(_order.find(id) - 1, 0)])]
+	var owned := s.owned(id)
+	var mult := Rules.mult(s, "compute")
+	var own_raw := Sim.producer_raw_rate(s, id)
+	var total_raw := Sim.raw_rate(s)
+	var share := 0.0 if own_raw.is_zero() or total_raw.is_zero() else pow(10.0, own_raw.log10() - total_raw.log10())
+	var lines: Array[String] = []
+	lines.append(title)
+	lines.append("Base %s/s per unit, ×%d owned." % [BigNum.from_float(float(d.base_output)).format(), owned])
+	lines.append("Output now %s/s (%.0f%% of raw production, total ×%.2f compute)." % [
+		own_raw.mul_f(mult).format(), share * 100.0, mult])
+	var next_ms := -1
+	var doublings := 0
+	for ms in Sim.MILESTONES:
+		if owned >= ms:
+			doublings += 1
+		elif next_ms < 0:
+			next_ms = ms
+	if next_ms > 0:
+		lines.append("Next ×2 output at %d owned (%d more). Doubles output per milestone." % [next_ms, next_ms - owned])
+	else:
+		lines.append("All milestones reached: ×%d output from them." % (1 << doublings))
+	var k := Game.max_affordable(id)
+	lines.append("Buy 1: %s · Buy 10: %s · Buy max (%d): %s" % [
+		Game.producer_cost(id, 1).format(), Game.producer_cost(id, 10).format(), k,
+		Game.producer_cost(id, maxi(k, 1)).format()])
+	return "\n".join(lines)
+
+
 func _set_amount(a: int) -> void:
 	_amount = a
 	_refresh()
@@ -183,7 +220,7 @@ func _refresh() -> void:
 				m *= 2
 			elif next_ms < 0:
 				next_ms = ms
-		var rate := BigNum.from_float(float(d.base_output) * owned * m * mult)
+		var rate := Sim.producer_raw_rate(s, id).mul_f(mult)
 		(r["name"] as Label).text = str(d.title)
 		(r["sub"] as Label).text = "×%d owned · %s/s" % [owned, rate.format()]
 		var bar := r["bar"] as ProgressBar

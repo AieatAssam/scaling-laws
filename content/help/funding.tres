@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "funding"
+title = "Funding Round"
+icon = "equity"
+order = 40
+conditions = Array[Dictionary]([{"type": "time_played_gte", "value": 1200.0}])
+hint = "Your first reset, and the staff it pays for."
+body = "## What it does\nA Funding Round turns the cash you earned since your last round into equity. Gain = floor(square root of (cash earned ÷ threshold)). Gain 1 needs {threshold:1} cash earned.\n## Wipes and keeps\nWipes cash, compute, producers and any training run. Keeps equity and everything in later layers.\n## Hiring\nEquity hires researchers, engineers and ops staff. Each hire adds to its own bonus, to training or to cash or compute. The Funding tab lists them.\n## Highlight\nThe reset is highlighted when its gain is at least 2 and at least twice what you already hold."

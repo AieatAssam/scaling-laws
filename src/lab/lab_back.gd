@@ -1,6 +1,6 @@
 class_name LabBack
 extends Control
-## Backdrop in art space, behind the lab. The 320x180 art is extended past its edges (edge rows and columns
+## Backdrop in art space, behind the lab. The 320x180 (logical) art is extended past its edges (edge rows and columns
 ## stretched for the garage and city, palette night for space), so the view never shows a bare band.
 ## Cross-fades when the backdrop changes. Clouds and stars drift; all of it is still under reduce_motion.
 
@@ -59,12 +59,15 @@ func _backdrop(bd: String, o: Vector2, a: float) -> void:
 	_extend(t, o, a, bd == "orbit")
 
 
-## Draws the art at o and fills the 3x3 surround with its edge pixels stretched outwards.
+## Draws the art at o (logical size LabData.BACKDROP, whatever its texel density) and fills the 3x3 surround
+## with its edge texels stretched outwards. Destination rects are logical; source rects are in texels.
 func _extend(t: Texture2D, o: Vector2, a: float, flat_below := false) -> void:
-	var w := float(t.get_width())
-	var h := float(t.get_height())
-	var xs := [[-BIG, o.x + BIG, 0.0, 1.0], [o.x, w, 0.0, w], [o.x + w, BIG, w - 1.0, 1.0]]
-	var ys := [[-BIG, o.y + BIG, 0.0, 1.0], [o.y, h, 0.0, h], [o.y + h, BIG, h - 1.0, 1.0]]
+	var tw := float(t.get_width())
+	var th := float(t.get_height())
+	var w := LabData.BACKDROP.x
+	var h := LabData.BACKDROP.y
+	var xs := [[-BIG, o.x + BIG, 0.0, 1.0], [o.x, w, 0.0, tw], [o.x + w, BIG, tw - 1.0, 1.0]]
+	var ys := [[-BIG, o.y + BIG, 0.0, 1.0], [o.y, h, 0.0, th], [o.y + h, BIG, th - 1.0, 1.0]]
 	for xi in 3:
 		for yi in 3:
 			if flat_below and yi == 2:

@@ -28,7 +28,8 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 6)
 	card.add_child(box)
 	_icon = TextureRect.new()
-	_icon.custom_minimum_size = Vector2(96, 64)
+	_icon.custom_minimum_size = Vector2(96, 64)   # logical size; the event art may be 2x
+	_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(_icon)

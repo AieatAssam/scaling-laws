@@ -44,8 +44,12 @@ func _row(d) -> HBoxContainer:
 	slot.custom_minimum_size = Vector2(32, 32)
 	row.add_child(slot)
 	var badge := TextureRect.new()
-	badge.texture = Fx.tex("res://assets/badges/%s.png" % d.badge, Vector2i(24, 24))
-	badge.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	badge.texture = Fx.tex("res://assets/badges/%s.png" % d.badge, Vector2i(24, 24))  # fallback at logical size
+	badge.custom_minimum_size = Vector2(24, 24)   # logical size; the badge art may be 2x
+	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	slot.add_child(badge)
 	var query := Label.new()
 	query.text = "?"
@@ -68,7 +72,17 @@ func _row(d) -> HBoxContainer:
 	reward.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(reward)
 	_rows[d.id] = {"def": d, "badge": badge, "query": query, "title": title, "desc": desc, "reward": reward}
+	Tip.attach(row, Callable(self, "_tip").bind(d.id))
 	return row
+
+
+## Earned: title, what it is and its reward. Locked: the requirements only; the reward stays hidden.
+func _tip(id: String) -> String:
+	var d = Content.get_def("benchmarks", id)
+	var got: bool = id in Game.state.persist["benchmarks"]
+	if got:
+		return "%s\n%s\nEarned. Reward: %s" % [d.title, d.description, Fx.effects_text(d.effects)]
+	return "Locked benchmark\nRequires: %s" % PanelText.conditions(d.conditions)
 
 
 func _refresh() -> void:

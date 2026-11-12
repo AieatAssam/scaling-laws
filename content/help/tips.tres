@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "tips"
+title = "Tips and mistakes"
+icon = "automation"
+order = 120
+conditions = Array[Dictionary]([])
+hint = "Common slips and quick wins."
+body = "## Tips\n- Read the gain on a reset card before you press it. It is the number that matters.\n- Start a training run, then go and do something else. The score lands when it finishes.\n- Save by hand from Settings before a big experiment.\n## Mistakes\n- Resetting at gain 1. That is rarely worth the wipe. Wait for gain 2 or more.\n- Forgetting that a training score grows with the log of compute. Ten times the compute is not ten times the score.\n- Ignoring alignment. Debt builds up and later events get worse."
