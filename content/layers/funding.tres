@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="LayerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/layer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "funding"
+title = "Funding Round"
+description = "Raise a round. Unlocks hiring."
+icon = "equity"
+index = 1
+currency = "equity"
+threshold = 100000.0
+target_hours = 0.5

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "data_centre"
+title = "Data Centre"
+description = "A leased hall full of racks."
+icon = "compute"
+order = 4
+base_cost = 10240.0
+base_output = 64.0

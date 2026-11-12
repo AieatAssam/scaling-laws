@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResearchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/research_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "dense_base"
+title = "Dense Transformer"
+description = "The classic. Predictable and expensive."
+icon = "research"
+cost = 5.0
+prereqs = PackedStringArray()
+branch = "dense"
+effects = Array[Dictionary]([{"key": "training", "value": 1.15}])

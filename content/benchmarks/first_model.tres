@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "first_model"
+title = "First Model"
+description = "A model that answers in full sentences."
+icon = "benchmarks"
+badge = "silver"
+conditions = Array[Dictionary]([{"type": "training_best_gte", "value": 2.0}, {"type": "currency_gte", "id": "compute", "value": 1000000.0}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.03}])

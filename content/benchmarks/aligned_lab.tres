@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "aligned_lab"
+title = "Aligned Lab"
+description = "Your first model and your first principles agree."
+icon = "benchmarks"
+badge = "gold"
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "first_model"}, {"type": "slider_gte", "value": 0.8}, {"type": "research_has", "id": "data_curation"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.05}])

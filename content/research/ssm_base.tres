@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResearchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/research_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "ssm_base"
+title = "State Space Model"
+description = "Linear time, long memory."
+icon = "research"
+cost = 5.0
+prereqs = PackedStringArray()
+branch = "ssm"
+effects = Array[Dictionary]([{"key": "training", "value": 1.15}])

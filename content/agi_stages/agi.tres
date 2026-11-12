@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AgiStageDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/agi_stage_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "agi"
+title = "AGI"
+description = "One step on the road to AGI."
+icon = "agi"
+order = 5
+conditions = Array[Dictionary]([{"type": "currency_gte", "id": "compute", "value": 1000000000000000019884624838656.0}])

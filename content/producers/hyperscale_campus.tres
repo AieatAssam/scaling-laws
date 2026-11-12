@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "hyperscale_campus"
+title = "Hyperscale Campus"
+description = "A town-sized compute campus."
+icon = "compute"
+order = 6
+base_cost = 655360.0
+base_output = 1024.0

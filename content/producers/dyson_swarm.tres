@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "dyson_swarm"
+title = "Dyson Swarm"
+description = "A star's output, turned into FLOPs."
+icon = "compute"
+order = 10
+base_cost = 2684354560.0
+base_output = 262144.0

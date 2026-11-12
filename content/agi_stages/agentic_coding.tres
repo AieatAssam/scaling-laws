@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AgiStageDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/agi_stage_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "agentic_coding"
+title = "Agentic Coding"
+description = "One step on the road to AGI."
+icon = "agi"
+order = 2
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "server_rack", "value": 20}])

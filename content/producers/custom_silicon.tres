@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "custom_silicon"
+title = "Custom Silicon"
+description = "Chips designed for exactly your workload."
+icon = "compute"
+order = 5
+base_cost = 81920.0
+base_output = 256.0

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "intern_laptop"
+title = "Intern Laptop"
+description = "A borrowed laptop running someone else's notebook."
+icon = "compute"
+order = 1
+base_cost = 20.0
+base_output = 1.0

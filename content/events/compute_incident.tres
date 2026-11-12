@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "compute_incident"
+title = "Compute Incident"
+description = "The rack room is on fire. Again."
+icon = "incident"
+category = "incident"
+weight = 1.0
+cooldown = 900.0
+conditions = Array[Dictionary]([{"type": "debt_gte", "value": 5.0}, {"type": "owned_gte", "id": "intern_laptop", "value": 1}])
+choices = Array[Dictionary]([{"label": "Pause and audit", "effects": Array[Dictionary]([{"type": "add_debt", "value": -3.0}, {"type": "add_slider", "value": 0.05}])}, {"label": "Ship anyway", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 10000.0}, {"type": "add_debt", "value": 4.0}])}])

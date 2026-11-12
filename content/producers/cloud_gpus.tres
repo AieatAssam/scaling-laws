@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "cloud_gpus"
+title = "Cloud GPUs"
+description = "Rented accelerators by the hour."
+icon = "compute"
+order = 2
+base_cost = 160.0
+base_output = 4.0

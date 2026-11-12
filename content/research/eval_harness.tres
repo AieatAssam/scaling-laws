@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResearchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/research_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "eval_harness"
+title = "Eval Harness"
+description = "Measure what you train on."
+icon = "research"
+cost = 6.0
+prereqs = PackedStringArray("data_curation")
+branch = ""
+effects = Array[Dictionary]([{"key": "training", "value": 1.15}])

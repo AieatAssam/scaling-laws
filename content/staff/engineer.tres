@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StaffDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/staff_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "engineer"
+title = "Engineer"
+description = "Squeezes more compute from every rack."
+icon = "hiring"
+base_cost = 5.0
+cost_growth = 1.5
+bonus_key = "compute"
+bonus_per_hire = 0.1

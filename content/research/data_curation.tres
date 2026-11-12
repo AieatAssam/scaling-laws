@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResearchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/research_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "data_curation"
+title = "Data Curation"
+description = "Cleaner pretraining mix."
+icon = "research"
+cost = 2.0
+prereqs = PackedStringArray()
+branch = ""
+effects = Array[Dictionary]([{"key": "training", "value": 1.1}])

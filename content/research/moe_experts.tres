@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResearchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/research_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "moe_experts"
+title = "Expert Pool"
+description = "Rent more specialists."
+icon = "research"
+cost = 15.0
+prereqs = PackedStringArray("moe_base")
+branch = "moe"
+effects = Array[Dictionary]([{"key": "cash", "value": 1.2}])

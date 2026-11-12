@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rival_launch_aurora"
+title = "Aurora Launches"
+description = "Aurora Labs ships a model that embarrasses your last one."
+icon = "rival_launch"
+category = "rival_launch"
+weight = 3.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "rival_aurora_launched"}])
+choices = Array[Dictionary]([{"label": "Race them", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 1.2, "seconds": 1200.0}, {"type": "add_debt", "value": 5.0}])}, {"label": "Open-source our weights", "effects": Array[Dictionary]([{"type": "add_flag", "id": "open_sourced"}, {"type": "rival_progress", "id": "aurora", "value": -0.2}, {"type": "add_slider", "value": 0.1}])}])

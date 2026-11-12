@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="LayerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/layer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "paradigm"
+title = "Paradigm Shift"
+description = "Change the field. Unlocks data, energy and automation."
+icon = "breakthroughs"
+index = 3
+currency = "breakthroughs"
+threshold = 30000000000.0
+target_hours = 36.0

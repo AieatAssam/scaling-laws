@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="EndingDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/ending_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "open_sourced"
+title = "Open-sourced"
+description = "The weights are public. Everyone gets a turn."
+icon = "open_sourced"
+order = 2
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "open_sourced"}])

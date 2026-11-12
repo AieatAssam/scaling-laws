@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "server_rack"
+title = "Server Rack"
+description = "Your first real hardware, humming in the garage."
+icon = "compute"
+order = 3
+base_cost = 1280.0
+base_output = 16.0

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResearchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/research_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "ssm_state"
+title = "Wide State"
+description = "Remember more per step."
+icon = "research"
+cost = 10.0
+prereqs = PackedStringArray("ssm_base")
+branch = "ssm"
+effects = Array[Dictionary]([{"key": "compute", "value": 1.2}])

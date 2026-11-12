@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ChallengeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/challenge_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "eu_ai_audit"
+title = "EU AI Audit"
+description = "A regulator wants answers."
+icon = "regulation"
+duration = 3600.0
+goal = Array[Dictionary]([{"type": "slider_gte", "value": 0.6}])
+reward = Array[Dictionary]([{"type": "perm_mult", "key": "cash", "value": 1.05}])
+penalty = Array[Dictionary]([{"type": "add_debt", "value": 20.0}])

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ResearchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/research_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "ssm_scale"
+title = "Recurrent Scaling"
+description = "Scale without quadratic pain."
+icon = "research"
+cost = 40.0
+prereqs = PackedStringArray("ssm_long")
+branch = "ssm"
+effects = Array[Dictionary]([{"key": "compute", "value": 1.4}])

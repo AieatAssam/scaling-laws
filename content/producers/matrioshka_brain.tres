@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "matrioshka_brain"
+title = "Matrioshka Brain"
+description = "Nested shells of thinking matter."
+icon = "compute"
+order = 11
+base_cost = 21474836480.0
+base_output = 1048576.0

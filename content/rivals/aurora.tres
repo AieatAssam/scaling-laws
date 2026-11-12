@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="RivalDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/rival_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "aurora"
+title = "Aurora Labs"
+description = "A rival lab racing for AGI."
+icon = "rivals"
+launch_hours = 6.0

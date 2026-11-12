@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "universe_simulator"
+title = "Universe Simulator"
+description = "Every atom computing."
+icon = "compute"
+order = 12
+base_cost = 171798691840.0
+base_output = 4194304.0

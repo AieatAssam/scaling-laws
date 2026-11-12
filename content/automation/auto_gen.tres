@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AutomationDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/automation_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "auto_gen"
+title = "Auto-generate"
+description = "Ships the next Model Generation when it is highlighted."
+icon = "automation"
+order = 4
+cost = 10.0

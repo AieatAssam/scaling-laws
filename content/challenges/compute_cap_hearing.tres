@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ChallengeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/challenge_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "compute_cap_hearing"
+title = "Compute Cap Hearing"
+description = "A regulator wants answers."
+icon = "regulation"
+duration = 5400.0
+goal = Array[Dictionary]([{"type": "currency_gte", "id": "energy", "value": 50.0}])
+reward = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.05}])
+penalty = Array[Dictionary]([{"type": "add_debt", "value": 10.0}])

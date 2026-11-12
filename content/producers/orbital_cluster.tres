@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ProducerDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/producer_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "orbital_cluster"
+title = "Orbital Cluster"
+description = "Compute in low orbit, cooled by vacuum."
+icon = "compute"
+order = 8
+base_cost = 41943040.0
+base_output = 16384.0
