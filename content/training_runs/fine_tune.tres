@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrainingRunDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/training_run_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "fine_tune"
+title = "Fine-tune"
+description = "Safe and cheap: a small step on a finished checkpoint. Few ways to diverge, small score."
+icon = "training"
+order = 1
+spend_share = 0.25
+seconds = 30.0
+fail_chance = 0.05
+score_mult = 0.85

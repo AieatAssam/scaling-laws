@@ -1,7 +1,11 @@
 class_name PrestigeOverlay
 extends Control
-## Full-screen transition when a layer resets: layer colour, layer name, gain. Click-through.
-## Under reduce_motion it cuts in and out without fading.
+## Full-screen transition when a layer resets: layer colour, layer name, gain. Blocks input while it plays (about 1.5 s)
+## and queues behind any dialog already open (`gate`). Under reduce_motion it cuts in and out without fading.
+
+signal closed
+
+var gate: Callable   # shell: runs an open Callable now or after the dialog in front closes
 
 var _bg: ColorRect
 var _title: Label
@@ -33,10 +37,15 @@ func _ready() -> void:
 	_gain.theme_type_variation = &"Value"
 	_gain.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_gain)
-	Game.layer_reset.connect(play)
+	Game.layer_reset.connect(func(layer: int, gain) -> void:
+		if gate.is_valid():
+			gate.call(play.bind(layer, gain))
+		else:
+			play(layer, gain))
 
 
-func play(layer: int, gain) -> void:
+## Returns false never; the transition always opens. It emits `closed` when it has faded out.
+func play(layer: int, gain) -> bool:
 	var def = Fx.layer_def(layer)
 	_bg.color = Fx.col(Fx.LAYER_COLORS[clampi(layer, 0, 4)])
 	_title.text = "%s reset" % (def.title if def else "Layer %d" % layer)
@@ -44,6 +53,7 @@ func play(layer: int, gain) -> void:
 	if _tween:
 		_tween.kill()
 	visible = true
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	var calm := Fx.reduce_motion()
 	_tween = create_tween()
 	if calm:
@@ -54,4 +64,11 @@ func play(layer: int, gain) -> void:
 	_tween.tween_interval(1.0)
 	if not calm:
 		_tween.tween_property(self, "modulate:a", 0.0, 0.3)
-	_tween.tween_callback(hide)
+	_tween.tween_callback(_finish)
+	return true
+
+
+func _finish() -> void:
+	hide()
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	closed.emit()

@@ -8,7 +8,8 @@ extends SceneTree
 ## CHEAT (dev only): granting currencies, filling layer life, setting clocks and pending events directly, because
 ## the real game needs hours to reach these states. Everything else is a G().* action or a UI press.
 
-const SHOTS := "/private/tmp/claude-501/-Users-aieat-Documents-git-scaling-laws/6e642b40-dda0-4e15-923f-dec4a0dac1b1/scratchpad/play"
+# Screenshots go to $SL_SHOTS if set, else a dev_shots folder in the OS temp dir.
+var SHOTS := (OS.get_environment("SL_SHOTS") if OS.get_environment("SL_SHOTS") != "" else OS.get_temp_dir().path_join("scaling-laws-dev-shots")).path_join("play")
 const SAVE := "user://dev_playthrough_save.json"
 const MAIN := "res://src/ui/main.tscn"
 const SIZES := {"desk": Vector2i(1280, 720), "phone": Vector2i(390, 844)}
@@ -131,6 +132,9 @@ func _run() -> void:
 	await _boot()
 	_check(_ending_node() != null, "startup shows a finished run")
 	await _shot("11_ending_startup_phone")
+	_ending_node().call("_close")  # "Back to the lab": the queue frees and play carries on
+	await _settle()
+	_check(_ending_node() == null and not bool(_main.get("_modal_busy")), "back to the lab frees the ending and the queue")
 
 	await _shots_all("12_final")
 
@@ -208,8 +212,18 @@ func _reset(layer: int, shot_name: String) -> void:
 	await _shots_all(shot_name)
 
 
+## Waits for the shell's modal queue to empty (a transition or card in front of the panels), so tab shots show the panels.
+func _wait_modals() -> void:
+	for i in 600:
+		if not bool(_main.get("_modal_busy")):
+			return
+		await process_frame
+	_check(false, "modal queue drains before a screenshot")
+
+
 func _shots_all(name: String) -> void:
 	await create_timer(0.3).timeout  # HUD rates refresh on a 0.25s real-time tick
+	await _wait_modals()
 	for key in SIZES:
 		DisplayServer.window_set_size(SIZES[key])
 		await _settle()
@@ -326,10 +340,10 @@ func _tooltip_phase() -> void:
 		G().state.set_cur("compute", BigNum.from_float(137.0))
 		_main.call("_select", "training")
 		await _settle()
-		var opt: Control = _panel("training").get("_opts")[0.25]["btn"]
+		var opt: Control = _panel("training").get("_cards")["fine_tune"]["btn"]
 		await _reveal(opt)
 		await _hover(opt)
-		_check(_text_has(_panel("training"), "Needs 400.00 compute to train on 25%"), "%s: disabled training option says what it needs" % key)
+		_check(_text_has(_panel("training"), "Needs 400.00 compute for Fine-tune"), "%s: disabled training option says what it needs" % key)
 		_check(_tip_showing() and _inside_view(), "%s: disabled training tip shows inside the view" % key)
 		await _shot("tip_training_disabled_%s" % key)
 		G().state.set_cur("compute", BigNum.from_float(1e4))
@@ -528,6 +542,15 @@ func _hard_reset_check() -> void:
 	await _reloaded()
 	_check(G().state.cur("compute").is_zero() and G().state.resets(1) == 0, "hard reset clears progress")
 	_check(G().state.persist["stats"]["runs"] == 1, "hard reset starts a fresh save")
+	# A fresh save replays the intro over the shell. Nothing ticks behind it; Skip ends it and marks it seen.
+	var intro = _main.get("_intro")
+	_check(intro != null and not G().running, "hard reset replays the intro with the sim paused")
+	await _shot("14_intro_open")
+	intro.call("_finish")
+	await create_timer(1.5).timeout
+	await _settle()
+	_check(_main.get("_intro") == null and G().state.persist["intro_seen"], "skipping the intro marks it seen")
+	_check(_main.get("_modal_busy") == false, "modal queue is free after the intro")
 
 
 ## Save data without the wall-clock field, so two snapshots can be compared.

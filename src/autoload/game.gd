@@ -6,7 +6,7 @@ extends Node
 signal started
 signal offline_progress(summary: Dictionary)
 signal producer_bought(id: String, count: int)
-signal training_started(frac: float)
+signal training_started(run_type: String)
 signal training_finished(result: Dictionary)
 signal staff_hired(role: String, count: int)
 signal research_bought(id: String)
@@ -44,6 +44,7 @@ func start() -> void:
 	var d := SaveSystem.load_data(save_path)
 	if not d.is_empty():
 		state = GameState.from_dict(Content, d)
+		Sim.drop_stale_pending(state)
 		var away: float = Time.get_unix_time_from_system() - float(state.persist["saved_at"])
 		# A player who quit mid-intro has no progress to catch up on; the intro must not sit over an offline dialog.
 		if away > 1.0 and bool(state.persist.get("intro_seen", true)):
@@ -110,8 +111,8 @@ func reset_preview(layer: int) -> Dictionary:
 	return Sim.reset_preview(state, layer)
 
 
-func training_preview(frac: float) -> Dictionary:
-	return Sim.training_preview(state, frac)
+func training_preview(run_type: String) -> Dictionary:
+	return Sim.training_preview(state, run_type)
 
 
 func staff_cost(role: String, count: int = 1) -> BigNum:
@@ -127,10 +128,10 @@ func buy_producer(id: String, count: int = 1) -> Dictionary:
 	return r
 
 
-func start_training(frac: float) -> Dictionary:
-	var r := Sim.start_training(state, frac)
+func start_training(run_type: String) -> Dictionary:
+	var r := Sim.start_training(state, run_type)
 	if r["ok"]:
-		training_started.emit(frac)
+		training_started.emit(run_type)
 	return r
 
 
@@ -216,7 +217,7 @@ func _dispatch(evs: Array) -> void:
 			"training_done":
 				training_finished.emit(e)
 			"auto_train":
-				training_started.emit(0.25)  # Sim._automate starts training at frac 0.25
+				training_started.emit(Sim.AUTO_TRAIN_RUN)
 			"reset":
 				layer_reset.emit(e["layer"], e["gain"])
 			"challenge_done":

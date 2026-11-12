@@ -41,13 +41,14 @@ func _row(d) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	var slot := PanelContainer.new()
-	slot.custom_minimum_size = Vector2(32, 32)
+	slot.custom_minimum_size = Vector2(56, 56)
 	row.add_child(slot)
 	var badge := TextureRect.new()
-	badge.texture = Fx.tex("res://assets/badges/%s.png" % d.badge, Vector2i(24, 24))  # fallback at logical size
-	badge.custom_minimum_size = Vector2(24, 24)   # logical size; the badge art may be 2x
+	badge.texture = Fx.tex("res://assets/badges/%s.png" % d.badge, Vector2i(48, 48))  # fallback at logical size
+	badge.custom_minimum_size = Vector2(48, 48)   # badge art is 48x48 (2x of a 24 logical icon) shown 1:1
 	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	slot.add_child(badge)

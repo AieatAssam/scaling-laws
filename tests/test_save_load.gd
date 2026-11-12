@@ -35,7 +35,7 @@ func _played_state() -> GameState:
 		Sim.buy_producer(s, list[1].id, 2)
 		Sim.tick(s, 45.0)
 	s.add_cur("compute", BigNum.from_float(5e4))
-	Sim.start_training(s, 0.5)
+	Sim.start_training(s, "standard")
 	for i in 40:
 		for e in Sim.tick(s, 7.0):
 			if e["kind"] == "event":

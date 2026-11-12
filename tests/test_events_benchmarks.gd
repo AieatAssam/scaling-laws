@@ -111,6 +111,8 @@ func test_events_are_only_offered_when_eligible() -> void:
 		var s := _fresh(seed_value)
 		for d in content.get_all("events"):
 			Support.satisfy(s, d.conditions)  # every event is eligible; the pool decides which one comes up
+		s.run["layers"][0]["clock"] = Sim.EVENT_MIN_SECONDS  # past the run-start gate
+		Support.set_owned(s, Sim.producers(s)[0].id, Sim.EVENT_MIN_PRODUCERS)
 		s.run["layers"][0]["event_timer"] = 0.0
 		for e in Sim.tick(s, 0.0):
 			if e["kind"] != "event":

@@ -50,6 +50,10 @@ var _saved_t := 0.0
 var _rate_tick := 0.0
 var _ending_shown := false
 var _intro: Control
+var _intro_requested := false
+## Modal dialogs (offline card, event, prestige transition, ending, intro) take turns: one open, the rest wait here.
+var _modal_queue: Array[Callable] = []
+var _modal_busy := false
 
 
 func _ready() -> void:
@@ -59,9 +63,11 @@ func _ready() -> void:
 	_build_shell()
 	_build_panels()
 	# Overlays connect to Game signals in their _ready, so they must exist before Game.start().
-	add_child(Notices.new())
-	add_child(EventPopup.new())
-	add_child(PrestigeOverlay.new())
+	# Modal ones share one queue (see _request_modal): each gets the gate and reports `closed` back to it.
+	for overlay in [Notices.new(), EventPopup.new(), PrestigeOverlay.new()]:
+		overlay.gate = _request_modal
+		overlay.closed.connect(_on_modal_closed)
+		add_child(overlay)
 	add_child(Tip.new())
 	Game.saved.connect(_on_saved)
 	Game.settings_changed.connect(_on_settings_changed)
@@ -72,6 +78,9 @@ func _ready() -> void:
 	_refresh_tabs()
 	_select(_first_unlocked())
 	_on_resized()
+	# Queue order matters: the intro goes first, so a saved event or ending waits behind it.
+	if not bool(Game.state.persist.get("intro_seen", true)):
+		play_intro()
 	for c in get_children():
 		if c is EventPopup:
 			c.check_pending()
@@ -79,8 +88,6 @@ func _ready() -> void:
 	var over := String(Game.state.run["run_over"])
 	if over != "":
 		_on_ending(over)
-	if not bool(Game.state.persist.get("intro_seen", true)):
-		play_intro()
 
 
 func _build_shell() -> void:
@@ -185,7 +192,7 @@ func _build_panels() -> void:
 		b.button_group = _tab_group
 		b.icon = Fx.tex_fit("res://assets/icons/%s.png" % PANEL_ICONS[id], Vector2i(32, 32))
 		b.add_theme_font_size_override("font_size", 8)
-		b.custom_minimum_size = Vector2(40, 40)
+		b.custom_minimum_size = Vector2(0, 40)  # width comes from the theme: nine icon tabs must fit 360 px
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.clip_text = true
 		Tip.attach(b, Callable(self, "_tab_tip").bind(id))
@@ -348,22 +355,34 @@ func _on_ending(id: String) -> void:
 	if _ending_shown or not ResourceLoader.exists(ENDING_SCENE):
 		return
 	_ending_shown = true
+	_request_modal(_open_ending.bind(id))
+
+
+func _open_ending(id: String) -> bool:
 	var scene: Node = load(ENDING_SCENE).instantiate()
 	add_child(scene)
+	scene.closed.connect(_on_modal_closed)
 	scene.tree_exited.connect(func() -> void: _ending_shown = false)
 	scene.call("show_ending", id)
+	return true
 
 
 ## Plays the intro over the shell and pauses the simulation until it ends. Called on first launch and by Settings.
 func play_intro() -> void:
-	if _intro != null or not ResourceLoader.exists(INTRO_SCENE):
+	if _intro_requested or not ResourceLoader.exists(INTRO_SCENE):
 		return
+	_intro_requested = true
+	_request_modal(_open_intro)
+
+
+func _open_intro() -> bool:
 	var was_running := Game.running
 	Game.running = false
 	_intro = load(INTRO_SCENE).instantiate()
 	add_child(_intro)
 	_intro.finished.connect(_on_intro_done.bind(was_running))
 	_intro.tree_exited.connect(func() -> void: _intro = null)
+	return true
 
 
 ## The story ended or was skipped: remember it (saved, so it never replays) and resume the simulation.
@@ -371,3 +390,27 @@ func _on_intro_done(was_running: bool) -> void:
 	Game.state.persist["intro_seen"] = true
 	Game.save_now()
 	Game.running = was_running
+	_intro_requested = false
+	_on_modal_closed()
+
+
+## Modal dialogs take turns. `open` shows its dialog and returns true, or returns false to skip it. Each dialog
+## emits `closed` when dismissed, which runs the next queued one. Focus is released so a panel button under the
+## dialog cannot be activated from the keyboard.
+func _request_modal(open: Callable) -> void:
+	_modal_queue.append(open)
+	_pump_modals()
+
+
+func _pump_modals() -> void:
+	while not _modal_busy and not _modal_queue.is_empty():
+		var open: Callable = _modal_queue.pop_front()
+		get_viewport().gui_release_focus()
+		_modal_busy = true
+		if not open.call():
+			_modal_busy = false
+
+
+func _on_modal_closed() -> void:
+	_modal_busy = false
+	_pump_modals()

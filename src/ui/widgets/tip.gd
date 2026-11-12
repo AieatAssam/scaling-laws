@@ -37,6 +37,7 @@ var _fade: Tween
 ## Registers a tip. Labels and containers default to MOUSE_FILTER_IGNORE, so they are switched to PASS to receive hover.
 static func attach(ctrl: Control, source: Variant) -> void:
 	ctrl.set_meta("tip", source)
+	ctrl.add_to_group(&"tip_owners")
 	if ctrl.mouse_filter == Control.MOUSE_FILTER_IGNORE:
 		ctrl.mouse_filter = Control.MOUSE_FILTER_PASS
 	ctrl.tooltip_text = ""
@@ -101,13 +102,14 @@ func _process(delta: float) -> void:
 		_press_t += delta
 		if _press_t >= LONG_PRESS:
 			_press_armed = false
-			var hovered := get_viewport().gui_get_hovered_control()
-			var target := _owner_of(hovered)
+			# By where the finger is: a touch does not reliably move the hover state.
+			# A held finger is a hold, not a click: a button under it drops its press so the release does not fire it.
+			var btn := _button_at(_press_at)
+			if btn != null:
+				btn.notification(Control.NOTIFICATION_MOUSE_EXIT)
+				_swallow_until = Time.get_ticks_msec() + 500
+			var target := _owner_at(_press_at)
 			if target != null:
-				# A held finger is a hold, not a click: the button drops its press so the release does not fire it.
-				if hovered is BaseButton:
-					hovered.notification(Control.NOTIFICATION_MOUSE_EXIT)
-					_swallow_until = Time.get_ticks_msec() + 500
 				_show(target, true)
 	# Mouse hover, ignored while a finger is down or just lifted (touch emulates the mouse).
 	var hover_ok := not _touch_down and Time.get_ticks_msec() - _last_touch > TOUCH_GRACE_MS
@@ -128,6 +130,27 @@ func _process(delta: float) -> void:
 			_refresh_t = 0.0
 			_fill()
 		_place()
+
+
+## The innermost visible tip owner whose rect holds the viewport position `pos`.
+func _owner_at(pos: Vector2) -> Control:
+	return _innermost_at(get_tree().get_nodes_in_group(&"tip_owners"), pos)
+
+
+## The innermost visible button whose rect holds `pos`.
+func _button_at(pos: Vector2) -> BaseButton:
+	return _innermost_at(get_tree().root.find_children("*", "BaseButton", true, false), pos) as BaseButton
+
+
+static func _innermost_at(nodes: Array, pos: Vector2) -> Control:
+	var best: Control = null
+	for n in nodes:
+		var c := n as Control
+		if c == null or not c.is_visible_in_tree() or not c.get_global_rect().has_point(pos):
+			continue
+		if best == null or c.get_global_rect().get_area() < best.get_global_rect().get_area():
+			best = c
+	return best
 
 
 ## Innermost ancestor-or-self of `c` that has a tip.

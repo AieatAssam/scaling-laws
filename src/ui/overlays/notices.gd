@@ -1,6 +1,11 @@
 class_name Notices
 extends Control
 ## "While you were away" card (blocks input until OK) and the benchmark toast (click-through).
+## The card is a modal: it opens through `gate` (the shell's modal queue) and emits `closed` on OK.
+
+signal closed
+
+var gate: Callable   # shell: runs an open Callable now or after the dialog in front closes
 
 var _shade: ColorRect
 var _card: PanelContainer
@@ -29,7 +34,8 @@ func _ready() -> void:
 	row.add_theme_constant_override("separation", 6)
 	_toast.add_child(row)
 	_toast_icon = TextureRect.new()
-	_toast_icon.custom_minimum_size = Vector2(24, 24)   # logical size; the badge art may be 2x
+	_toast_icon.custom_minimum_size = Vector2(48, 48)   # badge art is 48x48, shown 1:1
+	_toast_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_toast_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_toast_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_toast_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -67,11 +73,18 @@ func _ready() -> void:
 	ok.pressed.connect(_close)
 	box.add_child(ok)
 
-	Game.offline_progress.connect(show_offline)
+	Game.offline_progress.connect(func(s: Dictionary) -> void: _request(show_offline.bind(s)))
 	Game.benchmark_unlocked.connect(show_benchmark)
 
 
-func show_offline(s: Dictionary) -> void:
+func _request(open: Callable) -> void:
+	if gate.is_valid():
+		gate.call(open)
+	else:
+		open.call()
+
+
+func show_offline(s: Dictionary) -> bool:
 	# Real time away (the sim only credits up to the cap); saved_at is the last write, before this session.
 	var secs := maxf(0.0, Time.get_unix_time_from_system() - float(Game.state.persist.get("saved_at", 0.0)))
 	var h := int(secs) / 3600
@@ -82,16 +95,27 @@ func show_offline(s: Dictionary) -> void:
 		lines.append("Offline progress is capped at 24h.")
 	lines.append("Cash +%s" % (s["cash"] as BigNum).format())
 	lines.append("Compute +%s" % (s["compute"] as BigNum).format())
-	lines.append("Events while away: %d" % (s["events"] as Array).size())
+	lines.append("(earned at 50% efficiency)")
+	# What happened while away, counted by kind (these are sim happenings, not only random events).
+	var names := {"reset": "resets", "training_done": "training runs", "benchmark": "benchmarks", "rival_launched": "rival launches",
+		"challenge_done": "challenges", "agi_advanced": "AGI stages"}
+	var counts := {}
+	for e in s["events"] as Array:
+		var k := str((e as Dictionary).get("kind", ""))
+		if names.has(k):
+			counts[k] = int(counts.get(k, 0)) + 1
+	for k in counts:
+		lines.append("%s: %d" % [str(names[k]).capitalize(), counts[k]])
 	_offline.text = "\n".join(lines)
 	_shade.visible = true
 	_card.visible = true
 	_shade.mouse_filter = Control.MOUSE_FILTER_STOP
+	return true
 
 
 func show_benchmark(id: String, badge: String) -> void:
 	var d = Content.get_def("benchmarks", id)
-	_toast_icon.texture = Fx.tex("res://assets/badges/%s.png" % badge, Vector2i(24, 24))  # fallback at logical size
+	_toast_icon.texture = Fx.tex("res://assets/badges/%s.png" % badge, Vector2i(48, 48))  # fallback at logical size
 	_toast_title.text = "Benchmark: %s" % (d.title if d else id)
 	_toast.visible = true
 	_toast_t = 3.0
@@ -109,3 +133,4 @@ func _close() -> void:
 	_card.visible = false
 	_shade.visible = false
 	_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	closed.emit()

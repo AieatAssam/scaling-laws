@@ -1,7 +1,7 @@
 extends Control
 ## First-run intro: five illustrated beats with typed captions, shown over the shell. Pointer-first: a tap or click
-## finishes the typing, then the next tap advances. Skip, Enter, Space or Esc ends it. Emits `finished` once, when the
-## story ends or is skipped (main.gd sets persist.intro_seen and resumes the simulation), then fades out and frees itself.
+## finishes the typing, then the next tap advances. Skip, Enter, Space or Esc ends it. When the story ends or is skipped
+## it fades out, emits `finished` once and frees itself (main.gd sets persist.intro_seen and resumes the simulation).
 ## reduce_motion: no pan, zoom, twinkle, typing or fades; each beat is a cut.
 
 signal finished
@@ -129,6 +129,10 @@ func _ready() -> void:
 	_cursor.size = Vector2(8, 8)
 	_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_cursor)
+	# Only Skip takes the pointer. Containers default to STOP and would swallow taps on the art before _gui_input sees them.
+	for c in find_children("*", "Control", true, false):
+		if not c is Button:
+			(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_show(0)
 
 
@@ -290,10 +294,15 @@ func _finish() -> void:
 	_done = true
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cursor.visible = false
-	finished.emit()
 	if Fx.reduce_motion():
-		queue_free()
+		_end()
 		return
 	var t := create_tween()
 	t.tween_property(self, "modulate:a", 0.0, FADE * 2.0)
-	t.tween_callback(queue_free)
+	t.tween_callback(_end)
+
+
+## Emitted after the fade, so the next modal in the shell's queue never overlaps the intro.
+func _end() -> void:
+	finished.emit()
+	queue_free()

@@ -5,7 +5,9 @@ extends Control
 ## The x1 / x10 / MAX selector sets how many each buy button buys.
 
 const AMOUNTS := [1, 10, -1]   # -1 = max affordable
-const THUMB := Vector2(48, 32)  # logical size: room art (96x64 logical, 1x or 2x files) shown at half size (nearest)
+const THUMB_SMALL := Vector2(96, 64)     # phone: half density of the 2x room art
+const THUMB_WIDE := Vector2(192, 128)    # desktop: room art (192x128) drawn 1:1, every texel visible
+const WIDE_PANEL := 440.0                # panel width from which the wide thumbnails are used
 
 var _order: Array = []         # producer ids in tier order
 var _rows := {}                # id -> {row, thumb, name, sub, bar, next, cost, buy}
@@ -70,7 +72,16 @@ func _ready() -> void:
 	tm.timeout.connect(_refresh)
 	add_child(tm)
 	tm.start()
+	resized.connect(_fit_thumbs)
+	_fit_thumbs()
 	_refresh()
+
+
+## Room thumbnails: full 2x size on desktop-width panels, half on phones.
+func _fit_thumbs() -> void:
+	var thumb_size := THUMB_WIDE if size.x >= WIDE_PANEL else THUMB_SMALL
+	for id in _rows:
+		(_rows[id]["thumb"] as TextureRect).custom_minimum_size = thumb_size
 
 
 func _row(d) -> PanelContainer:
@@ -85,17 +96,18 @@ func _row(d) -> PanelContainer:
 	top.add_theme_constant_override("separation", 8)
 	v.add_child(top)
 	var thumb := TextureRect.new()
-	thumb.texture = Fx.tex("res://assets/rooms/%s.png" % id, Vector2i(96, 64))
-	thumb.custom_minimum_size = THUMB
+	thumb.texture = Fx.tex("res://assets/rooms/%s.png" % id, Vector2i(THUMB_WIDE))
+	thumb.custom_minimum_size = THUMB_SMALL
 	thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	thumb.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	top.add_child(thumb)
 	var mid := VBoxContainer.new()
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mid.add_theme_constant_override("separation", 2)
 	top.add_child(mid)
 	var name_lbl := Label.new()
-	name_lbl.clip_text = true
+	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long names wrap on phones instead of clipping
 	name_lbl.theme_type_variation = &"DimLabel"
 	mid.add_child(name_lbl)
 	var sub := Label.new()

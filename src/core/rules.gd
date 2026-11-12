@@ -72,6 +72,22 @@ static func apply(s: GameState, e: Dictionary) -> void:
 			push_error("Unknown effect type: %s" % e["type"])
 
 
+## Why effect `e` cannot be offered yet (its system is still locked), or "" when it is usable.
+## Events use this to hide choices that would touch a currency or system the player has not reached.
+static func effect_blocker(s: GameState, e: Dictionary) -> String:
+	var need := 0
+	match e["type"]:
+		"add_currency":
+			need = int(GameState.CURRENCY_LAYER.get(e["id"], 0))
+		"add_slider", "add_debt":
+			need = 2  # alignment: the slider and the debt it builds unlock with Model Generation
+		"rival_progress":
+			need = 4  # rivals exist from the Singularity on
+	if need > 0 and s.resets(need) == 0:
+		return "locked until reset %d" % need
+	return ""
+
+
 ## Product of every multiplier for `key` (cash, compute, training).
 static func mult(s: GameState, key: String) -> float:
 	var m := 1.0
@@ -126,4 +142,9 @@ static func debt_factor(s: GameState) -> float:
 
 ## Generation-best training score (per run of layer 2) plus a reduced bonus from the all-time best.
 static func training_bonus(s: GameState) -> float:
-	return (1.0 + 0.05 * float(s.run["layers"][2]["best"])) * (1.0 + 0.01 * float(s.persist["best_all"]))
+	return training_bonus_for(float(s.run["layers"][2]["best"]), float(s.persist["best_all"]))
+
+
+## The same bonus for given bests, e.g. to preview a score before it lands.
+static func training_bonus_for(best: float, best_all: float) -> float:
+	return (1.0 + 0.05 * best) * (1.0 + 0.01 * best_all)

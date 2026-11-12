@@ -4,7 +4,7 @@ class_name HelpText
 ## Markup, one item per line:
 ##   ## Heading        bold accent line
 ##   - item            bullet
-##   [training]        live table of the three training options for this save
+##   [training]        live table of the training run types (content/training_runs) for this save
 ##   [layers]          the four reset layers and their gain-1 thresholds
 ##   anything else     paragraph
 ## Inline: {NAME} is a number from Sim or GameState; {NAME:pct}, {NAME:h} and {NAME:min} format it.
@@ -12,7 +12,6 @@ class_name HelpText
 ## [badge:name] is assets/badges/name.png. An unknown token renders as <UNKNOWN:token>, which the content test catches.
 
 const CONSTANT_SOURCES := ["res://src/core/sim.gd", "res://src/core/game_state.gd"]
-const TRAIN_FRACS := [0.25, 0.5, 1.0]
 const RE_TOKEN := "\\{([^{}]+)\\}"
 const RE_IMAGE := "\\[(icon|badge):([a-z_]+)\\]"
 
@@ -34,7 +33,7 @@ static func to_bbcode(body: String, content, state: GameState) -> String:
 		if line == "":
 			lines.append("")
 		elif line == "[training]":
-			lines.append_array(_training(state))
+			lines.append_array(_training(content, state))
 		elif line == "[layers]":
 			lines.append_array(_layers(content))
 		elif line.begins_with("## "):
@@ -97,13 +96,16 @@ static func _layer(content, k: int):
 	return null
 
 
-## Live options: what each share of compute would spend, its fail chance and the compute needed to start it.
-static func _training(state: GameState) -> Array[String]:
-	var out: Array[String] = ["You hold %s compute. Each option spends a share of it:" % state.cur("compute").format()]
-	for f in TRAIN_FRACS:
-		var p := Sim.training_preview(state, f)
-		out.append("- %s of compute: spends %s, %s chance to fail, needs %s compute in stock" % [
-			_num(f * 100.0) + "%", (p["spend"] as BigNum).format(),
+## Live table of every run type: its share, length, score multiplier, fail chance (composed with Ops) and the compute
+## needed to start it. Order matches the Train tab.
+static func _training(content, state: GameState) -> Array[String]:
+	var out: Array[String] = ["You hold %s compute. Each run spends a share of it:" % state.cur("compute").format()]
+	var runs: Array = content.get_all("training_runs")
+	runs.sort_custom(func(a, b) -> bool: return a.order < b.order if a.order != b.order else a.id < b.id)
+	for d in runs:
+		var p := Sim.training_preview(state, d.id)
+		out.append("- %s: %s of compute, %ds, score x%.2f, %s chance to fail, needs %s compute in stock" % [
+			d.title, _num(float(d.spend_share) * 100.0) + "%", int(d.seconds), float(d.score_mult),
 			_num(float(p["fail_chance"]) * 100.0) + "%", (p["min_compute"] as BigNum).format()])
 	return out
 

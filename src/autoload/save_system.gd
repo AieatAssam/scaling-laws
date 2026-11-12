@@ -1,7 +1,7 @@
 extends Node
 ## Versioned JSON save. File = {"version": VERSION, "state": <GameState.to_dict()>}.
 
-const VERSION := 1
+const VERSION := 2
 const DEFAULT_PATH := "user://save.json"
 
 
@@ -40,5 +40,21 @@ func migrate(wrapper: Dictionary) -> Dictionary:
 		push_error("SaveSystem: save version %d is newer than %d" % [v, VERSION])
 		return {}
 	var state: Dictionary = wrapper["state"]
-	# if v < 2: state = _v1_to_v2(state)
+	if v < 2:
+		state = _v1_to_v2(state)
+	return state
+
+
+## Training runs used to store a compute share ("frac"), not a run type. A run still in flight is refunded in full
+## (its spend is 10^log) so it cannot break the new run types.
+static func _v1_to_v2(state: Dictionary) -> Dictionary:
+	var run: Dictionary = state.get("run", {})
+	if not run.has("layers"):
+		return state
+	var L0: Dictionary = run["layers"][0]
+	var t: Dictionary = L0.get("training", {})
+	if not t.is_empty() and not t.has("type"):
+		var refund := BigNum.from_float(pow(10.0, float(t["log"])))
+		L0["cur"]["compute"] = BigNum.from_json(L0["cur"]["compute"]).add(refund).to_json()
+		L0["training"] = {}
 	return state

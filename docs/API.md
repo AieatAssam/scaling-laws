@@ -29,7 +29,7 @@ Instance: `copy()`, `is_zero()`, `to_float()`, `log10()`, `add(o)`, `subtract(o)
 - `get_all(type: String) -> Array`: sorted by `(order, id)`.
 - `types() -> Array`: the content types found.
 
-Types loaded: `producers`, `layers`, `staff`, `research`, `automation`, `rivals`, `challenges`, `agi_stages`, `endings`, `events`, `benchmarks`, `help`.
+Types loaded: `producers`, `layers`, `staff`, `research`, `automation`, `rivals`, `challenges`, `agi_stages`, `endings`, `events`, `benchmarks`, `training_runs`, `help`.
 
 `help` (`HelpTopicDef`, `content/help/*.tres`): `order`, `conditions` (same shape as other unlocks; locked topics show `???` and `hint`), `hint`, `body`. `body` is a light markup: `## ` headings, `- ` bullets, blank-line paragraphs, `[icon:x]` / `[badge:x]` inline images, `{CONST}` / `{CONST:pct|h|min}` / `{threshold:k}` / `{layer:k}` tokens resolved against live state (unknown tokens render as `<UNKNOWN:x>`, which the test catches), and the `[training]` and `[layers]` directives. Resolved by `HelpText.to_bbcode` (`src/ui/panels/parts/help_text.gd`). Tested in `tests/test_help.gd`.
 
@@ -60,7 +60,7 @@ Every action returns `{ok: bool, reason: String, ...}`. Failures include a human
 
 The UI may call the pure statics below for read-only previews. Each `*_blocker` returns `""` when the action would succeed, otherwise the reason it would fail. Actions call the same blockers first, so the panel text and the action can't disagree.
 
-Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `TRAIN_SECONDS` (60), `MIN_TRAIN_SPEND`, `TRAIN_ENERGY`, `TRAIN_DATA`, `DATA_RATE`, `ENERGY_RATE`, `ENERGY_CAP`, `FAIL_BASE`, `FAIL_PER_FRAC`, `DEBT_RATE`, `SLIDER_SAFE` (0.3), `EVENT_INTERVAL`, `EVENT_CHANCE`, `OFFLINE_CAP` (86400), `OFFLINE_EFF` (0.5), `OFFLINE_STEP` (60), `LEGACY_MULT`, `AUTO_RESET_MIN_SECONDS` (60).
+Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `MIN_TRAIN_SPEND` (100), `TRAIN_ENERGY`, `TRAIN_DATA`, `REFUND_SHARE` (0.5: a failed run returns this share of its spend), `SCORE_ROLL` (0.02: a run's score rolls +/- this), `FAIL_FLOOR` (0.4: Ops cut a run's fail chance to this share of its base at most), `AUTO_TRAIN_RUN` ("standard"), `DATA_RATE`, `ENERGY_RATE`, `ENERGY_CAP`, `DEBT_RATE`, `SLIDER_SAFE` (0.3), `EVENT_INTERVAL`, `EVENT_CHANCE`, `OFFLINE_CAP` (86400), `OFFLINE_EFF` (0.5), `OFFLINE_STEP` (60), `LEGACY_MULT`, `AUTO_RESET_MIN_SECONDS` (60).
 
 | Function | Returns / notes |
 |---|---|
@@ -83,9 +83,11 @@ Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `TRAIN_SECONDS` (60), `MIN_TR
 | `legacy_blocker(s, key) -> String` | Why `buy_legacy` would fail, or `""`. |
 | `set_slider(s, value)` | Result adds `value`. Unlocks after reset 2. |
 | `new_run(s)` | Starts a new run after the current one ends. |
-| `training_preview(s, frac) -> Dictionary` | Keys `ok`, `reason`, `spend`, `seconds`, `fail_chance`, `min_compute` (smallest compute stock at which this fraction meets `MIN_TRAIN_SPEND`), `predicted_score` (log10(spend) × training multiplier, before the ±5% roll; 0 when the spend is zero), `factors` (see `training_factors`). |
+| `run_def(s, id)` | `TrainingRunDef` from `content/training_runs`, or null. |
+| `training_fail_factor(s) -> float` | Ops cut: `max(FAIL_FLOOR, 1 - sum of fail_per_hire x hires)`. |
+| `training_preview(s, id) -> Dictionary` | `id` is a run type (`fine_tune`, `standard`, `frontier`). Keys `ok`, `reason` ("unknown run type", "already training", "needs at least N compute", "not enough energy or data"), `id`, `title`, `spend`, `seconds`, `score_mult`, `base_fail`, `fail_factor`, `fail_chance` (base x Ops factor), `min_compute` (smallest stock at which the share meets `MIN_TRAIN_SPEND`), `predicted_score` (log10(spend) x training multiplier x `score_mult`, before the roll; 0 when the spend is zero), `bonus_now` and `bonus_if_success` (compute bonus before and after the predicted score lands), `factors` (see `training_factors`). |
 | `training_factors(s) -> Dictionary` | Keys `data`, `architecture`, `researcher`, `total`. `total` is the multiplier applied to the score. |
-| `start_training(s, frac)` | `frac` ∈ {0.25, 0.5, 1.0}. Result adds `spend`, `seconds`. |
+| `start_training(s, id)` | Charges the spend up front (and energy/data after reset 3). Result adds `id`, `spend`, `seconds`. |
 | `layer_def(s, k)` | `LayerDef` for layer k, or null. |
 | `reset_preview(s, k) -> Dictionary` | Keys `layer`, `currency`, `gain`, `holding`, `highlight`, `allowed`, `reason`. |
 | `perform_reset(s, k)` | Result adds `layer`, `gain`, `currency`. |
@@ -99,7 +101,7 @@ Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `TRAIN_SECONDS` (60), `MIN_TR
 
 Event dicts returned by `tick`, each with a `kind` key:
 
-- `training_done` (`ok`; `score` is present only when `ok` is true)
+- `training_done` (`id` = run type, `ok`). Success adds `score`, `new_best` and `new_all_time`. Failure adds `refund` (BigNum, half the spend, already added to compute).
 - `auto_train`
 - `reset` (`layer`, `gain`)
 - `challenge_done` (`id`, `success`)
@@ -113,6 +115,8 @@ Event dicts returned by `tick`, each with a `kind` key:
 
 - `mult(s, key) -> float`: product of `mult_parts(s, key)`.
 - `mult_parts(s, key) -> Array`: each factor as `{id, name, value}` (legacy perks, run upgrades, timed boosts, owned research, staff, and for `compute` alignment, debt and training score). The UI uses it for "why is my multiplier this?" tooltips.
+- `training_bonus(s) -> float`: the training score factor, `training_bonus_for(best, best_all)` with the state's bests.
+- `training_bonus_for(best: float, best_all: float) -> float`: `(1 + 0.05 x best) x (1 + 0.01 x best_all)`. Used for previews of a score before it lands.
 
 ## UI widgets
 
@@ -121,7 +125,7 @@ Event dicts returned by `tick`, each with a `kind` key:
 
 ## SaveSystem (autoload `SaveSystem`)
 
-- `VERSION = 1`, `DEFAULT_PATH = "user://save.json"`
+- `VERSION = 2`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared.
 - `save(state: Dictionary, path=DEFAULT_PATH) -> bool`: writes `{"version", "state"}` as JSON.
 - `load_data(path=DEFAULT_PATH) -> Dictionary`: returns the migrated state dict, or `{}`.
 - `delete(path=DEFAULT_PATH)`
@@ -140,13 +144,13 @@ Lifecycle:
 - On close request: saves.
 - `save_now() -> bool`
 
-Read helpers: `cash()`, `compute()`, `cash_per_second()`, `compute_per_second()`, `producer_cost(id, count=1)`, `max_affordable(id)`, `producer_available(id)`, `reset_preview(layer)`, `training_preview(frac)`.
+Read helpers: `cash()`, `compute()`, `cash_per_second()`, `compute_per_second()`, `producer_cost(id, count=1)`, `max_affordable(id)`, `producer_available(id)`, `reset_preview(layer)`, `training_preview(run_type)`.
 
 Automation runs inside `tick` and emits no `producer_bought` for auto-buy, so the UI should poll `cash()` and `compute()` every frame rather than rely on signals. Auto-reset does emit `layer_reset`. An automatic reset of layer k (from `auto_fund` for k=1, `auto_gen` for k=2) fires only when `reset_preview(s, k)` is `allowed` and `highlight`, and the layer's clock is at least `Sim.AUTO_RESET_MIN_SECONDS` (60 s). The clock is zeroed by any reset of that layer, so this also spaces automatic resets apart. `LayerDef.target_hours` plays no part in this rule.
 
 Read helpers also include `staff_cost(role, count=1) -> BigNum`.
 
-Actions (each returns the Sim result dict and emits its signal only on `ok`): `buy_producer(id, count=1)`, `start_training(frac)`, `hire(role, count=1)`, `research(id)`, `set_slider(value)`, `buy_automation(id)`, `buy_legacy(key)`, `start_challenge(id)`, `abandon_challenge()`, `resolve_event(choice)`, `reset_layer(layer)`, `new_run()`.
+Actions (each returns the Sim result dict and emits its signal only on `ok`): `buy_producer(id, count=1)`, `start_training(run_type)`, `hire(role, count=1)`, `research(id)`, `set_slider(value)`, `buy_automation(id)`, `buy_legacy(key)`, `start_challenge(id)`, `abandon_challenge()`, `resolve_event(choice)`, `reset_layer(layer)`, `new_run()`.
 `set_setting(key, value)` writes `persist.settings` and emits `settings_changed`.
 
 Signals:
@@ -156,7 +160,7 @@ Signals:
 | `started` | |
 | `offline_progress` | `summary: Dictionary` (the `Sim.offline` result) |
 | `producer_bought` | `id: String, count: int` |
-| `training_started` | `frac: float` (also emitted for auto-training at 0.25) |
+| `training_started` | `run_type: String` (also emitted for auto-training, which starts `standard`) |
 | `training_finished` | `result: Dictionary` |
 | `staff_hired` | `role: String, count: int` |
 | `research_bought` | `id: String` |
@@ -190,7 +194,8 @@ Per-type keys:
 |---|---|---|
 | `producers` | `ProducerDef` | `order`, `base_cost`, `base_output` |
 | `layers` | `LayerDef` | `index`, `currency`, `threshold`, `target_hours` (design target for the pacing report only; no game rule reads it) |
-| `staff` | `StaffDef` | `base_cost`, `cost_growth`, `bonus_key`, `bonus_per_hire` |
+| `staff` | `StaffDef` | `base_cost`, `cost_growth`, `bonus_key`, `bonus_per_hire`, `fail_per_hire` (cut to a training run's fail chance per hire; see `Sim.training_fail_factor`) |
+| `training_runs` | `TrainingRunDef` | `order`, `spend_share` (0..1 of current compute), `seconds`, `fail_chance`, `score_mult` |
 | `research` | `ResearchDef` | `cost`, `prereqs` (PackedStringArray), `branch`, `effects` (array of `{key, value}` multipliers) |
 | `automation` | `AutomationDef` | `order`, `cost` |
 | `rivals` | `RivalDef` | `launch_hours` |

@@ -63,6 +63,8 @@ func _draw() -> void:
 	var c := view.counts()
 	var stage := view.shown_stage
 	if stage <= 1:
+		# Solid earth under the ground strip, so the backdrop's lower third never shows through below it.
+		draw_rect(Rect2(-1040, LabData.GY + LabData.GROUND_H - 1, 2600, 600), Color("6B3A1E"))
 		for gx in range(-1040, 1456, 104):
 			LabData.draw_art(self, LabData.GROUND_PNG, Vector2(float(gx), LabData.GY), Vector2(LabData.FLOOR.x, LabData.GROUND_H))
 	for f in 6:

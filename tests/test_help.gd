@@ -79,10 +79,12 @@ func test_every_icon_in_the_folder_has_a_legend_entry() -> void:
 		assert_true(legend.contains("[icon:%s]" % name), "legend explains icon %s" % name)
 
 
-func test_training_options_show_one_row_per_share() -> void:
+func test_training_table_has_one_row_per_run_type() -> void:
 	var text := HelpText.to_bbcode(_topic("training").body, content, state)
-	for f in HelpText.TRAIN_FRACS:
-		assert_true(text.contains("%s%% of compute" % str(int(f * 100.0))), "training row for %s" % f)
+	for d in content.get_all("training_runs"):
+		assert_true(text.contains("%s: " % d.title), "training row for %s" % d.id)
+		assert_true(text.contains("%s%% of compute" % str(int(float(d.spend_share) * 100.0))), "share shown for %s" % d.id)
+	assert_false(text.contains("UNKNOWN"), "training help has no unresolved tokens")
 
 
 func test_layer_list_names_every_reset_layer() -> void:

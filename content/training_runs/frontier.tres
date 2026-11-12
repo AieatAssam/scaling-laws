@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TrainingRunDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/training_run_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "frontier"
+title = "Frontier push"
+description = "Everything on one huge, unstable run. Bigger runs diverge more: loss spikes, node failures."
+icon = "training"
+order = 3
+spend_share = 1.0
+seconds = 120.0
+fail_chance = 0.3
+score_mult = 1.25

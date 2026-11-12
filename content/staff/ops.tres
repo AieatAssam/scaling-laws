@@ -6,9 +6,10 @@
 script = ExtResource("1_s")
 id = "ops"
 title = "Ops"
-description = "Keeps the lights on and the invoices paid."
+description = "Keeps the lights on, the nodes up and the invoices paid. Fewer failed runs."
 icon = "hiring"
 base_cost = 1.0
 cost_growth = 1.5
 bonus_key = "cash"
 bonus_per_hire = 0.15
+fail_per_hire = 0.1

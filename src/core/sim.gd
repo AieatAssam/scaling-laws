@@ -5,19 +5,22 @@ class_name Sim
 const REVENUE := 0.5             # cash per compute/sec (before cash mults)
 const COST_GROWTH := 1.15
 const MILESTONES := [25, 50, 100, 200]   # each milestone doubles that producer's output
-const TRAIN_SECONDS := 60.0
 const MIN_TRAIN_SPEND := 100.0
 const TRAIN_ENERGY := 10.0
 const TRAIN_DATA := 2.0
+const REFUND_SHARE := 0.5        # a failed run returns this share of its spend to compute
+const SCORE_ROLL := 0.02         # run score is rolled up or down by this share
+const FAIL_FLOOR := 0.4          # staff can cut a run's fail chance to this share of its base at most
+const AUTO_TRAIN_RUN := "standard"   # run type that auto_train starts
 const DATA_RATE := 0.1           # data/sec once Paradigm Shift is done
 const ENERGY_RATE := 1.0
 const ENERGY_CAP := 100.0
-const FAIL_BASE := 0.05
-const FAIL_PER_FRAC := 0.3
 const DEBT_RATE := 0.002         # debt/sec while slider < SLIDER_SAFE
 const SLIDER_SAFE := 0.3
 const EVENT_INTERVAL := 90.0
 const EVENT_CHANCE := 0.5
+const EVENT_MIN_SECONDS := 120.0  # no events in the first two minutes of a run (layer-0 clock)
+const EVENT_MIN_PRODUCERS := 3    # ...or before a few producers exist
 const OFFLINE_CAP := 86400.0
 const OFFLINE_EFF := 0.5
 const OFFLINE_STEP := 60.0
@@ -307,17 +310,42 @@ static func training_factors(s: GameState) -> Dictionary:
 	return {"data": data, "architecture": arch, "researcher": researcher, "total": Rules.mult(s, "training")}
 
 
-static func training_preview(s: GameState, frac: float) -> Dictionary:
-	var spend: BigNum = s.cur("compute").mul_f(frac)
+## Run type `id` from content/training_runs, or null.
+static func run_def(s: GameState, id: String):
+	return s.db.get_def("training_runs", id)
+
+
+## Staff cut training fail chance: 1 - sum(fail_per_hire × hires), floored at FAIL_FLOOR.
+static func training_fail_factor(s: GameState) -> float:
+	var cut := 0.0
+	for st in s.db.get_all("staff"):
+		cut += float(st.fail_per_hire) * int(s.run["layers"][1]["staff"].get(st.id, 0))
+	return maxf(FAIL_FLOOR, 1.0 - cut)
+
+
+## What run type `id` would do now. Keys: ok, reason, id, title, spend, seconds, score_mult, base_fail, fail_factor,
+## fail_chance (composed), min_compute, predicted_score (no roll), bonus_now and bonus_if_success (compute bonus
+## before and after the predicted score lands), factors.
+static func training_preview(s: GameState, id: String) -> Dictionary:
+	var d = run_def(s, id)
+	if d == null:
+		return {"ok": false, "reason": "unknown run type", "id": id}
+	var share: float = d.spend_share
+	var spend: BigNum = s.cur("compute").mul_f(share)
 	var energy_ok := s.resets(3) == 0 or (s.cur("energy").gte(_big(TRAIN_ENERGY)) and s.cur("data").gte(_big(TRAIN_DATA)))
 	var factors := training_factors(s)
+	var predicted := 0.0 if spend.is_zero() else spend.log10() * float(factors["total"]) * float(d.score_mult)
+	var factor := training_fail_factor(s)
 	var p := {
-		"ok": false, "reason": "", "spend": spend, "seconds": TRAIN_SECONDS,
-		"fail_chance": FAIL_BASE + FAIL_PER_FRAC * frac,
-		# Smallest compute stock at which this fraction meets MIN_TRAIN_SPEND.
-		"min_compute": _big(MIN_TRAIN_SPEND / frac) if frac > 0.0 else BigNum.new(),
-		# Expected score without the ±5% roll: log10(spend) × total training multiplier.
-		"predicted_score": 0.0 if spend.is_zero() else spend.log10() * float(factors["total"]),
+		"ok": false, "reason": "", "id": id, "title": d.title, "spend": spend, "seconds": float(d.seconds),
+		"score_mult": float(d.score_mult),
+		"base_fail": float(d.fail_chance), "fail_factor": factor, "fail_chance": float(d.fail_chance) * factor,
+		# Smallest compute stock at which this share meets MIN_TRAIN_SPEND.
+		"min_compute": _big(MIN_TRAIN_SPEND / share) if share > 0.0 else BigNum.new(),
+		"predicted_score": predicted,
+		"bonus_now": Rules.training_bonus(s),
+		"bonus_if_success": Rules.training_bonus_for(
+			maxf(float(s.run["layers"][2]["best"]), predicted), maxf(float(s.persist["best_all"]), predicted)),
 		"factors": factors,
 	}
 	if not (s.run["layers"][0]["training"] as Dictionary).is_empty():
@@ -331,10 +359,8 @@ static func training_preview(s: GameState, frac: float) -> Dictionary:
 	return p
 
 
-static func start_training(s: GameState, frac: float) -> Dictionary:
-	if not (frac in [0.25, 0.5, 1.0]):
-		return _fail("frac must be 0.25, 0.5 or 1.0")
-	var p := training_preview(s, frac)
+static func start_training(s: GameState, id: String) -> Dictionary:
+	var p := training_preview(s, id)
 	if not p["ok"]:
 		return _fail(p["reason"])
 	var spend: BigNum = p["spend"]
@@ -343,11 +369,14 @@ static func start_training(s: GameState, frac: float) -> Dictionary:
 		s.set_cur("energy", s.cur("energy").subtract(_big(TRAIN_ENERGY)))
 		s.set_cur("data", s.cur("data").subtract(_big(TRAIN_DATA)))
 	s.run["layers"][0]["training"] = {
-		"frac": frac, "log": spend.log10(), "left": TRAIN_SECONDS, "fail": p["fail_chance"],
+		"type": id, "spend": spend.to_json(), "log": spend.log10(), "left": p["seconds"],
+		"fail": p["fail_chance"], "score_mult": p["score_mult"],
 	}
-	return {"ok": true, "spend": spend, "seconds": TRAIN_SECONDS}
+	return {"ok": true, "id": id, "spend": spend, "seconds": p["seconds"]}
 
 
+## Finishes a run when its clock runs out. A failed run refunds REFUND_SHARE of its spend. A success scores
+## log10(spend) × training multiplier × run score_mult × a roll of ±SCORE_ROLL, and only raises the bests.
 static func _train_tick(s: GameState, dt: float, evs: Array) -> void:
 	var L0: Dictionary = s.run["layers"][0]
 	var t: Dictionary = L0["training"]
@@ -360,13 +389,19 @@ static func _train_tick(s: GameState, dt: float, evs: Array) -> void:
 	s.persist["stats"]["trainings"] = int(s.persist["stats"]["trainings"]) + 1
 	if s.rng.randf() < float(t["fail"]):
 		s.persist["stats"]["failed"] = int(s.persist["stats"]["failed"]) + 1
-		evs.append({"kind": "training_done", "ok": false})
+		var refund := BigNum.from_json(t["spend"]).mul_f(REFUND_SHARE)
+		s.add_cur("compute", refund)
+		evs.append({"kind": "training_done", "ok": false, "id": t["type"], "refund": refund})
 		return
-	var score := float(t["log"]) * Rules.mult(s, "training") * s.rng.randf_range(0.95, 1.05)
+	var score := float(t["log"]) * Rules.mult(s, "training") * float(t["score_mult"]) \
+		* s.rng.randf_range(1.0 - SCORE_ROLL, 1.0 + SCORE_ROLL)
 	var L2: Dictionary = s.run["layers"][2]
+	var new_best := score > float(L2["best"])
+	var new_all := score > float(s.persist["best_all"])
 	L2["best"] = maxf(float(L2["best"]), score)
 	s.persist["best_all"] = maxf(float(s.persist["best_all"]), score)
-	evs.append({"kind": "training_done", "ok": true, "score": score})
+	evs.append({"kind": "training_done", "ok": true, "id": t["type"], "score": score,
+		"new_best": new_best, "new_all_time": new_all})
 
 
 # ---------------------------------------------------------------- resets
@@ -434,18 +469,45 @@ static func resolve_event(s: GameState, choice: int) -> Dictionary:
 	return {"ok": true, "id": d.id, "choice": choice}
 
 
+## An event may be offered only when every choice's effects are unlocked (see Rules.effect_blocker).
+static func event_eligible(s: GameState, d) -> bool:
+	for ch in d.choices:
+		for e in ch["effects"]:
+			if Rules.effect_blocker(s, e) != "":
+				return false
+	return true
+
+
+## Clears a pending event that a save left behind with a choice that is now locked (saves from before the gate).
+static func drop_stale_pending(s: GameState) -> void:
+	var L0: Dictionary = s.run["layers"][0]
+	var pend: String = L0["pending"]
+	var d = s.db.get_def("events", pend) if pend != "" else null
+	if pend != "" and (d == null or not event_eligible(s, d)):
+		L0["pending"] = ""
+
+
+static func _events_open(s: GameState) -> bool:
+	var owned := 0
+	for d in producers(s):
+		owned += s.owned(d.id)
+	return float(s.run["layers"][0]["clock"]) >= EVENT_MIN_SECONDS and owned >= EVENT_MIN_PRODUCERS
+
+
 static func _events_tick(s: GameState, dt: float, evs: Array) -> void:
 	var L0: Dictionary = s.run["layers"][0]
 	L0["event_timer"] = float(L0["event_timer"]) - dt
 	if L0["pending"] != "" or float(L0["event_timer"]) > 0.0:
 		return
+	if not _events_open(s):
+		return  # timer stays due: the first roll happens as soon as the run is underway
 	L0["event_timer"] = EVENT_INTERVAL
 	if s.rng.randf() >= EVENT_CHANCE:
 		return
 	var pool: Array = []
 	var total := 0.0
 	for d in s.db.get_all("events"):
-		if L0["cooldowns"].has(d.id) or not Rules.check_all(s, d.conditions):
+		if L0["cooldowns"].has(d.id) or not Rules.check_all(s, d.conditions) or not event_eligible(s, d):
 			continue
 		pool.append(d)
 		total += float(d.weight)
@@ -534,7 +596,7 @@ static func _automate(s: GameState, evs: Array) -> void:
 			buy_producer(s, id, max_affordable(s, id))
 			id = best_producer(s)
 	if "auto_train" in auto:
-		var r := start_training(s, 0.25)
+		var r := start_training(s, AUTO_TRAIN_RUN)
 		if r["ok"]:
 			evs.append({"kind": "auto_train"})
 	if "auto_fund" in auto:

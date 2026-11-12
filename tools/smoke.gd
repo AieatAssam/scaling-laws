@@ -17,6 +17,9 @@ func _initialize() -> void:
 	content.load_all()
 	var ss = load("res://src/autoload/save_system.gd").new()
 	_run(content, ss)
+	# Nodes made with .new() are not in the tree, so nothing frees them at exit; free them to avoid leak warnings.
+	content.free()
+	ss.free()
 	if fails == 0:
 		print("OK")
 		quit(0)
@@ -67,13 +70,14 @@ func _run(content, ss) -> void:
 
 	# --- training run
 	s.add_cur("compute", BigNum.from_float(1e4))
-	r = Sim.start_training(s, 0.25)
+	r = Sim.start_training(s, "standard")
 	check(r["ok"], "start training: %s" % r.get("reason", ""))
 	var trained := false
-	for e in Sim.tick(s, Sim.TRAIN_SECONDS + 1.0):
+	var secs := float(Sim.run_def(s, "standard").seconds)
+	for e in Sim.tick(s, secs + 1.0):
 		if e["kind"] == "training_done":
 			trained = true
-	check(trained, "training finishes within %d s" % int(Sim.TRAIN_SECONDS))
+	check(trained, "training finishes within %d s" % int(secs))
 
 	# --- all four resets, in sequence (each granted enough life for gain 2)
 	for k in range(1, 5):

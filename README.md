@@ -7,7 +7,8 @@ A pixel-art incremental game about running an AI lab from a garage to AGI. Godot
 
 Twelve producer tiers (intern laptop → universe simulator), training runs, four reset layers
 (Funding Round, Model Generation, Paradigm Shift, Singularity), events, benchmarks, offline
-progress, and three endings. The design contract is in [SPEC.md](SPEC.md); the core API in
+progress, and three endings. There is a first-run intro, tooltips on everything (hover, or long-press
+on touch) and an in-game Help tab. The design contract is in [SPEC.md](SPEC.md); the core API in
 [docs/API.md](docs/API.md).
 
 ## Run
@@ -38,7 +39,7 @@ $GODOT --headless --path . -s tools/smoke.gd
 $GODOT --headless --path . -s tools/simulate.gd -- --hours=336 --seed=1 --ending=aligned
 ```
 
-CI runs all three on every push. Pushing a `vX.Y.Z` tag builds every platform, publishes a
+`tools/check.sh` runs all of the above in order (`--fast` skips the simulator). CI runs all three on every push. Pushing a `vX.Y.Z` tag builds every platform, publishes a
 GitHub Release and deploys the web build to Pages; bump `config/version` in `project.godot` and
 the version fields in `export_presets.cfg` to match the tag first.
 

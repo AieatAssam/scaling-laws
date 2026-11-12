@@ -10,7 +10,8 @@ extends Node
 ## do is clicked, not called: buttons are pressed and sliders set through their own signals.
 ## Resets, hires, research, automation, legacy, challenges and rival launches all run through the core.
 
-const SHOTS := "/private/tmp/claude-501/-Users-aieat-Documents-git-scaling-laws/d4cd34e7-b20a-44b0-8741-10a15de4b901/scratchpad/panels"
+# Screenshots go to $SL_SHOTS if set, else a dev_shots folder in the OS temp dir.
+var SHOTS := (OS.get_environment("SL_SHOTS") if OS.get_environment("SL_SHOTS") != "" else OS.get_temp_dir().path_join("scaling-laws-dev-shots")).path_join("panels")
 const SIZES := [Vector2i(340, 600), Vector2i(900, 500)]
 const PANELS := ["training", "funding", "generation", "paradigm", "singularity"]
 const GUTTER := 12
@@ -42,7 +43,7 @@ func _run() -> void:
 	for d in Content.get_all("producers"):
 		Game.buy_producer(d.id, -1)
 	_tick(120.0, 5.0)
-	await _press_each("training", "25%")
+	await _press_each("training", "Start Fine-tune")
 	_tick(61.0)
 	_check(Game.state.persist["stats"]["trainings"] >= 1, "a training run finished")
 
@@ -54,7 +55,7 @@ func _run() -> void:
 	await _press_each("funding", "Hire 5")
 	_check(_staff_total() >= 1, "at least one hire")
 	_cheat_add("compute", 1e6)
-	await _press_each("training", "50%")
+	await _press_each("training", "Start Standard run")
 	_tick(61.0)
 
 	# Phase 3: Model Generation (layer 2): alignment slider, presets, research.
@@ -80,7 +81,7 @@ func _run() -> void:
 	for _pass in 4:
 		await _press_each("paradigm", "Buy for")
 	_check(Game.state.persist["automation"].size() >= 1, "automation bought")
-	await _press_each("training", "100%")
+	await _press_each("training", "Start Frontier push")
 	_tick(61.0)
 
 	# Phase 5: Singularity (layer 4): legacy perks, challenges, rivals.

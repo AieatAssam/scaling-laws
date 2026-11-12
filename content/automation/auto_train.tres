@@ -6,7 +6,7 @@
 script = ExtResource("1_s")
 id = "auto_train"
 title = "Auto-train"
-description = "Starts a 25% training run whenever idle."
+description = "Starts a standard training run whenever idle."
 icon = "automation"
 order = 2
 cost = 3.0
