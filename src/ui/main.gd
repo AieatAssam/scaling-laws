@@ -54,21 +54,30 @@ var _intro_requested := false
 ## Modal dialogs (offline card, event, prestige transition, ending, intro) take turns: one open, the rest wait here.
 var _modal_queue: Array[Callable] = []
 var _modal_busy := false
+var _column: VBoxContainer        # the whole shell; padded by the safe-area insets on phones
+var _notices: Notices             # offline card and save notice (Back closes it)
+var _ending: Node                 # the ending screen while it is up (Back closes it)
+var _tip: Tip
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_to_group("shell")
 	resized.connect(_on_resized)
+	get_window().size_changed.connect(_fit_base)
+	RenderingServer.set_default_clear_color(Fx.col(Fx.BG))  # the inset strips on phones show this, not Godot's grey
 	_build_shell()
 	_build_panels()
+	_fit_base()  # after the panels exist: a base change resizes the root and fires _on_resized
 	# Overlays connect to Game signals in their _ready, so they must exist before Game.start().
 	# Modal ones share one queue (see _request_modal): each gets the gate and reports `closed` back to it.
-	for overlay in [Notices.new(), EventPopup.new(), PrestigeOverlay.new()]:
+	_notices = Notices.new()
+	for overlay in [_notices, EventPopup.new(), PrestigeOverlay.new()]:
 		overlay.gate = _request_modal
 		overlay.closed.connect(_on_modal_closed)
 		add_child(overlay)
-	add_child(Tip.new())
+	_tip = Tip.new()
+	add_child(_tip)
 	Game.saved.connect(_on_saved)
 	Game.settings_changed.connect(_on_settings_changed)
 	Game.ending_reached.connect(_on_ending)
@@ -91,7 +100,8 @@ func _ready() -> void:
 
 
 func _build_shell() -> void:
-	var col := VBoxContainer.new()
+	_column = VBoxContainer.new()
+	var col := _column
 	col.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	col.add_theme_constant_override("separation", 4)
 	add_child(col)
@@ -300,12 +310,94 @@ func _select(id: String) -> void:
 	_refresh_tabs()
 
 
+## Keeps the UI at least 1:1 with the window: below the 360x640 base in a dimension, the base shrinks to the window
+## (so a 390-tall phone landscape is not scaled to 0.6). Larger windows keep the 360x640 base.
+func _fit_base() -> void:
+	var w := get_window().size
+	get_window().content_scale_size = Vector2i(mini(360, w.x), mini(640, w.y))
+
+
 ## Portrait below ~1:1 aspect; switches the body between row and column.
 func _on_resized() -> void:
 	var portrait := size.y > size.x
 	_body.vertical = portrait
 	_lab_slot.size_flags_stretch_ratio = 0.9 if portrait else 1.0
 	_panel_area.size_flags_stretch_ratio = 1.1 if portrait else 1.0
+	_apply_safe_area()
+
+
+## Phones: pads the shell clear of the notch, rounded corners and gesture bar. Desktop reports the screen minus the
+## menu bar and dock as its "safe area", so it is not used there.
+func _apply_safe_area() -> void:
+	if _column == null or not OS.has_feature("mobile") or get_window().size.x <= 0 or get_window().size.y <= 0:
+		return
+	var win := get_window()
+	var px := safe_insets_px(DisplayServer.get_display_safe_area(), Rect2i(win.position, win.size))
+	var k := get_viewport_rect().size / Vector2(win.size)  # window pixels -> viewport units
+	_column.offset_left = px.x * k.x
+	_column.offset_top = px.y * k.y
+	_column.offset_right = -px.z * k.x
+	_column.offset_bottom = -px.w * k.y
+
+
+## Insets of the safe area `safe` inside the window `win` (both in screen pixels), as (left, top, right, bottom).
+## An empty or non-overlapping safe area gives no insets.
+static func safe_insets_px(safe: Rect2i, win: Rect2i) -> Vector4:
+	var r := safe.intersection(win)
+	if safe.size.x <= 0 or safe.size.y <= 0 or r.size.x <= 0 or r.size.y <= 0:
+		return Vector4.ZERO
+	return Vector4(
+		r.position.x - win.position.x,
+		r.position.y - win.position.y,
+		win.end.x - r.end.x,
+		win.end.y - r.end.y)
+
+
+## Android back (WM_GO_BACK_REQUEST; the app does not quit on it, see project.godot): closes the topmost dialog,
+## else goes to the first tab, else saves and quits.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_back()
+
+
+## Escape on desktop closes the topmost dialog. (The intro handles Escape itself, before this.)
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and _dismiss_top():
+		get_viewport().set_input_as_handled()
+
+
+func _back() -> void:
+	if _dismiss_top():
+		return
+	var first := _first_unlocked()
+	if first != "" and first != _current:
+		_select(first)
+		return
+	Game.save_now()
+	get_tree().quit()
+
+
+## Closes the topmost thing that can be dismissed: a sub-window (settings confirm), a tip, the offline or save card,
+## the ending or the intro. Returns false when nothing is open. An event choice or the prestige transition must be
+## answered, so while one is up this returns true and leaves it open.
+func _dismiss_top() -> bool:
+	var subs := get_viewport().get_embedded_subwindows()
+	for i in range(subs.size() - 1, -1, -1):
+		if subs[i].visible:
+			subs[i].hide()
+			return true
+	if _tip != null and bool(_tip.get("_shown")):
+		_tip.call("_hide")
+		return true
+	if _intro != null and not _intro.is_queued_for_deletion():
+		_intro.call("_finish")
+		return true
+	if _ending != null and not _ending.is_queued_for_deletion():
+		_ending.call("_close")
+		return true
+	if _notices.dismiss():
+		return true
+	return _modal_busy
 
 
 func _process(delta: float) -> void:
@@ -361,8 +453,11 @@ func _on_ending(id: String) -> void:
 func _open_ending(id: String) -> bool:
 	var scene: Node = load(ENDING_SCENE).instantiate()
 	add_child(scene)
+	_ending = scene
 	scene.closed.connect(_on_modal_closed)
-	scene.tree_exited.connect(func() -> void: _ending_shown = false)
+	scene.tree_exited.connect(func() -> void:
+		_ending_shown = false
+		_ending = null)
 	scene.call("show_ending", id)
 	return true
 
@@ -379,7 +474,7 @@ func _open_intro() -> bool:
 	var was_running := Game.running
 	Game.running = false
 	_intro = load(INTRO_SCENE).instantiate()
-	add_child(_intro)
+	add_child(_intro)  # Back/Escape end it through _finish, see _dismiss_top
 	_intro.finished.connect(_on_intro_done.bind(was_running))
 	_intro.tree_exited.connect(func() -> void: _intro = null)
 	return true

@@ -26,13 +26,24 @@ signal layer_reset(layer: int, gain: int)
 signal new_run_started
 signal saved(ok: bool)
 signal settings_changed(key: String, value: Variant)
+## A damaged or newer save was set aside, or a backup was used (text for the player). Emitted before `started`.
+signal save_notice(text: String)
 
 const AUTOSAVE_SECONDS := 30.0
+## Offline progress is only reported (the "While you were away" card) for absences at least this long.
+const SUMMARY_MIN_SECONDS := 60.0
+## One frame never simulates more than this. A frame that arrives after the app was suspended would otherwise
+## run the whole gap at full rate, before the resume handler has the chance to credit it at 50%.
+const MAX_TICK_SECONDS := 1.0
 
 var state: GameState
 var running := false
 var save_path: String = "user://save.json"
 var _autosave_t := 0.0
+## Unix time the app went away (paused, or lost focus on mobile/web); 0 when it is not away.
+var _away_since := 0.0
+## Seconds the sim ticked since _away_since: already simulated at full rate, so not credited again on return.
+var _ticked_since := 0.0
 
 
 func _ready() -> void:
@@ -44,30 +55,87 @@ func start() -> void:
 	var d := SaveSystem.load_data(save_path)
 	if not d.is_empty():
 		state = GameState.from_dict(Content, d)
-		Sim.drop_stale_pending(state)
-		var away: float = Time.get_unix_time_from_system() - float(state.persist["saved_at"])
-		# A player who quit mid-intro has no progress to catch up on; the intro must not sit over an offline dialog.
-		if away > 1.0 and bool(state.persist.get("intro_seen", true)):
-			var summary := Sim.offline(state, away)
-			_dispatch(summary["events"])
-			offline_progress.emit(summary)
+	if SaveSystem.last_notice != "":
+		save_notice.emit(SaveSystem.last_notice)
+	var saved_at := float(state.persist.get("saved_at", 0.0))
+	var away := maxf(0.0, Time.get_unix_time_from_system() - saved_at) if saved_at > 0.0 else 0.0
+	_catch_up(away, away)
 	started.emit()
 	running = true
+
+
+## Credits `credit` seconds of offline progress (at 50% efficiency, by Sim.offline) and saves it. `away` is the real
+## time away, reported to the player. Nothing is credited while the intro is unplayed: the intro must not sit over
+## an offline dialog.
+func _catch_up(credit: float, away: float) -> void:
+	Sim.drop_stale_pending(state)
+	if credit <= 1.0 or not bool(state.persist.get("intro_seen", true)):
+		return
+	var summary := Sim.offline(state, credit)
+	summary["away"] = away
+	_dispatch(summary["events"])
+	save_now()  # so a quit before the next autosave cannot credit this time again
+	if away >= SUMMARY_MIN_SECONDS:
+		offline_progress.emit(summary)
 
 
 func _process(delta: float) -> void:
 	if not running:
 		return
-	_dispatch(Sim.tick(state, delta))
-	_autosave_t += delta
+	var dt := minf(delta, MAX_TICK_SECONDS)
+	_dispatch(Sim.tick(state, dt))
+	if _away_since > 0.0:
+		_ticked_since += dt
+	_autosave_t += dt
 	if _autosave_t >= AUTOSAVE_SECONDS:
 		_autosave_t = 0.0
 		save_now()
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST and state != null:
-		save_now()
+	if state == null:
+		return
+	match what:
+		NOTIFICATION_WM_CLOSE_REQUEST:
+			save_now()
+		NOTIFICATION_APPLICATION_PAUSED:
+			_begin_away()
+		NOTIFICATION_APPLICATION_RESUMED:
+			_end_away()
+		NOTIFICATION_APPLICATION_FOCUS_OUT:
+			save_now()
+			if _losing_focus_is_away():
+				_begin_away()
+		NOTIFICATION_APPLICATION_FOCUS_IN:
+			if _losing_focus_is_away():
+				_end_away()
+
+
+## On phones and in browsers a lost focus means the app is in the background (notification shade, tab switch).
+## On desktop it is just a click elsewhere, so the sim keeps running and nothing is credited.
+static func _losing_focus_is_away() -> bool:
+	return OS.has_feature("mobile") or OS.has_feature("web")
+
+
+## The app went away: save now, and start measuring how long. A second signal for the same absence is ignored.
+func _begin_away() -> void:
+	save_now()
+	if _away_since == 0.0:
+		_away_since = Time.get_unix_time_from_system()
+		_ticked_since = 0.0
+
+
+## The app came back. Credits the part of the absence the sim did not already tick through. No marker means a
+## resume at launch (nothing to credit); a stopped sim (the intro is up) only closes the measurement.
+func _end_away() -> void:
+	if _away_since == 0.0:
+		return
+	var away := Time.get_unix_time_from_system() - _away_since
+	var ticked := _ticked_since
+	_away_since = 0.0
+	_ticked_since = 0.0
+	if running:
+		_catch_up(maxf(0.0, away - ticked), away)
 
 
 func save_now() -> bool:

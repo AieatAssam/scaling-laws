@@ -125,23 +125,31 @@ Event dicts returned by `tick`, each with a `kind` key:
 
 ## SaveSystem (autoload `SaveSystem`)
 
-- `VERSION = 2`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared.
-- `save(state: Dictionary, path=DEFAULT_PATH) -> bool`: writes `{"version", "state"}` as JSON.
-- `load_data(path=DEFAULT_PATH) -> Dictionary`: returns the migrated state dict, or `{}`.
-- `delete(path=DEFAULT_PATH)`
-- `migrate(wrapper) -> Dictionary`: one `if v < N:` block per schema change.
+- `VERSION = 2`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. A save with no version field counts as v0 (same migrations as v1).
+- `save(state: Dictionary, path=DEFAULT_PATH) -> bool`: writes `{"version", "state"}` as JSON. Before overwriting, copies the current file to `<path>.bak`, but only if it is a valid save, so a damaged file never replaces the backup. Refuses (`false`, `push_error`) to overwrite a file written by a newer version.
+- `load_data(path=DEFAULT_PATH) -> Dictionary`: returns the migrated state dict, or `{}` for a new game. Sets `last_notice: String` (empty when nothing needed reporting):
+  - missing file: `{}`, no notice.
+  - damaged file (not JSON, no `state`, wrong shape): renamed to `<path>.bad-<ms>`, then `<path>.bak` is used if valid (notice says it was restored), else a new game (notice says so).
+  - newer version: renamed to `<path>.newer-<ms>` and a new game starts (notice).
+  - Never migrates or fills defaults itself. `GameState.from_dict` fills missing keys, so `migrate` followed by `from_dict` is the full load (what Settings > Import does).
+- `delete(path=DEFAULT_PATH)`: removes the save and `<path>.bak` (Hard reset).
+- `migrate(wrapper) -> Dictionary`: runs the `if v < N:` blocks in order, one per schema change. Returns `{}` for a version newer than `VERSION`.
+- `_parse(path)`: reads a file without migrating; status is `missing`, `corrupt`, `newer` or `ok`.
 
 ## Game (autoload `Game`)
 
 Fields: `state: GameState`, `running: bool`, `save_path: String` (default `user://save.json`).
-Constant: `AUTOSAVE_SECONDS` (30).
+Constants: `AUTOSAVE_SECONDS` (30), `SUMMARY_MIN_SECONDS` (60: shorter absences are credited with no card), `MAX_TICK_SECONDS` (1: a frame never simulates more than this).
 
 Lifecycle:
 - The main scene must call `Game.start()` once. Nothing else calls it, and `running` stays false until it does.
-- `start()`: loads the save if one exists, simulates the time since `saved_at` (`Sim.offline`), then starts ticking. Offline catch-up is skipped while `persist.intro_seen` is false (the player quit mid-intro).
+- `start()`: loads the save (emitting `save_notice` first if the loader had to recover), then credits the time since `saved_at` (`_catch_up`), then starts ticking. A missing or zero `saved_at` credits nothing.
+- `_catch_up(credit, away)`: runs `Sim.offline(credit)` when `credit > 1` and `persist.intro_seen` is true (the player quit mid-intro gets no catch-up), saves, and emits `offline_progress` only when `away >= SUMMARY_MIN_SECONDS`. The summary is the `Sim.offline` result plus `"away"`: the real seconds away.
+- `_process(delta)`: ticks the state with `min(delta, MAX_TICK_SECONDS)` and autosaves every 30 s. The web build's periodic save is this autosave; nothing else is needed there.
+- Going away and coming back (no double counting): `NOTIFICATION_APPLICATION_PAUSED` begins an absence; `NOTIFICATION_APPLICATION_RESUMED` ends it. On phones and in browsers, `FOCUS_OUT`/`FOCUS_IN` do the same. Beginning saves and records `_away_since`; the frames ticked meanwhile are counted in `_ticked_since`. Ending credits `away - ticked` through `_catch_up` (so the 50% credit covers only what was not simulated) and saves. A repeated begin or end is ignored, a resume at launch (no marker) does nothing, and an end while `running` is false (the intro is up) only closes the measurement.
+- `NOTIFICATION_APPLICATION_FOCUS_OUT` always saves (desktop included).
+- `NOTIFICATION_WM_CLOSE_REQUEST`: saves. (Android back is handled by the shell, see below; the app does not quit on it.)
 - Main scene: `play_intro()` plays the first-run intro over the shell and sets `Game.running = false` until it finishes (finish or skip sets `intro_seen` and saves). Settings > Replay intro calls it too.
-- `_process(delta)`: ticks the state and autosaves every 30 s.
-- On close request: saves.
 - `save_now() -> bool`
 
 Read helpers: `cash()`, `compute()`, `cash_per_second()`, `compute_per_second()`, `producer_cost(id, count=1)`, `max_affordable(id)`, `producer_available(id)`, `reset_preview(layer)`, `training_preview(run_type)`.
@@ -158,7 +166,8 @@ Signals:
 | Signal | Args |
 |---|---|
 | `started` | |
-| `offline_progress` | `summary: Dictionary` (the `Sim.offline` result) |
+| `offline_progress` | `summary: Dictionary` (the `Sim.offline` result plus `away`: real seconds away; emitted only for `away >= 60`) |
+| `save_notice` | `text: String`: the save was damaged or newer and was set aside, or a backup was restored. Emitted once, before `started`. |
 | `producer_bought` | `id: String, count: int` |
 | `training_started` | `run_type: String` (also emitted for auto-training, which starts `standard`) |
 | `training_finished` | `result: Dictionary` |

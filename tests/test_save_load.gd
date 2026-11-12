@@ -17,7 +17,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
-	saver.delete(PATH)
+	Support.remove_save_files(PATH)
 
 
 ## JSON turns every number into a float, so equality is checked on the JSON form of both sides.
@@ -97,4 +97,5 @@ func test_corrupt_files_load_as_empty_and_report() -> void:
 		f.store_string(text)
 		f = null
 		assert_eq(saver.load_data(PATH), {}, "corrupt: %s" % text)
-		assert_push_error("not a valid save")
+		assert_ne(saver.last_notice, "", "the player is told the save was damaged")
+		assert_false(FileAccess.file_exists(PATH), "the damaged file was moved aside")

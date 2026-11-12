@@ -102,27 +102,62 @@ func to_dict() -> Dictionary:
 	return {"persist": persist.duplicate(true), "run": r, "rng": str(rng.state)}
 
 
+## Rebuilds a state from to_dict() output. Keys missing from an older or partial save are filled from a fresh
+## state (see _fill); a save with no intro flag counts as seen, and a save with no lifetime counter gets this run's resets.
 static func from_dict(content_db, d: Dictionary) -> GameState:
 	var s := GameState.new(content_db, 1)
-	s.persist = d["persist"]
-	s.run = d["run"]
+	var t := _template(content_db)
+	var data := d.duplicate(true)
+	_fill(data, t)
+	_fill(data["run"], t["run"])
+	var persist: Dictionary = data["persist"]
+	for k in ["stats", "settings"]:  # structs: a partial one is completed key by key, never replaced wholesale
+		if not (persist.get(k) is Dictionary):
+			persist[k] = t["persist"][k].duplicate(true)
+		_fill(persist[k], t["persist"][k])
+	_fill(persist, t["persist"])
+	s.persist = persist
+	s.run = data["run"]
 	if not s.persist.has("lifetime_resets"):  # saves older than the counter: this run's resets are the best guess
 		s.persist["lifetime_resets"] = s.run["resets_done"].duplicate()
-	if not s.persist.has("intro_seen"):  # saves from before the intro existed: the player has been playing, so it counts as seen
-		s.persist["intro_seen"] = true
-	s.rng.state = String(d["rng"]).to_int()
-	var layers: Array = []
-	for L in s.run["layers"]:
-		var o: Dictionary = L
+	s.rng.state = String(data["rng"]).to_int()
+	var tmpl_layers: Array = t["run"]["layers"]
+	var layers: Array = s.run.get("layers", [])
+	while layers.size() < tmpl_layers.size():
+		layers.append(tmpl_layers[layers.size()].duplicate(true))
+	for i in layers.size():
+		var o: Dictionary = layers[i]
+		if not o.has("cur"):  # starting cash lives in the template: a save without cur gets none
+			o["cur"] = {}
+		if i < tmpl_layers.size():
+			_fill(o, tmpl_layers[i])
+	var out_layers: Array = []
+	for L in layers:
 		var cur_in := {}
-		for k in o["cur"]:
-			cur_in[k] = BigNum.from_json(o["cur"][k])
-		o["cur"] = cur_in
-		o["life"] = BigNum.from_json(o["life"])
-		layers.append(o)
-	s.run["layers"] = layers
+		for k in L["cur"]:
+			cur_in[k] = BigNum.from_json(L["cur"][k])
+		L["cur"] = cur_in
+		L["life"] = BigNum.from_json(L["life"])
+		out_layers.append(L)
+	s.run["layers"] = out_layers
 	s._normalize_ints()
 	return s
+
+
+## A fresh state in to_dict() form: the defaults for every key a save may lack. The intro flag defaults to seen
+## (a save without it was played before the intro existed) and the lifetime counter is left out so from_dict backfills it.
+static func _template(content_db) -> Dictionary:
+	var t := GameState.new(content_db, 1).to_dict()
+	t["persist"]["intro_seen"] = true
+	t["persist"].erase("lifetime_resets")
+	return t
+
+
+## Copies each key that `saved` lacks from `tmpl` (maps and arrays are copied, never shared with the template).
+static func _fill(saved: Dictionary, tmpl: Dictionary) -> void:
+	for k in tmpl:
+		if not saved.has(k):
+			saved[k] = tmpl[k].duplicate(true) if (tmpl[k] is Dictionary or tmpl[k] is Array) else tmpl[k]
 
 
 ## JSON gives every number back as float; restore the fields that are integers.

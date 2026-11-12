@@ -43,7 +43,7 @@ func _run() -> void:
 	for d in Content.get_all("producers"):
 		Game.buy_producer(d.id, -1)
 	_tick(120.0, 5.0)
-	await _press_each("training", "Start Fine-tune")
+	await _press_run("fine_tune")
 	_tick(61.0)
 	_check(Game.state.persist["stats"]["trainings"] >= 1, "a training run finished")
 
@@ -55,7 +55,7 @@ func _run() -> void:
 	await _press_each("funding", "Hire 5")
 	_check(_staff_total() >= 1, "at least one hire")
 	_cheat_add("compute", 1e6)
-	await _press_each("training", "Start Standard run")
+	await _press_run("standard")
 	_tick(61.0)
 
 	# Phase 3: Model Generation (layer 2): alignment slider, presets, research.
@@ -81,7 +81,7 @@ func _run() -> void:
 	for _pass in 4:
 		await _press_each("paradigm", "Buy for")
 	_check(Game.state.persist["automation"].size() >= 1, "automation bought")
-	await _press_each("training", "Start Frontier push")
+	await _press_run("frontier")
 	_tick(61.0)
 
 	# Phase 5: Singularity (layer 4): legacy perks, challenges, rivals.
@@ -248,6 +248,17 @@ func _walk(n: Node) -> Array:
 	for c in n.get_children():
 		out.append_array(_walk(c))
 	return out
+
+
+## Presses the Start button of one training run (rows are told apart by run id, not by label).
+func _press_run(id: String) -> void:
+	await _settle()
+	var b: Button = _p("training").get("_cards")[id]["btn"]
+	if b.disabled:
+		print("DEV: training: %s not startable" % id)
+		return
+	b.pressed.emit()
+	await get_tree().process_frame
 
 
 func _enabled_buttons(p: Node, contains: String) -> Array:

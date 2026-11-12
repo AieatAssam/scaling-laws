@@ -9,6 +9,7 @@ var gate: Callable   # shell: runs an open Callable now or after the dialog in f
 
 var _shade: ColorRect
 var _card: PanelContainer
+var _head: Label
 var _offline: Label
 var _toast: PanelContainer
 var _toast_icon: TextureRect
@@ -60,10 +61,9 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	_card.add_child(box)
-	var head := Label.new()
-	head.text = "While you were away"
-	head.theme_type_variation = &"Heading"
-	box.add_child(head)
+	_head = Label.new()
+	_head.theme_type_variation = &"Heading"
+	box.add_child(_head)
 	_offline = Label.new()
 	_offline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_offline)
@@ -74,6 +74,7 @@ func _ready() -> void:
 	box.add_child(ok)
 
 	Game.offline_progress.connect(func(s: Dictionary) -> void: _request(show_offline.bind(s)))
+	Game.save_notice.connect(func(text: String) -> void: _request(show_save_notice.bind(text)))
 	Game.benchmark_unlocked.connect(show_benchmark)
 
 
@@ -85,8 +86,8 @@ func _request(open: Callable) -> void:
 
 
 func show_offline(s: Dictionary) -> bool:
-	# Real time away (the sim only credits up to the cap); saved_at is the last write, before this session.
-	var secs := maxf(0.0, Time.get_unix_time_from_system() - float(Game.state.persist.get("saved_at", 0.0)))
+	# Real time away (the sim only credits up to the cap); Game puts it in the summary as "away".
+	var secs := float(s.get("away", 0.0))
 	var h := int(secs) / 3600
 	var m := (int(secs) % 3600) / 60
 	var lines := PackedStringArray()
@@ -106,7 +107,17 @@ func show_offline(s: Dictionary) -> bool:
 			counts[k] = int(counts.get(k, 0)) + 1
 	for k in counts:
 		lines.append("%s: %d" % [str(names[k]).capitalize(), counts[k]])
-	_offline.text = "\n".join(lines)
+	return _show("While you were away", "\n".join(lines))
+
+
+## Save file trouble (a damaged save was set aside or a backup was used). Same card, different heading.
+func show_save_notice(text: String) -> bool:
+	return _show("Save file", text)
+
+
+func _show(heading: String, body: String) -> bool:
+	_head.text = heading
+	_offline.text = body
 	_shade.visible = true
 	_card.visible = true
 	_shade.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -134,3 +145,11 @@ func _close() -> void:
 	_shade.visible = false
 	_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	closed.emit()
+
+
+## Back button / Escape: closes the card if it is open. Returns true when it was.
+func dismiss() -> bool:
+	if not _card.visible:
+		return false
+	_close()
+	return true

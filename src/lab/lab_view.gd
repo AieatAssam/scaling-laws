@@ -240,7 +240,11 @@ func backdrop_origin() -> Vector2:
 func _target() -> Dictionary:
 	if stage > 0:
 		var f: Dictionary = LabData.FOCUS[stage]
-		return {"c": f.c, "r": Rect2(f.c - f.s * 0.5, f.s), "stage": stage}
+		var r := Rect2(f.c - f.s * 0.5, f.s)
+		var c: Vector2 = f.c
+		if _too_small(r.size):
+			c = _newest_in(stage, c)
+		return {"c": c, "r": r, "stage": stage}
 	var c := counts()
 	var levels := [0, 0]   # highest owned level per column (1..3)
 	for f in 6:
@@ -256,9 +260,23 @@ func _target() -> Dictionary:
 	bld = Vector2(x1 * 0.5, LabData.GY - float(tall) * LabData.FLOOR.y * 0.5)
 	var r := Rect2(x0 - MARGIN, top_y - MARGIN, x1 - x0 + 2.0 * MARGIN, bot_y - top_y + 2.0 * MARGIN)
 	var centre := r.get_center()
-	if top >= 0 and (_art_view().x < r.size.x or _art_view().y < r.size.y):
-		centre = LabData.floor_origin(top) + LabData.FLOOR * 0.5
+	if _too_small(r.size):
+		centre = _newest_in(0, centre)
 	return {"c": centre, "r": r, "stage": 0}
+
+
+## True when the view cannot show the whole framing s at the current scale (phones, small windows).
+func _too_small(s: Vector2) -> bool:
+	return _art_view().x < s.x or _art_view().y < s.y
+
+
+## Centre of the newest owned tier in zoom stage st (its art centre), or `otherwise` when none is owned. A view too
+## small for the framing centres here, so the part that just grew stays on screen.
+func _newest_in(st: int, otherwise: Vector2) -> Vector2:
+	for i in range(11, -1, -1):
+		if shown[i] > 0 and LabData.TIER_STAGE[i] == st:
+			return tier_art_pos(i)
+	return otherwise
 
 
 ## Applies a framing with no animation.

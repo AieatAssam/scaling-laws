@@ -60,6 +60,7 @@ USE_REF="${REF_FLAG:-$REF_DEFAULT}"
 if [[ "$USE_REF" == yes && -f "$ROOT/art/style_ref.png" ]]; then ATTACH=(--image="$ROOT/art/style_ref.png"); fi
 
 LOG="${OUT%.png}.log"
+printf '%s\n' "$PROMPT" > "${OUT%.png}.prompt.txt"   # full prompt kept beside the raw, for reproducibility
 EVENTS="$(mktemp)"
 codex exec --json --skip-git-repo-check -s read-only -C "$ROOT/art/raw" ${ATTACH[@]+"${ATTACH[@]}"} "$PROMPT" </dev/null >"$EVENTS" 2>"$LOG" || { echo "codex exec failed, see $LOG" >&2; cat "$EVENTS" >&2; exit 1; }
 

@@ -5,7 +5,7 @@ Every game asset is made the same way: the Codex built-in image tool draws a raw
 the palette and writes the exact game size. `tools/art/asset.sh` runs both for one manifest asset and
 picks the canvas, grid, flags and output path, so you only give a category, an id and a subject.
 
-- Raw files: `art/raw/` (gitignored). Game assets: `assets/` (paths in `SPEC.md`, "Asset manifest").
+- Raw files: `art/raw/` (gitignored). Each generation also saves its full prompt as `<raw>.prompt.txt` beside the raw. Game assets: `assets/` (paths in `SPEC.md`, "Asset manifest").
 - Palette: `art/palette.hex` (32 colours). Art uses only these, plus full transparency.
 - Previews (x6, nearest): `art/preview/`.
 

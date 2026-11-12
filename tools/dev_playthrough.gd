@@ -343,7 +343,7 @@ func _tooltip_phase() -> void:
 		var opt: Control = _panel("training").get("_cards")["fine_tune"]["btn"]
 		await _reveal(opt)
 		await _hover(opt)
-		_check(_text_has(_panel("training"), "Needs 400.00 compute for Fine-tune"), "%s: disabled training option says what it needs" % key)
+		_check(_tip_showing() and _tip_text().contains("Needs 400.00 compute for Fine-tune"), "%s: disabled training option says what it needs" % key)
 		_check(_tip_showing() and _inside_view(), "%s: disabled training tip shows inside the view" % key)
 		await _shot("tip_training_disabled_%s" % key)
 		G().state.set_cur("compute", BigNum.from_float(1e4))

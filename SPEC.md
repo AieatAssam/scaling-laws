@@ -81,7 +81,7 @@ docs/API.md    the core API the UI codes against (written by the core agent)
   energy, alignment, capability, training, hiring, research, benchmarks, events, rivals,
   regulation, automation, settings, agi.
 - `assets/events/<category>.png` 192x128 — rival_launch, regulation, poaching, incident,
-  breakthrough, media, funding, outage.
+  breakthrough, media, funding, outage. Opaque illustrations (full-bleed art, no transparent background).
 - `assets/badges/{bronze,silver,gold,platinum,diamond,cosmic}.png` 48x48.
 - `assets/backdrops/{garage_sky,city,orbit,swarm,universe}.png` 640x360 (opaque).
 - `assets/legacy/{funding,generation,paradigm,singularity}.png` 48x48 — the prop kept after a

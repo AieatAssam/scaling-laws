@@ -60,10 +60,9 @@ removed). Commands and the prompt recipe are in [art/README.md](art/README.md).
 The game is already pointer-first and responsive (360x640 base viewport, portrait and landscape),
 and CI produces a debug APK. Still to do for a real Android release:
 
-- Test on a device: the APK has never been installed or played.
+- Test on a device: the APK has never been installed or played. Pause/resume offline credit, the Android
+  back button and the safe-area insets are implemented but unverified until a phone runs them.
 - A release keystore and signing config (CI signs with a throwaway debug key), plus an AAB for Play.
-- Safe-area insets (notches, gesture bar) and the Android back button.
-- Pause/resume handling: save on `NOTIFICATION_APPLICATION_PAUSED` and apply offline progress on resume.
 - Adaptive launcher icons; only a single PNG icon exists.
 - A 32-bit ARM / x86_64 build if those devices matter (only arm64-v8a is exported).
 

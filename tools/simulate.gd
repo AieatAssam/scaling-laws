@@ -87,6 +87,9 @@ var next_trace := 0.0
 var probe := false                                     # --probe: log higher-layer reset decisions and rate crossings
 var cross_all: Array = []                              # first game time compute/s reached 10^p
 var cross_post: Array = []                             # same, counted only once Singularity has reset
+var snaps: Array = []                                  # phase snapshot lines (state before each first reset, and at 15 min)
+var snap_15 := false
+var picks: Array = []                                  # [seconds, run id, log10 stock, training mult, generation best, ops] per pick
 
 
 func _initialize() -> void:
@@ -304,6 +307,8 @@ func _training() -> void:
 			raw_id = d.id
 	var pick := gain_id if gain_id != "" else raw_id
 	if pick != "":
+		picks.append([now(), pick, log(maxf(1.0, s.cur("compute").to_float())) / log(10.0),
+			Rules.mult(s, "training"), best_now, _staff_count("ops")])
 		Sim.start_training(s, pick)
 		_log("train %s" % pick)
 
@@ -369,6 +374,8 @@ func _resets() -> void:
 				print("  probe %s reset #%d: epoch %d, duration %.3f h, gain %d, gain/h %.3f, holding %s, life %s, why %s" % [
 					LAYER_NAMES[k], cycles[k].size() + 1, _epoch(k), dur / HOUR, int(p["gain"]), int(p["gain"]) / maxf(dur / HOUR, 1e-9),
 					(p["holding"] as BigNum).format(), (s.run["layers"][k]["life"] as BigNum).format(), why])
+			if first_reset[k] < 0.0:
+				_snap("before first %s" % LAYER_NAMES[k])
 			var r := Sim.perform_reset(s, k)
 			if r["ok"]:
 				_on_reset(k, int(r["gain"]), why)
@@ -482,6 +489,23 @@ func _handle(evs: Array) -> void:
 				_log("event offered: %s" % e["id"])
 
 
+func _median(vals: Array) -> float:
+	if vals.is_empty():
+		return 0.0
+	var v := vals.duplicate()
+	v.sort()
+	return float(v[v.size() / 2])
+
+
+## Records the economy state that training_balance.gd's phases are built from (diagnostics only, no gate).
+func _snap(label: String) -> void:
+	var stock := maxf(1.0, s.cur("compute").to_float())
+	var rate := maxf(1.0, Sim.compute_per_second(s).to_float())
+	snaps.append("  snapshot %-22s %s  stock 1e%.1f  compute/s 1e%.1f  training x%.2f  generation best %.2f  ops %d" % [
+		label, _fmt(now()), log(stock) / log(10.0), log(rate) / log(10.0), Rules.mult(s, "training"),
+		float(s.run["layers"][2]["best"]), _staff_count("ops")])
+
+
 ## Detects unlocks that happen inside tick (auto-buy, auto-reset), checks cycles, idleness and numbers.
 func _observe() -> void:
 	var day := int(now() / DAY)
@@ -495,6 +519,9 @@ func _observe() -> void:
 				cross_all[p] = now()
 			if s.resets(4) > 0 and cross_post[p] < 0.0:
 				cross_post[p] = now()
+	if not snap_15 and now() >= 900.0:
+		snap_15 = true
+		_snap("15 min")
 	if now() >= next_trace:
 		next_trace = now() + TRACE_EVERY
 		var owned_tiers := 0
@@ -696,6 +723,28 @@ func _report() -> int:
 	for k in range(1, 5):
 		reset_parts.append("%s %d" % [LAYER_NAMES[k], s.resets(k)])
 	print("resets: " + ", ".join(reset_parts))
+	print("phase snapshots (state before each first reset; used to set training_balance.gd phases):")
+	for line in snaps:
+		print(line)
+	print("training picks by game window (counts; medians of log10 stock, training x, generation best, ops):")
+	var spans := [["< 1 h", 0.0, HOUR], ["1-24 h", HOUR, DAY], ["1-5 d", DAY, 5.0 * DAY], ["> 5 d", 5.0 * DAY, INF]]
+	for w in spans:
+		var counts := {}
+		var cols := [[], [], [], []]
+		for p in picks:
+			if float(p[0]) < float(w[1]) or float(p[0]) >= float(w[2]):
+				continue
+			counts[p[1]] = int(counts.get(p[1], 0)) + 1
+			for i in 4:
+				cols[i].append(float(p[i + 2]))
+		if counts.is_empty():
+			print("  %-7s no picks" % w[0])
+			continue
+		var parts: Array = []
+		for id in counts:
+			parts.append("%s %d" % [id, counts[id]])
+		print("  %-7s %s | stock 1e%.1f  training x%.2f  best %.1f  ops %.0f" % [w[0], ", ".join(parts),
+			_median(cols[0]), _median(cols[1]), _median(cols[2]), _median(cols[3])])
 	var peaks: Array = []
 	for i in peak_rate.size():
 		peaks.append("d%d %s" % [i, BigNum.from_float(float(peak_rate[i])).format()])

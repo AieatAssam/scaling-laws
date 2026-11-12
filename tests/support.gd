@@ -11,6 +11,15 @@ static func make_content() -> Node:
 	return c
 
 
+## Deletes a save file and everything the save system leaves beside it: <path>.bak, <path>.bad-<ms>, <path>.newer-<ms>.
+static func remove_save_files(path: String) -> void:
+	var dir := path.get_base_dir()
+	var base := path.get_file()
+	for f in DirAccess.get_files_at(dir):
+		if f == base or f == base + ".bak" or f.begins_with(base + ".bad-") or f.begins_with(base + ".newer-"):
+			DirAccess.remove_absolute(dir.path_join(f))
+
+
 static func new_state(content: Node, seed_value: int = 1) -> GameState:
 	return GameState.new(content, seed_value)
 
