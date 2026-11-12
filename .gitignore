@@ -1,0 +1,7 @@
+.godot/
+*.import.tmp
+.DS_Store
+.venv/
+__pycache__/
+art/raw/
+export/
