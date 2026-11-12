@@ -120,6 +120,7 @@ jobs:
           TAG: ${{ steps.ver.outputs.tag }}
         run: |
           set -euo pipefail
+          chmod +x build/linux/ScalingLaws.x86_64
           (cd build/win && zip -q "../scaling-laws-$TAG-windows.zip" ScalingLaws.exe ScalingLaws.pck)
           (cd build/linux && zip -q "../scaling-laws-$TAG-linux.zip" ScalingLaws.x86_64 ScalingLaws.pck)
           (cd build/web && zip -q -r "../scaling-laws-$TAG-web.zip" .)
@@ -141,7 +142,6 @@ jobs:
             done
             grep -aq "art/palette.hex" "$pck" || { echo "palette.hex missing from $pck"; exit 1; }
           done
-          chmod +x build/linux/ScalingLaws.x86_64
 
       - name: Upload desktop and web archives
         uses: actions/upload-artifact@v4
