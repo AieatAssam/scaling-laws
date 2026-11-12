@@ -98,15 +98,17 @@ func _tip() -> String:
 	return "\n".join(lines)
 
 
-## "Est.: worth it in ~12m, next +1 in ~3m" (at the current cash rate). "now" once worth it; "—" when there is no income.
+## "Est.: worth it in ~12m, next +1 in ~3m" (at the current cash rate). "now" once worth it; "-" when there is no income.
 func _eta_text(e: Dictionary) -> String:
-	var worth_in := float(e["worth_in"])
-	var next_in := float(e["next_in"])
-	if is_inf(worth_in) and is_inf(next_in):
-		return "Est.: —"
-	var worth := "worth it now" if e["worth_now"] else ("worth it: —" if is_inf(worth_in) else "worth it in ~%s" % _span(worth_in))
-	var nxt := "next +1: —" if is_inf(next_in) else "next +1 in ~%s" % _span(next_in)
-	return "Est.: %s, %s" % [worth, nxt]
+	var worth := "worth it now" if e["worth_now"] else "worth it in " + _dur(float(e["worth_in"]))
+	return "Est.: %s, next +1 in %s" % [worth, _dur(float(e["next_in"]))]
+
+
+## "~12m" style, "<1m" under a minute, "-" when the rate is zero (INF).
+static func _dur(sec: float) -> String:
+	if is_inf(sec):
+		return "-"
+	return "<1m" if sec < 60.0 else "~" + _span(sec)
 
 
 ## Coarse time: "<1m", "12m", "3h", "5d", "over 100y".

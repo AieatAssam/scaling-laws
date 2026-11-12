@@ -18,6 +18,8 @@ signal challenge_finished(id: String, success: bool)
 signal challenge_abandoned(id: String)
 signal event_offered(id: String)
 signal event_resolved(id: String, choice: int)
+signal paper_offered(id: String)
+signal paper_resolved(id: String, choice: int)
 signal benchmark_unlocked(id: String, badge: String)
 signal rival_launched(id: String)
 signal agi_advanced(index: int)
@@ -28,6 +30,12 @@ signal saved(ok: bool)
 signal settings_changed(key: String, value: Variant)
 ## A damaged or newer save was set aside, or a backup was used (text for the player). Emitted before `started`.
 signal save_notice(text: String)
+## A layer reset beat that layer's fastest cycle (not its first reset). Notices shows the toast.
+signal record_set(layer: int, secs: float)
+signal upgrade_bought(id: String)
+signal launch_fired(id: String)
+signal news_spawned(id: String)
+signal news_caught(id: String, reward: Dictionary)
 
 const AUTOSAVE_SECONDS := 30.0
 ## Offline progress is only reported (the "While you were away" card) for absences at least this long.
@@ -46,8 +54,20 @@ var _away_since := 0.0
 var _ticked_since := 0.0
 
 
+## Set by Main while a modal is open: breaking news does not spawn then (see News).
+var news_held := false
+
+
 func _ready() -> void:
 	state = GameState.new(Content, randi())
+	# Records (see Records) are kept here, from the same signals for manual actions and sim events alike.
+	producer_bought.connect(func(id: String, _n: int) -> void: Records.note(state.persist, "producers", id))
+	research_bought.connect(func(id: String) -> void: Records.note(state.persist, "research", id))
+	challenge_finished.connect(_on_challenge_finished)
+	agi_advanced.connect(func(index: int) -> void: Records.note_agi(state.persist, index))
+	ending_reached.connect(func(id: String) -> void: Records.note_ending(state, id))
+	layer_reset.connect(_on_layer_reset)
+	new_run_started.connect(func() -> void: Records.new_run(state.persist))
 
 
 ## Loads the save (if any), simulates the time since it was written, then starts ticking.
@@ -56,6 +76,8 @@ func start() -> void:
 	if not d.is_empty():
 		state = GameState.from_dict(Content, d)
 	apply_settings()
+	Records.absorb(state)  # counts what a loaded save already holds; the hooks in _ready count the rest
+	Reveals.seed(state)
 	if SaveSystem.last_notice != "":
 		save_notice.emit(SaveSystem.last_notice)
 	var saved_at := float(state.persist.get("saved_at", 0.0))
@@ -84,7 +106,7 @@ func _process(delta: float) -> void:
 	if not running:
 		return
 	var dt := minf(delta, MAX_TICK_SECONDS)
-	_dispatch(Sim.tick(state, dt))
+	_dispatch(Sim.tick(state, dt, false, news_held))
 	if _away_since > 0.0:
 		_ticked_since += dt
 	_autosave_t += dt
@@ -137,6 +159,17 @@ func _end_away() -> void:
 	_ticked_since = 0.0
 	if running:
 		_catch_up(maxf(0.0, away - ticked), away)
+
+
+func _on_challenge_finished(id: String, success: bool) -> void:
+	if success:
+		Records.note(state.persist, "challenges", id)
+
+
+func _on_layer_reset(layer: int, _gain: int) -> void:
+	var r := Records.note_reset(state.persist, layer)
+	if r["record"]:
+		record_set.emit(layer, float(r["secs"]))
 
 
 func save_now() -> bool:
@@ -232,6 +265,27 @@ func buy_automation(id: String) -> Dictionary:
 	return r
 
 
+func buy_upgrade(id: String) -> Dictionary:
+	var r := Upgrades.buy(state, id)
+	if r["ok"]:
+		upgrade_bought.emit(id)
+	return r
+
+
+func fire_launch(id: String) -> Dictionary:
+	var r := Launches.fire(state, id)
+	if r["ok"]:
+		launch_fired.emit(id)
+	return r
+
+
+func catch_news() -> Dictionary:
+	var r := News.catch(state)
+	if r["ok"]:
+		news_caught.emit(r["id"], r)
+	return r
+
+
 func buy_legacy(key: String) -> Dictionary:
 	var r := Sim.buy_legacy(state, key)
 	if r["ok"]:
@@ -258,6 +312,13 @@ func resolve_event(choice: int) -> Dictionary:
 	var r := Sim.resolve_event(state, choice)
 	if r["ok"]:
 		event_resolved.emit(r["id"], choice)
+	return r
+
+
+func resolve_paper(slot: int, choice: int) -> Dictionary:
+	var r := Desk.resolve(state, slot, choice)
+	if r["ok"]:
+		paper_resolved.emit(r["id"], choice)
 	return r
 
 
@@ -306,5 +367,15 @@ func _dispatch(evs: Array) -> void:
 				ending_reached.emit(e["id"])
 			"benchmark":
 				benchmark_unlocked.emit(e["id"], e["badge"])
+			"paper_offered":
+				paper_offered.emit(e["id"])
+			"paper_resolved":
+				paper_resolved.emit(e["id"], e["choice"])
 			"event":
 				event_offered.emit(e["id"])
+			"upgrade_bought":
+				upgrade_bought.emit(e["id"])
+			"launch_fired":
+				launch_fired.emit(e["id"])
+			"news":
+				news_spawned.emit(e["id"])

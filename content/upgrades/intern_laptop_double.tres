@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "intern_laptop_double"
+title = "Second Monitor"
+description = "Doubles the output of Intern Laptop."
+icon = "compute"
+order = 1
+cost = 80.0
+kind = "double"
+target = "intern_laptop"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "intern_laptop", "value": 1}])

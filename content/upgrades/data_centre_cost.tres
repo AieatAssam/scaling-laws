@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "data_centre_cost"
+title = "Preferred Vendor"
+description = "-10% cost of Data Centre producers."
+icon = "compute"
+order = 12
+cost = 102400.0
+kind = "cost"
+target = "data_centre"
+source = ""
+value = 0.10
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "data_centre", "value": 25}])

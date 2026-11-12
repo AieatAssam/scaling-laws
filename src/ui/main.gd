@@ -58,6 +58,8 @@ var _column: VBoxContainer        # the whole shell; padded by the safe-area ins
 var _notices: Notices             # offline card and save notice (Back closes it)
 var _ending: Node                 # the ending screen while it is up (Back closes it)
 var _tip: Tip
+var _reveal_card: RevealCard       # one-time "New: ..." cards (see Reveals)
+var _stats: StatsPanel            # Settings > Statistics overlay, built on first open
 
 
 func _ready() -> void:
@@ -72,7 +74,8 @@ func _ready() -> void:
 	# Overlays connect to Game signals in their _ready, so they must exist before Game.start().
 	# Modal ones share one queue (see _request_modal): each gets the gate and reports `closed` back to it.
 	_notices = Notices.new()
-	for overlay in [_notices, EventPopup.new(), PrestigeOverlay.new()]:
+	_reveal_card = RevealCard.new()
+	for overlay in [_notices, EventPopup.new(), PrestigeOverlay.new(), _reveal_card]:
 		overlay.gate = _request_modal
 		overlay.closed.connect(_on_modal_closed)
 		add_child(overlay)
@@ -365,6 +368,44 @@ func _notification(what: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and _dismiss_top():
 		get_viewport().set_input_as_handled()
+	elif event is InputEventKey and event.pressed and not event.echo and _hotkey(event as InputEventKey):
+		get_viewport().set_input_as_handled()
+
+
+## Desktop keys (listed in Settings and the Keyboard shortcuts help topic). 1-9 pick a tab, B cycles the producer buy
+## amount, Space or Enter confirms the open card. Ignored while typing in a text field, with Ctrl/Alt/Cmd, and behind a dialog.
+func _hotkey(ev: InputEventKey) -> bool:
+	if ev.ctrl_pressed or ev.alt_pressed or ev.meta_pressed:
+		return false
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit:
+		return false
+	if ev.keycode == KEY_SPACE or ev.keycode == KEY_ENTER or ev.keycode == KEY_KP_ENTER:
+		return _confirm_top()
+	if _modal_busy or (_stats != null and _stats.visible):
+		return false
+	if ev.keycode >= KEY_1 and ev.keycode <= KEY_9:
+		var id: String = PANEL_IDS[ev.keycode - KEY_1]
+		if _tabs.has(id) and (_tabs[id] as Button).visible:
+			_select(id)
+			return true
+	if ev.keycode == KEY_B and _panels.get("producers") != null:
+		(_panels["producers"] as Control).call("cycle_amount")
+		return true
+	return false
+
+
+## Space or Enter: the open card's OK, the reveal card or the offline and save card. False when none is open.
+func _confirm_top() -> bool:
+	return _reveal_card.dismiss() or _notices.dismiss()
+
+
+## Settings > Statistics: the overlay over the shell. Close and Back hide it (see _dismiss_top).
+func open_stats() -> void:
+	if _stats == null:
+		_stats = StatsPanel.new()
+		add_child(_stats)
+	_stats.visible = true
 
 
 func _back() -> void:
@@ -396,12 +437,18 @@ func _dismiss_top() -> bool:
 	if _ending != null and not _ending.is_queued_for_deletion():
 		_ending.call("_close")
 		return true
+	if _stats != null and _stats.visible:
+		_stats.hide()
+		return true
+	if _reveal_card.dismiss():
+		return true
 	if _notices.dismiss():
 		return true
 	return _modal_busy
 
 
 func _process(delta: float) -> void:
+	Game.news_held = _modal_busy
 	(_cash["value"] as TickLabel).set_target(Game.cash())
 	(_compute["value"] as TickLabel).set_target(Game.compute())
 	_rate_tick += delta

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "data_centre_synergy"
+title = "Cable Management"
+description = "+1% of Data Centre output per Server Rack owned (up to +100%)."
+icon = "compute"
+order = 11
+cost = 61440.0
+kind = "synergy"
+target = "data_centre"
+source = "server_rack"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "data_centre", "value": 10}])

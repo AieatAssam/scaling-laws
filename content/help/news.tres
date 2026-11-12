@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "news"
+title = "Breaking news"
+icon = "events"
+order = 45
+conditions = Array[Dictionary]([])
+hint = "A chip appears now and then. Tap it before it fades."
+body = "## The chip
+BREAKING appears in the lab view for 15 seconds, at random. Tap it to claim one reward: cash or compute worth 30 to 90 seconds of income, double cash for 30 seconds, or a rare viral moment with 7x cash for 15 seconds.
+## Missing it
+A missed chip costs nothing.
+## Catches
+Each headline you catch counts toward the news benchmarks."

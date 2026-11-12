@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "cloud_gpus_cost"
+title = "Reserved Instances"
+description = "-10% cost of Cloud GPUs producers."
+icon = "compute"
+order = 6
+cost = 1600.0
+kind = "cost"
+target = "cloud_gpus"
+source = ""
+value = 0.10
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "cloud_gpus", "value": 25}])

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "server_rack_double"
+title = "Liquid Cooling"
+description = "Doubles the output of Server Rack."
+icon = "compute"
+order = 7
+cost = 5120.0
+kind = "double"
+target = "server_rack"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "server_rack", "value": 1}])

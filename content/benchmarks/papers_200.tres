@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "papers_200"
+title = "200 Papers"
+description = "Read 200 papers."
+icon = "benchmarks"
+badge = "bronze"
+conditions = Array[Dictionary]([{"type": "stat_gte", "id": "papers", "value": 200}])
+effects = Array[Dictionary]([])

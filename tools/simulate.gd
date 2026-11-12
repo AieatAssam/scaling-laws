@@ -215,6 +215,8 @@ func _next_dt() -> float:
 func _policy() -> void:
 	_track_gains()
 	_resolve_event()
+	while not Desk.state(s)["slots"].is_empty():
+		Desk.resolve(s, 0, Desk.best_cash(s, Desk.state(s)["slots"][0]))
 	_buy_producers()
 	_hire()
 	_research()
@@ -548,7 +550,7 @@ func _signature() -> int:
 		n += _staff_count(role)
 	n += s.run["layers"][2]["research"].size() + s.persist["automation"].size()
 	n += s.persist["benchmarks"].size() + s.run["challenges_done"].size() + int(s.run["stage"])
-	n += int(s.persist["stats"]["trainings"]) + int(s.persist["stats"]["events"])
+	n += int(s.persist["stats"]["trainings"]) + int(s.persist["stats"]["events"]) + int(s.persist["stats"].get("papers", 0))
 	for k in range(1, 5):
 		n += 1000 * s.resets(k)
 	for key in s.persist["legacy_perks"]:

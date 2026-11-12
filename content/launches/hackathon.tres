@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LaunchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/launch_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "hackathon"
+title = "Hackathon"
+description = "Training runs 2x faster for 5 min. Costs 5% of compute. Cooldown 20 min."
+icon = "breakthroughs"
+order = 3
+cost_currency = "compute"
+cost_share = 0.05
+cooldown = 1200.0
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 2, "value": 1}])
+effects = Array[Dictionary]([{"type": "timed_mod", "key": "train_speed", "value": 2.00, "seconds": 300.0}])

@@ -4,7 +4,7 @@ class_name Rules
 
 const CONDITION_TYPES := [
 	"owned_gte", "currency_gte", "resets_gte", "training_best_gte", "staff_gte", "research_has",
-	"slider_gte", "time_played_gte", "benchmark_unlocked", "flag_set", "debt_gte", "compute_rate_gte",
+	"stat_gte", "slider_gte", "time_played_gte", "benchmark_unlocked", "flag_set", "debt_gte", "compute_rate_gte",
 ]
 const EFFECT_TYPES := [
 	"add_currency", "add_debt", "add_slider", "add_flag", "timed_mod", "run_mult", "perm_mult", "rival_progress",
@@ -34,6 +34,8 @@ static func check(s: GameState, c: Dictionary) -> bool:
 			return c["id"] in s.run["layers"][2]["research"]
 		"slider_gte":
 			return float(s.run["slider"]) >= float(c["value"])
+		"stat_gte":
+			return float(s.persist["stats"].get(c["id"], 0)) >= float(c["value"])
 		"time_played_gte":
 			return float(s.persist["stats"]["time"]) >= float(c["value"])
 		"benchmark_unlocked":
@@ -61,6 +63,9 @@ static func apply(s: GameState, e: Dictionary) -> void:
 		"add_flag":
 			s.run["flags"][e["id"]] = true
 		"timed_mod":
+			for i in range(L0["timed"].size() - 1, -1, -1):
+				if L0["timed"][i]["key"] == e["key"]:
+					L0["timed"].remove_at(i)
 			L0["timed"].append({"key": e["key"], "value": float(e["value"]), "left": float(e["seconds"])})
 		"run_mult":
 			L0["run_mult"][e["key"]] = float(L0["run_mult"].get(e["key"], 1.0)) * float(e["value"])
@@ -101,7 +106,10 @@ static func mult_parts(s: GameState, key: String) -> Array:
 	var L0: Dictionary = s.run["layers"][0]
 	var out: Array = []
 	out.append({"id": "perm", "name": "Legacy perks", "value": float(s.persist["perm_mult"].get(key, 1.0))})
+	if key == "compute":
+		out.append({"id": "desk", "name": "Research desk", "value": 1.0 + float(s.run["layers"][2]["desk"]["bonus"])})
 	out.append({"id": "run", "name": "Run upgrades", "value": float(L0["run_mult"].get(key, 1.0))})
+	out.append_array(Upgrades.parts(s, key))
 	for t in L0["timed"]:
 		if t["key"] == key:
 			out.append({"id": "timed", "name": "Timed boost", "value": float(t["value"])})
@@ -178,6 +186,8 @@ static func condition_progress(s: GameState, c: Dictionary) -> float:
 			p = _linear(float(s.run["layers"][1]["staff"].get(c["id"], 0)), float(c["value"]))
 		"slider_gte":
 			p = _linear(float(s.run["slider"]), float(c["value"]))
+		"stat_gte":
+			p = _linear(float(s.persist["stats"].get(c["id"], 0)), float(c["value"]))
 		"time_played_gte":
 			p = _linear(float(s.persist["stats"]["time"]), float(c["value"]))
 		"debt_gte":

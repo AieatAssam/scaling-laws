@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "enterprise_tier"
+title = "Enterprise Tier"
+description = "+25% cash from all compute income."
+icon = "cash"
+order = 21
+cost = 40000.0
+kind = "revenue"
+target = ""
+source = ""
+value = 0.25
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "data_centre", "value": 1}])

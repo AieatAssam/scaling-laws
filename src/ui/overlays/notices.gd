@@ -76,6 +76,7 @@ func _ready() -> void:
 	Game.offline_progress.connect(func(s: Dictionary) -> void: _request(show_offline.bind(s)))
 	Game.save_notice.connect(func(text: String) -> void: _request(show_save_notice.bind(text)))
 	Game.benchmark_unlocked.connect(show_benchmark)
+	Game.record_set.connect(show_record)
 
 
 func _request(open: Callable) -> void:
@@ -127,10 +128,19 @@ func _show(heading: String, body: String) -> bool:
 func show_benchmark(id: String, badge: String) -> void:
 	var d = Content.get_def("benchmarks", id)
 	_toast_icon.texture = Fx.tex("res://assets/badges/%s.png" % badge, Vector2i(48, 48))  # fallback at logical size
+	_toast_icon.visible = true
 	_toast_title.text = "Benchmark: %s" % (d.title if d else id)
 	_toast.visible = true
 	_toast_t = 3.0
 	Fx.pop(_toast_icon, 1.25)
+
+
+## A layer reset beat its fastest cycle. Toast only; the first reset of a layer is never a record.
+func show_record(layer: int, secs: float) -> void:
+	_toast_icon.visible = false
+	_toast_title.text = "New record: fastest %s %s" % [Records.layer_title(Game.state, layer), Records.format_duration(secs)]
+	_toast.visible = true
+	_toast_t = 3.0
 
 
 func _process(delta: float) -> void:

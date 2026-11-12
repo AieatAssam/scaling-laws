@@ -23,14 +23,7 @@ var _reset_dialog: ConfirmationDialog
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var margin := MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 8)
-	add_child(margin)
-	var page := VBoxContainer.new()
-	page.add_theme_constant_override("separation", 10)
-	margin.add_child(page)
+	var page := PanelKit.scroll_page(self)  # drag-scrolls on phones: the page is taller than 640 px
 
 	var head := Label.new()
 	head.text = "Settings"
@@ -103,6 +96,17 @@ func _ready() -> void:
 	var intro_btn := PanelKit.button("Replay intro", _replay_intro, true)
 	Tip.attach(intro_btn, "Replay intro\nPlays the opening story again. The game pauses until it ends.")
 	page.add_child(intro_btn)
+	var stats_btn := PanelKit.button("Statistics", _open_stats, true)
+	Tip.attach(stats_btn, "Statistics\nCompletion, this run and all time, the fastest cycle of each reset layer.")
+	page.add_child(stats_btn)
+	page.add_child(PanelKit.label("Keyboard (desktop)", PanelKit.GOLD))
+	var keys_row := HBoxContainer.new()
+	keys_row.add_theme_constant_override("separation", 6)
+	page.add_child(keys_row)
+	var keys := PanelKit.label("1-9 switch tabs · B cycles buy amount · Space or Enter confirms a card · Esc closes it", PanelKit.TEXT)
+	keys.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	keys_row.add_child(keys)
+	keys_row.add_child(PanelHelp.button("hotkeys"))
 
 	page.add_child(PanelKit.label("Save data", PanelKit.GOLD))
 	var io_row := VBoxContainer.new()
@@ -193,6 +197,10 @@ func _import() -> void:
 
 
 ## Asks the shell to play the intro again (main.gd play_intro). Replaying does not change the flag.
+func _open_stats() -> void:
+	get_tree().call_group("shell", "open_stats")
+
+
 func _replay_intro() -> void:
 	var main := get_tree().current_scene
 	if main != null and main.has_method("play_intro"):

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LaunchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/launch_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "ship_demo"
+title = "Ship a demo"
+description = "Cash x1.5 for 5 min. Costs 2% of compute. Cooldown 10 min."
+icon = "breakthroughs"
+order = 1
+cost_currency = "compute"
+cost_share = 0.02
+cooldown = 600.0
+conditions = Array[Dictionary]([{"type": "stat_gte", "id": "trainings", "value": 1}])
+effects = Array[Dictionary]([{"type": "timed_mod", "key": "cash", "value": 1.50, "seconds": 300.0}])

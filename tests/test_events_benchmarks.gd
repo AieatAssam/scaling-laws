@@ -80,6 +80,7 @@ func test_every_condition_type_passes_only_when_satisfied() -> void:
 		"research_has": {"id": Support.first_with_no_prereq(content)},
 		"slider_gte": {"value": 0.9},
 		"time_played_gte": {"value": 100.0},
+		"stat_gte": {"id": "papers", "value": 3},
 		"benchmark_unlocked": {"id": content.get_all("benchmarks")[0].id},
 		"flag_set": {"id": "test_flag"},
 		"debt_gte": {"value": 4.0},

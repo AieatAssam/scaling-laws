@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "research_desk"
+title = "Research desk"
+icon = "research"
+order = 65
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 2, "value": 1}])
+hint = "Read research papers after a Model Generation."
+body = "## Papers\nA paper arrives every 20 minutes while a slot is free, including while away. Three papers fit and never expire. Choose one response for each paper.\n## Resets\nFunding keeps papers and the timer. Model Generation clears the desk and its generation bonus.\n## Landmarks\nAfter a Paradigm Shift, some papers are landmarks and have doubled effects. Auto-review chooses the best cash option."

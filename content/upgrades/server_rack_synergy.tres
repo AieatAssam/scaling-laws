@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "server_rack_synergy"
+title = "Hot Aisle Sharing"
+description = "+1% of Server Rack output per Cloud GPUs owned (up to +100%)."
+icon = "compute"
+order = 8
+cost = 7680.0
+kind = "synergy"
+target = "server_rack"
+source = "cloud_gpus"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "server_rack", "value": 10}])

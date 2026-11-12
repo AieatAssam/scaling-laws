@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "intern_laptop_synergy"
+title = "Free Snacks"
+description = "+1% of Intern Laptop output per Cloud GPUs owned (up to +100%)."
+icon = "compute"
+order = 2
+cost = 120.0
+kind = "synergy"
+target = "intern_laptop"
+source = "cloud_gpus"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "intern_laptop", "value": 10}])

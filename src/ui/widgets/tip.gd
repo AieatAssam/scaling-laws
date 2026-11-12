@@ -8,7 +8,7 @@ extends CanvasLayer
 
 const HOVER_DELAY := 0.35
 const LONG_PRESS := 0.4
-const SLOP := 10.0            # finger movement (px) that turns a press into a scroll
+const SLOP := DragScroll.DEAD_ZONE  # finger movement (px) that turns a press into a scroll
 const TOUCH_GRACE_MS := 700   # emulated mouse hover right after a touch is ignored
 const WIDTH := 300.0
 const EDGE_GAP := 8.0

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "upgrades"
+title = "Lab upgrades"
+icon = "research"
+order = 35
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "intern_laptop", "value": 1}])
+hint = "One-time buys that boost a tier, cut its cost, or lift revenue."
+body = "## What they do
+An upgrade is bought once with cash. Each one either doubles a tier's output, adds output for every unit of another tier owned, cuts a tier's cost by 10%, adds cash income, or cuts training time.
+## Unlocks
+Tier upgrades unlock when you own 1, 10 or 25 of that tier.
+## Resets
+Upgrades are part of the run. A Funding Round wipes them, like producers.
+## Automation
+Auto-upgrade buys them as soon as they are affordable."

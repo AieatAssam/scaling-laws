@@ -24,11 +24,14 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 	persist = {
 		"perm_mult": {}, "legacy_perks": {}, "automation": [], "benchmarks": [],
 		"best_all": 0.0,
-		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0},
+		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0, "launches": 0, "news": 0},
 		"lifetime_resets": [0, 0, 0, 0],
 		"settings": {"reduce_motion": false, "notation": "suffix"},
 		"intro_seen": false,
 		"saved_at": 0.0,
+		"records": Records.default(0.0),   # see Records; a v3 save gets one from SaveSystem._v3_to_v4
+		"seen_reveals": {},                # reveal id -> true once its "New: ..." card has been shown
+		"reveals_seeded": false,           # Reveals.seed has run (see Game.start)
 	}
 	run = fresh_run()
 
@@ -41,6 +44,7 @@ static func fresh_run() -> Dictionary:
 	return {
 		"layers": layers, "resets_done": [0, 0, 0, 0], "stage": 0, "slider": 0.5,
 		"flags": {}, "rivals": {}, "challenges_done": [], "challenge_passed": {}, "run_over": "",
+		"launches": {}, "news": {"timer": News.FIRST_SECONDS, "chip": {}},
 	}
 
 
@@ -50,7 +54,7 @@ static func fresh_layer() -> Dictionary:
 		"owned": {}, "staff": {}, "research": [],
 		"best": 0.0, "debt": 0.0, "run_mult": {}, "timed": [],
 		"training": {}, "cooldowns": {}, "pending": "", "event_timer": 90.0,
-		"challenge": {},
+		"challenge": {}, "upgrades": [], "desk": {"slots": [], "timer": 1200.0, "bonus": 0.0},
 	}
 
 
@@ -177,3 +181,4 @@ func _normalize_ints() -> void:
 		persist["legacy_perks"][key] = int(persist["legacy_perks"][key])
 	for i in persist["lifetime_resets"].size():
 		persist["lifetime_resets"][i] = int(persist["lifetime_resets"][i])
+	persist["records"]["agi_best"] = int(persist["records"]["agi_best"])

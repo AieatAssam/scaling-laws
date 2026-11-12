@@ -3,6 +3,10 @@ extends PanelBase
 
 const PRESETS := [0.0, 0.3, 0.7, 1.0]
 
+var _desk: VBoxContainer
+var _desk_timer: Label
+var _desk_cards: VBoxContainer
+var _desk_signature := ""
 var _card: PanelResetCard
 var _slider_info: Label
 var _slider: HSlider
@@ -12,6 +16,12 @@ var _tree: PanelResearchTree
 
 
 func _build() -> void:
+	_desk = PanelKit.section(page, "Research desk", "research")
+	_desk_timer = PanelKit.label("")
+	_desk.add_child(_desk_timer)
+	_desk_cards = VBoxContainer.new()
+	_desk_cards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_desk.add_child(_desk_cards)
 	_card = PanelResetCard.new().setup(2, Callable(self, "report"))
 	page.add_child(_card)
 
@@ -50,6 +60,8 @@ func is_unlocked() -> bool:
 
 func wants_attention() -> bool:
 	var s: GameState = Game.state
+	if not Desk.state(s)["slots"].is_empty():
+		return true
 	if Sim.reset_preview(s, 2)["highlight"]:
 		return true
 	for d in Content.get_all("research"):
@@ -79,6 +91,7 @@ func _on_slider(v: float) -> void:
 
 func _refresh() -> void:
 	_card.refresh()
+	_refresh_desk()
 	var s: GameState = Game.state
 	var unlocked := s.resets(2) > 0
 	var sl := float(s.run["slider"])
@@ -95,3 +108,52 @@ func _refresh() -> void:
 		_slider_info.text = "Alignment unlocks after your first Model Generation. Low alignment buys raw capability and adds debt."
 	_insights.text = "Insights: %s" % s.cur("insights").format()
 	_tree.refresh()
+
+
+func _refresh_desk() -> void:
+	var s: GameState = Game.state
+	var desk := Desk.state(s)
+	if not Desk.unlocked(s):
+		_desk_timer.text = "Unlocks after your first Model Generation."
+	else:
+		_desk_timer.text = "Desk full" if desk["slots"].size() >= Desk.CAP else "Next paper: %s" % PanelKit.hms(float(desk["timer"]))
+	var signature := str(desk["slots"])
+	if signature == _desk_signature:
+		return
+	_desk_signature = signature
+	for node in _desk_cards.get_children():
+		node.queue_free()
+	for slot in desk["slots"].size():
+		var card: Dictionary = desk["slots"][slot]
+		var d = Content.get_def("papers", card["id"])
+		if d == null:
+			continue
+		var panel := PanelKit.card()
+		if card["landmark"]:
+			var style: StyleBoxFlat = panel.get_theme_stylebox("panel").duplicate()
+			style.border_color = PanelKit.col(PanelKit.GOLD)
+			panel.add_theme_stylebox_override("panel", style)
+		_desk_cards.add_child(panel)
+		var box := VBoxContainer.new()
+		panel.add_child(box)
+		box.add_child(PanelKit.label(("[Landmark] " if card["landmark"] else "") + d.title, PanelKit.BRIGHT))
+		box.add_child(PanelKit.label(d.blurb, PanelKit.TEXT))
+		for i in d.choices.size():
+			var choice: Dictionary = d.choices[i]
+			var button := PanelKit.button(choice["label"], func():
+				report(Game.resolve_paper(slot, i), "Paper reviewed.")
+				_refresh_desk())
+			box.add_child(button)
+			Tip.attach(button, _paper_tip(choice, bool(card["landmark"])))
+
+
+func _paper_tip(choice: Dictionary, landmark: bool) -> String:
+	var lines: Array[String] = [String(choice["label"])]
+	var scale := 2.0 if landmark else 1.0
+	for e in choice["effects"]:
+		match e["type"]:
+			"cash_seconds": lines.append("Cash: %.0f seconds of current income." % (float(e["value"]) * scale))
+			"generation_mult": lines.append("Compute: +%.0f%% for this generation (cap +50%%)." % (float(e["value"]) * scale * 100.0))
+			"timed_mod": lines.append("%s x%.2f for %.0f minutes." % [String(e["key"]).capitalize(), 1.0 + (float(e["value"]) - 1.0) * scale, float(e["seconds"]) / 60.0])
+			"rival_progress": lines.append("Rival %s progress: %.1f%%." % [e["id"], float(e["value"]) * scale * 100.0])
+	return "\n".join(lines)

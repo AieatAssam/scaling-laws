@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "fusion_plant_double"
+title = "Grid Handshake"
+description = "Doubles the output of Fusion Plant."
+icon = "compute"
+order = 17
+cost = 20971520.0
+kind = "double"
+target = "fusion_plant"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "fusion_plant", "value": 1}])

@@ -177,3 +177,10 @@ func test_reset_eta_zero_at_the_worth_it_point() -> void:
 	s.run["layers"][1]["life"] = BigNum.from_float(25.0 * T * (1.0 - 1e-6))
 	assert_false(Sim.reset_preview(s, 1)["highlight"])
 	assert_false(Rules.reset_eta(s, 1)["worth_now"])
+
+
+func test_reset_eta_text_formats() -> void:
+	assert_eq(PanelResetCard._dur(INF), "-", "no income shows a dash")
+	assert_eq(PanelResetCard._dur(30.0), "<1m")
+	assert_eq(PanelResetCard._dur(720.0), "~12m")
+	assert_eq(PanelResetCard._dur(7200.0), "~2h")

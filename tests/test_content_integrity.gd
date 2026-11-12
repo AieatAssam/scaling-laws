@@ -4,7 +4,7 @@ extends GutTest
 ## The asset test checks the SPEC.md manifest paths exist (fails until the art lands).
 
 const Support := preload("res://tests/support.gd")
-const MULTIPLIER_KEYS := ["compute", "cash", "training"]
+const MULTIPLIER_KEYS := ["compute", "cash", "training", "train_speed"]
 const SPEC_ICONS := ["compute", "cash", "equity", "insights", "breakthroughs", "legacy", "data", "energy",
 	"alignment", "capability", "training", "hiring", "research", "benchmarks", "events", "rivals",
 	"regulation", "automation", "settings", "agi"]

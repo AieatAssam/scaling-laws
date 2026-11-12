@@ -87,6 +87,8 @@ static func satisfy(s: GameState, conds: Array) -> void:
 					s.run["layers"][2]["research"].append(c["id"])
 			"slider_gte":
 				s.run["slider"] = maxf(float(s.run["slider"]), v)
+			"stat_gte":
+				s.persist["stats"][c["id"]] = maxi(int(s.persist["stats"].get(c["id"], 0)), int(v))
 			"time_played_gte":
 				s.persist["stats"]["time"] = maxf(float(s.persist["stats"]["time"]), v)
 			"benchmark_unlocked":

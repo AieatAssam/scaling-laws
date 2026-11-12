@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "faster_checkpoints"
+title = "Faster Checkpoints"
+description = "Training runs take 10% less time."
+icon = "training"
+order = 23
+cost = 5000.0
+kind = "train_speed"
+target = ""
+source = ""
+value = 0.10
+conditions = Array[Dictionary]([{"type": "stat_gte", "id": "trainings", "value": 1}])

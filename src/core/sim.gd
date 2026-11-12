@@ -56,7 +56,7 @@ static func producers(s: GameState) -> Array:
 
 static func cost_for(s: GameState, id: String, count: int) -> BigNum:
 	var d = s.db.get_def("producers", id)
-	return _series(_big(d.base_cost), COST_GROWTH, s.owned(id), count)
+	return _series(_big(float(d.base_cost) * Upgrades.cost_mult(s, id)), COST_GROWTH, s.owned(id), count)
 
 
 static func max_affordable(s: GameState, id: String) -> int:
@@ -67,7 +67,7 @@ static func max_affordable(s: GameState, id: String) -> int:
 	# n = floor(log_g(1 + cash*(g-1)/(base*g^owned)))
 	var owned := s.owned(id)
 	var lg := _log10(COST_GROWTH)
-	var l := cash.log10() + _log10(COST_GROWTH - 1.0) - _log10(float(d.base_cost)) - owned * lg
+	var l := cash.log10() + _log10(COST_GROWTH - 1.0) - _log10(float(d.base_cost) * Upgrades.cost_mult(s, id)) - owned * lg
 	var x: float = l if l > 15.0 else _log10(1.0 + pow(10.0, l))
 	var n := int(minf(floor(x / lg), 1e6))
 	# The log estimate is off by one either way near exact costs; correct both directions.
@@ -99,7 +99,7 @@ static func best_producer(s: GameState) -> String:
 		for ms in MILESTONES:
 			if n >= ms:
 				m *= 2
-		var ratio := cost_for(s, d.id, 1).log10() - _log10(float(d.base_output) * m)
+		var ratio := cost_for(s, d.id, 1).log10() - _log10(float(d.base_output) * m * Upgrades.tier_mult(s, d.id))
 		if ratio < best_ratio:
 			best_ratio = ratio
 			best = d.id
@@ -116,7 +116,7 @@ static func producer_raw_rate(s: GameState, id: String) -> BigNum:
 	for ms in MILESTONES:
 		if n >= ms:
 			m *= 2
-	return _big(float(d.base_output) * n * m)
+	return _big(float(d.base_output) * n * m * Upgrades.tier_mult(s, id))
 
 
 static func raw_rate(s: GameState) -> BigNum:
@@ -339,7 +339,7 @@ static func training_preview(s: GameState, id: String) -> Dictionary:
 	var predicted := 0.0 if spend.is_zero() else spend.log10() * float(factors["total"]) * float(d.score_mult)
 	var factor := training_fail_factor(s)
 	var p := {
-		"ok": false, "reason": "", "id": id, "title": d.title, "spend": spend, "seconds": float(d.seconds),
+		"ok": false, "reason": "", "id": id, "title": d.title, "spend": spend, "seconds": float(d.seconds) / Rules.mult(s, "train_speed"),
 		"score_mult": float(d.score_mult),
 		"base_fail": float(d.fail_chance), "fail_factor": factor, "fail_chance": float(d.fail_chance) * factor,
 		# Smallest compute stock at which this share meets MIN_TRAIN_SPEND.
@@ -482,6 +482,7 @@ static func perform_reset(s: GameState, k: int) -> Dictionary:
 		s.run["layers"][j] = GameState.fresh_layer()
 	s.set_cur("cash", BigNum.from_float(GameState.START_CASH))  # layer 0 was wiped; bootstrap income
 	var L: Dictionary = s.run["layers"][k]
+	if k == 2: L["desk"] = GameState.fresh_layer()["desk"]
 	L["life"] = BigNum.new()
 	L["clock"] = 0.0
 	s.add_cur(p["currency"], _big(float(p["gain"])))
@@ -628,6 +629,8 @@ static func _auto_reset(s: GameState, k: int, evs: Array) -> void:
 
 
 static func _automate(s: GameState, evs: Array) -> void:
+	Upgrades.automate(s, evs)
+	Launches.automate(s, evs)
 	var auto: Array = s.persist["automation"]
 	if "auto_buy" in auto:
 		var id := best_producer(s)
@@ -690,8 +693,8 @@ static func _rivals(s: GameState, evs: Array) -> void:
 
 # ---------------------------------------------------------------- tick
 
-## Advances the game by dt seconds. offline=true halves income and skips random events.
-static func tick(s: GameState, dt: float, offline: bool = false) -> Array:
+## Advances the game by dt seconds. offline=true halves income and skips random events; modal=true (a modal is open) holds breaking news.
+static func tick(s: GameState, dt: float, offline: bool = false, modal: bool = false) -> Array:
 	var evs: Array = []
 	var eff := OFFLINE_EFF if offline else 1.0
 	var L0: Dictionary = s.run["layers"][0]
@@ -715,6 +718,7 @@ static func tick(s: GameState, dt: float, offline: bool = false) -> Array:
 		if L0["timed"][i]["left"] <= 0.0:
 			L0["timed"].remove_at(i)
 
+	Launches.tick(s, dt)
 	_train_tick(s, dt, eff, evs)
 	if s.resets(3) > 0:
 		s.add_cur("data", _big(DATA_RATE * dt * eff))
@@ -723,6 +727,7 @@ static func tick(s: GameState, dt: float, offline: bool = false) -> Array:
 	if s.resets(2) > 0 and float(s.run["slider"]) < SLIDER_SAFE:
 		L0["debt"] = float(L0["debt"]) + DEBT_RATE * dt * eff
 
+	Desk.tick(s, dt, evs)
 	_automate(s, evs)
 	_benchmarks(s, evs)
 	_agi(s, evs)
@@ -730,6 +735,7 @@ static func tick(s: GameState, dt: float, offline: bool = false) -> Array:
 	_challenge_tick(s, dt, evs)
 	if not offline:
 		_events_tick(s, dt, evs)
+	News.tick(s, dt, evs, offline or modal)
 	return evs
 
 

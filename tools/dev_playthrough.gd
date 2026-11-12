@@ -42,12 +42,12 @@ func _run() -> void:
 	_cheat("compute", 1e4)
 	_play(300.0)
 	for amount in [1, 10, -1]:
-		_call("producers", "_set_amount", [amount])
+		_main.get("_panels")["producers"].get("_picker").select(amount)
 		await _settle()
 		_press_buy(_first_id("producers"))
 		await _settle()
 	_check(_any_owned(), "bought producers")
-	_call("producers", "_set_amount", [1])
+	_main.get("_panels")["producers"].get("_picker").select(1)
 	await _shots_all("01_five_minutes")
 
 	# Phase 2: first Funding Round (layer 1), then a training run.
@@ -167,9 +167,18 @@ func S() -> Node:
 
 
 func _settle() -> void:
+	_close_reveals()
 	for i in 4:
 		await process_frame
 	await RenderingServer.frame_post_draw
+
+
+## One-time "New: ..." cards (Reveals) open on their own as time passes. The playthrough dismisses them so the
+## flows below can reach their controls; RevealCard's OK path is what runs here.
+func _close_reveals() -> void:
+	var card = _main.get("_reveal_card")
+	if card != null and card.dismiss():
+		_check(G().state.persist["seen_reveals"].size() > 0, "a reveal card was saved as seen")
 
 
 ## After a deferred reload_current_scene (settings import/reset): picks up the new main scene.
@@ -215,6 +224,7 @@ func _reset(layer: int, shot_name: String) -> void:
 ## Waits for the shell's modal queue to empty (a transition or card in front of the panels), so tab shots show the panels.
 func _wait_modals() -> void:
 	for i in 600:
+		_close_reveals()
 		if not bool(_main.get("_modal_busy")):
 			return
 		await process_frame

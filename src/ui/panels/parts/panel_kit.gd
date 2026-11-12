@@ -42,7 +42,7 @@ static func reduce_motion() -> bool:
 
 ## Scrollable page with a 12px gutter. Returns the VBox to add content to.
 static func scroll_page(parent: Control) -> VBoxContainer:
-	var sc := ScrollContainer.new()
+	var sc := DragScroll.new()
 	sc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	parent.add_child(sc)

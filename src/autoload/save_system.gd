@@ -4,7 +4,7 @@ extends Node
 ## a file from a newer version is set aside as <path>.newer-<ms> and never overwritten. `last_notice` says
 ## what load_data had to do (empty when nothing happened); Game shows it to the player.
 
-const VERSION := 2
+const VERSION := 5
 const DEFAULT_PATH := "user://save.json"
 
 var last_notice := ""
@@ -70,6 +70,53 @@ func migrate(wrapper: Dictionary) -> Dictionary:
 	var state: Dictionary = wrapper.get("state", {})
 	if v < 2:
 		state = _v1_to_v2(state)
+	if v < 3:
+		state = _v2_to_v3(state)
+	if v < 4:
+		state = _v3_to_v4(state)
+	if v < 5:
+		state = _v4_to_v5(state)
+	return state
+
+
+## Adds persist.records (Records) to a save from before the statistics screen. Its clocks start now: the first reset of
+## each layer after this sets that layer's baseline time.
+static func _v3_to_v4(state: Dictionary) -> Dictionary:
+	var persist: Dictionary = state.get("persist", {})
+	var stats: Dictionary = persist.get("stats", {})
+	if not persist.has("records"):
+		persist["records"] = Records.default(float(stats.get("time", 0.0)))
+	state["persist"] = persist
+	return state
+
+
+## Adds the lab upgrade list (layer 0), run-level launch cooldowns and breaking-news state, and their catch counters.
+## Missing keys get their empty values; a save that already has them is left as it is.
+static func _v4_to_v5(state: Dictionary) -> Dictionary:
+	var run: Dictionary = state.get("run", {})
+	var persist: Dictionary = state.get("persist", {})
+	var layers: Array = run.get("layers", [])
+	if layers.size() > 0 and layers[0] is Dictionary and not layers[0].has("upgrades"):
+		layers[0]["upgrades"] = []
+	if not run.has("launches"):
+		run["launches"] = {}
+	if not run.has("news"):
+		run["news"] = {"timer": News.FIRST_SECONDS, "chip": {}}
+	var stats: Dictionary = persist.get("stats", {})
+	for k in ["launches", "news"]:
+		if not stats.has(k):
+			stats[k] = 0
+	persist["stats"] = stats
+	state["run"] = run
+	state["persist"] = persist
+	return state
+
+
+static func _v2_to_v3(state: Dictionary) -> Dictionary:
+	var run: Dictionary = state.get("run", {})
+	var layers: Array = run.get("layers", [])
+	if layers.size() > 2 and layers[2] is Dictionary and not layers[2].has("desk"):
+		layers[2]["desk"] = {"slots": [], "timer": 1200.0, "bonus": 0.0}
 	return state
 
 

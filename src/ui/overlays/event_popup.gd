@@ -36,7 +36,7 @@ func _ready() -> void:
 	add_child(center)
 	_card = PanelContainer.new()
 	center.add_child(_card)
-	_scroll = ScrollContainer.new()
+	_scroll = DragScroll.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_card.add_child(_scroll)
 	var box := VBoxContainer.new()

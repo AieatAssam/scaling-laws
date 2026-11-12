@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "orbital_cluster_double"
+title = "Solar Sails"
+description = "Doubles the output of Orbital Cluster."
+icon = "compute"
+order = 19
+cost = 167772160.0
+kind = "double"
+target = "orbital_cluster"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "orbital_cluster", "value": 1}])

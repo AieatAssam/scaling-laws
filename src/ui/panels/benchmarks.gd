@@ -19,7 +19,7 @@ func _ready() -> void:
 	_count = Label.new()
 	_count.theme_type_variation = &"Heading"
 	page.add_child(_count)
-	var scroll := ScrollContainer.new()
+	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	page.add_child(scroll)

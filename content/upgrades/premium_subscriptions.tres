@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "premium_subscriptions"
+title = "Premium Subscriptions"
+description = "+50% cash from all compute income."
+icon = "cash"
+order = 22
+cost = 400000.0
+kind = "revenue"
+target = ""
+source = ""
+value = 0.50
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "custom_silicon", "value": 1}])

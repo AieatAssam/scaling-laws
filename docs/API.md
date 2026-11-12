@@ -118,15 +118,28 @@ Event dicts returned by `tick`, each with a `kind` key:
 - `mult_parts(s, key) -> Array`: each factor as `{id, name, value}` (legacy perks, run upgrades, timed boosts, owned research, staff, and for `compute` alignment, debt and training score). The UI uses it for "why is my multiplier this?" tooltips.
 - `training_bonus(s) -> float`: the training score factor, `training_bonus_for(best, best_all)` with the state's bests.
 - `training_bonus_for(best: float, best_all: float) -> float`: `(1 + 0.05 x best) x (1 + 0.01 x best_all)`. Used for previews of a score before it lands.
+- `condition_progress(s, cond) -> float`: 0..1 toward one condition dict. Exactly 1.0 only when `check()` passes; otherwise capped at 0.99. Currency-like amounts (`currency_gte`, `compute_rate_gte`) use log scale (`log10(1 + x)`), counts are linear. Every condition type is covered; the all-or-nothing ones (`research_has`, `benchmark_unlocked`, `flag_set`) are 0 until they hold.
+- `conditions_progress(s, conds) -> float`: the minimum over a condition list (1.0 for an empty list).
+- `reset_worth_life(s, k) -> BigNum`: lifetime cash (layer k's `life`) at which a reset of layer k is highlighted. Gain needed is `G = max(2, ceil(2 x holding))`, life is `threshold x G^2`, matching `Sim.reset_preview`.
+- `reset_eta(s, k) -> {worth_now: bool, worth_in: float, next_in: float}`: seconds (estimate) at the current `Sim.cash_per_second`. `worth_in` is 0 when worth it now; `next_in` is the time until the gain rises by one. Both are `INF` when cash income is zero. Assumes income stays put.
+- `next_goals(s, n) -> Array`: the n nearest unmet goals, each `{kind, id, title, progress, hint}`. Kinds: `benchmark` (locked; `title` is the real name, so the UI hides it), `reset` (the layer's worth-it point; layers 1..4, when reachable and not yet worth it), `producer` (first tier not owned), `milestone` (next of 25/50/100/200 for an owned producer), `agi` (current AGI stage once Singularity is reachable). Sorted by progress; a big kind (`BIG_KINDS`: reset, producer, agi) within `BIG_BONUS` (0.10) of the nearest ranks first. Pure.
 
 ## UI widgets
 
 - Help: the Help tab is `src/ui/panels/help.gd` (`HelpPanel`). `main.gd` `open_help(topic)` (reached through the `shell` group) selects it and calls `open_topic(id)`, which opens and scrolls to that topic. The "?" buttons (`PanelHelp.button(topic)`) call `open_help`.
 - `Tip` (`src/ui/widgets/tip.gd`, a CanvasLayer added once by `main.gd`): `Tip.attach(ctrl, source)` gives any control a tooltip. `source` is a String or a `Callable` returning one, re-read while the tip is open. The first line is the title. Mouse: shows after 0.35 s of hover. Touch: a press held 0.4 s shows it; lifting the finger or tapping elsewhere hides it and swallows that input, so a Buy button under the finger does not fire. `reduce_motion` skips the fade.
+- `GoalRail` (`src/ui/widgets/goal_rail.gd`): the one-line "Next: <title> <bar> <pct>" row under the HUD, 14 px tall. Built by `main.gd` `_build_shell`. It polls `Rules.next_goals(Game.state, 3)` every 0.25 s; a tap cycles the three goals. A locked benchmark reads "Benchmark: <requirements>" (name and reward hidden). The tooltip gives the goal's hint and requirements.
+- Reset cards (`PanelResetCard`, `src/ui/panels/parts/panel_reset_card.gd`): show "Est.: worth it in ~12m, next +1 in ~3m" from `Rules.reset_eta`. "now" once worth it; "-" when cash income is zero.
+- Benchmarks panel: locked rows show a progress bar and percent from `Rules.conditions_progress`, plus the requirement text.
+- `DragScroll` (`src/ui/widgets/drag_scroll.gd`, a `ScrollContainer`): every scroll page is one (`PanelKit.scroll_page`, Help, event popup, tip-hosting pages). Touch and mouse drags scroll it from `_input`, so child buttons (which stop the press) cannot swallow the drag. Movement under 8 px is a tap and goes to the child. A drag cancels the press on the child it started on (`MOUSE_EXIT`); the release is passed through with that child's signals muted for one frame so no click fires. A release with speed fling-scrolls (`FLING_MIN` 150 px/s, `FLING_FRICTION`, stops below `FLING_STOP`); a press during a fling stops it and is not a click.
+- `RevealCard` (`src/ui/overlays/reveal_card.gd`): the one-time "New: <System>" card. Asked of the shell's modal queue (`gate`) once a second, never during the intro, at most one per `REVEAL_GAP_MS` (30 s). OK, Space/Enter or Back closes it. "Learn more" closes it and calls `open_help(topic)`. Showing it marks the reveal seen and saves at once.
+- `StatsPanel` (`src/ui/panels/stats.gd`): the Statistics overlay, opened from Settings > Statistics (`shell` group `open_stats`). Shows completion (`Records.completion`), this run (time played, resets per layer), all time (persist.stats), the fastest cycle of each reset layer, and lifetime resets. Read-only.
+- Keyboard (desktop), in `main.gd` `_hotkey`: keys 1–9 select the visible tab in order; B cycles the producer buy amount (1, 10, MAX); Space/Enter (`_confirm_top`) closes the open reveal card, else the notice card. Ignored with Ctrl/Alt/Meta and while a text field has focus. Tabs and B are also ignored while a modal or the Statistics overlay is up. Listed in Settings and the `hotkeys` help topic.
+- Notices: `show_record(layer, secs)` shows the toast "New record: fastest <layer> <duration>" on `Game.record_set`. Not shown for a layer's first reset.
 
 ## SaveSystem (autoload `SaveSystem`)
 
-- `VERSION = 2`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. A save with no version field counts as v0 (same migrations as v1).
+- `VERSION = 4`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. v3 → v4 (`_v3_to_v4`): adds `persist.records` (see Records) with `cycle_start` set to the migration time, so the first reset of each layer sets a baseline, not a record. A save with no version field counts as v0 (same migrations as v1).
 - `save(state: Dictionary, path=DEFAULT_PATH) -> bool`: writes `{"version", "state"}` as JSON. Before overwriting, copies the current file to `<path>.bak`, but only if it is a valid save, so a damaged file never replaces the backup. Refuses (`false`, `push_error`) to overwrite a file written by a newer version.
 - `load_data(path=DEFAULT_PATH) -> Dictionary`: returns the migrated state dict, or `{}` for a new game. Sets `last_notice: String` (empty when nothing needed reporting):
   - missing file: `{}`, no notice.
@@ -150,6 +163,8 @@ Lifecycle:
 - Going away and coming back (no double counting): `NOTIFICATION_APPLICATION_PAUSED` begins an absence; `NOTIFICATION_APPLICATION_RESUMED` ends it. On phones and in browsers, `FOCUS_OUT`/`FOCUS_IN` do the same. Beginning saves and records `_away_since`; the frames ticked meanwhile are counted in `_ticked_since`. Ending credits `away - ticked` through `_catch_up` (so the 50% credit covers only what was not simulated) and saves. A repeated begin or end is ignored, a resume at launch (no marker) does nothing, and an end while `running` is false (the intro is up) only closes the measurement.
 - `NOTIFICATION_APPLICATION_FOCUS_OUT` always saves (desktop included).
 - `NOTIFICATION_WM_CLOSE_REQUEST`: saves. (Android back is handled by the shell, see below; the app does not quit on it.)
+- `start()` also calls `Records.absorb(state)` (counts what a loaded save already holds) and `Reveals.seed(state)` (already-met reveals count as seen, so an old save gets no burst of cards).
+- `record_set(layer: int, secs: float)`: emitted by a layer reset that beats that layer's fastest cycle (never a layer's first reset). Notices shows the toast.
 - Main scene: `play_intro()` plays the first-run intro over the shell and sets `Game.running = false` until it finishes (finish or skip sets `intro_seen` and saves). Settings > Replay intro calls it too.
 - `save_now() -> bool`
 
@@ -280,3 +295,19 @@ Run:
 ```
 
 It prints `OK` and exits 0, or prints `FAIL` lines and exits 1.
+
+## Records, completion and reveals
+
+`Records` (`src/core/records.gd`, pure) keeps `persist.records`, which survives resets: `fastest` (layer key "1".."4" → seconds of the quickest cycle), `cycle_start` (per layer 0..4, game time the layer was last cleared), `run_start`, the achieved sets `producers`, `research`, `challenges`, `endings`, `outpaced` (rivals not launched when an ending is reached), and `agi_best`.
+- `note_reset(persist, k) -> {layer, secs, first, record}`: `secs` is the time since layer k's clock. The first reset of a layer sets its baseline (no record). Later ones are records when faster; a reset of k clears clocks 0..k. `Game` calls it from `layer_reset`.
+- `note(persist, group, id)`, `note_agi(persist, index)` (keeps the max), `note_ending(s, id)`, `new_run(persist)`, `absorb(s)`.
+- `completion(s) -> {percent: float 0..100, parts: [{id, label, done, total}]}`: nine parts, equal weight each: producers, benchmarks, research, automation, resets (layers ever reset / 4), challenges, rivals outpaced / 5, AGI stages (`agi_best` / 5), endings / 3.
+- `run_seconds(persist)`, `format_duration(secs)` ("45s", "12m 04s", "1h 03m"), `layer_title(s, k)`.
+
+`Reveals` (`src/core/reveals.gd`, pure) holds the one-time "New: <System>" cards. Each entry has `id`, `title`, `topic` (the Help topic it links to), `body` and `conditions` (mirrors the topic). `next_due(s)` returns the first reveal whose conditions hold and that is not in `persist.seen_reveals`; `mark_seen`, `is_seen`, `find`. `seed(s)` runs once (`persist.reveals_seeded`). "Constraints" covers the regulation challenges; "Training" uses `time_played_gte` 600 because training has no content gate. The card itself is `RevealCard` (see UI widgets).
+
+## Research desk
+
+`Desk` (`src/core/desk.gd`) owns the generation-scoped desk in `run.layers[2].desk`: `slots`, `timer`, and additive `bonus`. It unlocks after the first lifetime Model Generation. `Desk.tick(s, dt, events)` draws a weighted eligible paper every 1,200 seconds while fewer than three slots are occupied, including during offline simulation. `Desk.resolve(s, slot, choice)` consumes a card and increments persistent `stats.papers` and, for landmarks, `stats.landmarks`. `Desk.best_cash(s, card)` is the simulator and Auto-review policy. Model Generation and higher resets clear the desk; Funding does not. Save version 3 initializes the desk for older saves.
+
+Paper resources have `blurb`, `conditions`, `weight`, and `choices`. Choices have `label`, `effects`, and an optional `{id, value}` currency `cost`. Alongside event effects, `cash_seconds` pays the given seconds of current cash income and `generation_mult` adds to the generation's compute bonus (capped at 0.5). Landmark effects double their magnitudes, including the excess above 1 for multipliers. Paper timed effects replace other timed effects on the same key. `stat_gte` conditions compare a persistent statistic by `id` and `value`. `Game.resolve_paper(slot, choice)` emits `paper_resolved`; draws emit `paper_offered`.

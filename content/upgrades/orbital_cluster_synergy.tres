@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "orbital_cluster_synergy"
+title = "Launch Window Hacks"
+description = "+1% of Orbital Cluster output per Fusion Plant owned (up to +100%)."
+icon = "compute"
+order = 20
+cost = 251658240.0
+kind = "synergy"
+target = "orbital_cluster"
+source = "fusion_plant"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "orbital_cluster", "value": 10}])

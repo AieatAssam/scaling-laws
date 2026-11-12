@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "custom_silicon_double"
+title = "Tapeout Party"
+description = "Doubles the output of Custom Silicon."
+icon = "compute"
+order = 13
+cost = 327680.0
+kind = "double"
+target = "custom_silicon"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "custom_silicon", "value": 1}])

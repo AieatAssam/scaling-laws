@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PaperDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/paper_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "paper_14"
+title = "A Modest Proposal for More Context"
+blurb = "The context window now includes the appendix."
+conditions = Array[Dictionary]([])
+weight = 1.0
+choices = Array[Dictionary]([{"label": "Publish", "effects": [{"type": "timed_mod", "key": "cash", "value": 1.005, "seconds": 600.0}]}, {"label": "Productise", "effects": [{"type": "cash_seconds", "value": 2.0}]}, {"label": "Keep proprietary", "effects": [{"type": "timed_mod", "key": "training", "value": 1.005, "seconds": 900.0}]}])

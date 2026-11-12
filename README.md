@@ -8,7 +8,10 @@ A pixel-art incremental game about running an AI lab from a garage to AGI. Godot
 Twelve producer tiers (intern laptop → universe simulator), training runs, four reset layers
 (Funding Round, Model Generation, Paradigm Shift, Singularity), events, benchmarks, offline
 progress, and three endings. There is a first-run intro, tooltips on everything (hover, or long-press
-on touch) and an in-game Help tab. The design contract is in [SPEC.md](SPEC.md); the core API in
+on touch) and an in-game Help tab. Touch and mouse drag-to-scroll on every page; a Statistics screen
+(Settings > Statistics) with completion, fastest cycle per reset layer and lifetime resets; desktop
+shortcuts (1–9 tabs, B buy amount, Space/Enter to confirm); and one-time "New:" cards as each system
+opens. The design contract is in [SPEC.md](SPEC.md); the core API in
 [docs/API.md](docs/API.md).
 
 ## Run

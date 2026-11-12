@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "data_centre_double"
+title = "Night Shift Batch"
+description = "Doubles the output of Data Centre."
+icon = "compute"
+order = 10
+cost = 40960.0
+kind = "double"
+target = "data_centre"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "data_centre", "value": 1}])

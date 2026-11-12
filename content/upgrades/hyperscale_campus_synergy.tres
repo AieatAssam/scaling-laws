@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "hyperscale_campus_synergy"
+title = "Rack Diplomacy"
+description = "+1% of Hyperscale Campus output per Custom Silicon owned (up to +100%)."
+icon = "compute"
+order = 16
+cost = 3932160.0
+kind = "synergy"
+target = "hyperscale_campus"
+source = "custom_silicon"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "hyperscale_campus", "value": 10}])

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "hotkeys"
+title = "Keyboard shortcuts"
+icon = "settings"
+order = 130
+conditions = Array[Dictionary]([])
+hint = "Desktop keys for tabs, buy amount and cards."
+body = "## Tabs\nKeys 1 to 9 open the tabs in order: Compute, Train, Funding, Models, Paradigm, AGI, Bench, Settings, Help. A tab that is still locked does nothing.\n## Buying\nB cycles the Compute buy amount through x1, x10 and MAX.\n## Cards\nSpace or Enter confirms the card on screen: the New card, the offline card or the save notice. Escape closes it.\n## Typing\nThese keys are ignored while you type in a text box, and when Ctrl, Alt or Cmd is held."

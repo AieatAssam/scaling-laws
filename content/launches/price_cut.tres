@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LaunchDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/launch_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "price_cut"
+title = "Price cut"
+description = "Compute x1.3 for 10 min. Costs 10% of cash. Cooldown 15 min."
+icon = "breakthroughs"
+order = 2
+cost_currency = "cash"
+cost_share = 0.10
+cooldown = 900.0
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 1, "value": 1}])
+effects = Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 1.30, "seconds": 600.0}])

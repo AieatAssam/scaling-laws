@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="NewsDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/news_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "news_09"
+title = "Model explains how to make a sandwich in 4,000 words"
+description = "Breaking news. Tap the chip to claim it."
+icon = "events"
+weight = 5.0
+reward = "compute"

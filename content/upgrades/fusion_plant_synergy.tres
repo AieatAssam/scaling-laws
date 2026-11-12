@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "fusion_plant_synergy"
+title = "Reactor Overtime"
+description = "+1% of Fusion Plant output per Hyperscale Campus owned (up to +100%)."
+icon = "compute"
+order = 18
+cost = 31457280.0
+kind = "synergy"
+target = "fusion_plant"
+source = "hyperscale_campus"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "fusion_plant", "value": 10}])

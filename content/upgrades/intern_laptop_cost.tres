@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "intern_laptop_cost"
+title = "Coffee Budget"
+description = "-10% cost of Intern Laptop producers."
+icon = "compute"
+order = 3
+cost = 200.0
+kind = "cost"
+target = "intern_laptop"
+source = ""
+value = 0.10
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "intern_laptop", "value": 25}])
