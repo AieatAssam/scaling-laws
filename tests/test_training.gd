@@ -1,6 +1,6 @@
 extends GutTest
 ## Training runs: the three content-defined run types, spend and fail chance (ops-composed), score maths, refunds,
-## best-only ratchet and the permanent compute multiplier.
+## best-only ratchet, the permanent compute multiplier, the cash burst on success, and the shared pick rule.
 
 const Support := preload("res://tests/support.gd")
 
@@ -32,7 +32,6 @@ func test_three_run_types_load_in_content_order() -> void:
 	for d in runs:
 		ids.append(d.id)
 	assert_eq(ids, ["fine_tune", "standard", "frontier"])
-	assert_eq(Sim.AUTO_TRAIN_RUN, "standard", "auto_train starts a standard run")
 
 
 func test_spend_is_the_run_share_of_compute() -> void:
@@ -90,8 +89,9 @@ func test_fail_chance_rises_with_run_risk() -> void:
 
 
 func test_duration_is_exact() -> void:
+	var secs := float(_def("frontier").seconds)
 	Sim.start_training(s, "frontier")
-	assert_eq(_training_done(Sim.tick(s, 119.5)), {}, "not done early")
+	assert_eq(_training_done(Sim.tick(s, secs - 0.5)), {}, "not done early")
 	assert_false(_training_done(Sim.tick(s, 0.5)).is_empty(), "done at exactly the run length")
 	assert_true(s.run["layers"][0]["training"].is_empty())
 
@@ -177,3 +177,158 @@ func test_best_score_is_a_permanent_compute_multiplier() -> void:
 	var m2 := Rules.mult(s, "compute")
 	s.persist["best_all"] = 0.0
 	assert_gt(m2, Rules.mult(s, "compute"))
+
+
+# ---------------------------------------------------------------- cash burst and pick rule
+
+## A state that earns cash: one producer tier owned, so the cash rate is above zero (bursts are a multiple of it).
+func _earning_state(seed_value: int = 9) -> GameState:
+	var st := Support.new_state(content, seed_value)
+	Support.set_cash_float(st, "compute", 1e6)
+	Support.set_owned(st, Sim.producers(st)[0].id, 10)
+	assert_gt(Sim.cash_per_second(st).to_float(), 0.0, "the test state earns cash")
+	return st
+
+
+func test_success_pays_revenue_seconds_of_cash_rate() -> void:
+	var st := _earning_state()
+	var rate := Sim.cash_per_second(st)
+	var cash0 := st.cur("cash")
+	Sim.start_training(st, "standard")
+	st.run["layers"][0]["training"]["fail"] = 0.0
+	var e := _training_done(Sim.tick(st, 60.0))
+	assert_true(e["ok"])
+	assert_true(Support.bn_near(e["revenue"], rate.mul_f(_def("standard").revenue_seconds)), "burst = 12 s of rate")
+	# Cash gained this tick = 60 s of income + the burst.
+	var gained := st.cur("cash").subtract(cash0)
+	assert_true(Support.bn_near(gained, rate.mul_f(60.0 + _def("standard").revenue_seconds)), "burst is added to cash")
+
+
+func test_burst_counts_in_every_layer_life_like_income() -> void:
+	var st := _earning_state()
+	var rate := Sim.cash_per_second(st)
+	Sim.start_training(st, "fine_tune")
+	st.run["layers"][0]["training"]["fail"] = 0.0
+	var before := []
+	for k in range(1, 5):
+		before.append(st.run["layers"][k]["life"])
+	Sim.tick(st, 30.0)
+	var burst := rate.mul_f(_def("fine_tune").revenue_seconds)
+	for k in range(1, 5):
+		var gained: BigNum = (st.run["layers"][k]["life"] as BigNum).subtract(before[k - 1])
+		assert_true(Support.bn_near(gained, rate.mul_f(30.0).add(burst)), "layer %d life counts income and burst" % k)
+
+
+func test_failure_pays_no_burst() -> void:
+	var st := _earning_state()
+	var rate := Sim.cash_per_second(st)
+	var cash0 := st.cur("cash")
+	Sim.start_training(st, "standard")
+	st.run["layers"][0]["training"]["fail"] = 1.0
+	var e := _training_done(Sim.tick(st, 60.0))
+	assert_false(e["ok"])
+	assert_true((e["revenue"] as BigNum).is_zero(), "no burst on failure")
+	assert_true(Support.bn_near(st.cur("cash").subtract(cash0), rate.mul_f(60.0)), "only income, no burst")
+
+
+func test_frontier_pays_no_burst() -> void:
+	var st := _earning_state()
+	assert_true((Sim.training_preview(st, "frontier")["revenue"] as BigNum).is_zero(), "preview: no burst")
+	Sim.start_training(st, "frontier")
+	st.run["layers"][0]["training"]["fail"] = 0.0
+	var e := _training_done(Sim.tick(st, 120.0))
+	assert_true(e["ok"])
+	assert_true((e["revenue"] as BigNum).is_zero(), "payout: no burst")
+
+
+func test_preview_revenue_is_the_payout_when_the_rate_is_unchanged() -> void:
+	for id in ["fine_tune", "standard"]:
+		var st := _earning_state()
+		var p := Sim.training_preview(st, id)
+		assert_eq(float(p["revenue_seconds"]), _def(id).revenue_seconds, "%s: preview seconds" % id)
+		Sim.start_training(st, id)
+		st.run["layers"][0]["training"]["fail"] = 0.0
+		var e := _training_done(Sim.tick(st, float(_def(id).seconds)))
+		assert_true(Support.bn_near(e["revenue"], p["revenue"]), "%s: preview matches payout" % id)
+
+
+func test_offline_burst_is_scaled_like_offline_income() -> void:
+	var st := _earning_state()
+	var rate := Sim.cash_per_second(st)
+	Sim.start_training(st, "fine_tune")
+	st.run["layers"][0]["training"]["fail"] = 0.0
+	var e := _training_done(Sim.tick(st, 30.0, true))
+	assert_true(Support.bn_near(e["revenue"], rate.mul_f(_def("fine_tune").revenue_seconds * Sim.OFFLINE_EFF)),
+		"offline: burst at the offline efficiency")
+
+
+func test_run_started_before_the_burst_existed_pays_none() -> void:
+	var st := _earning_state()
+	Sim.start_training(st, "standard")
+	st.run["layers"][0]["training"].erase("revenue_seconds")  # a save from before this field
+	st.run["layers"][0]["training"]["fail"] = 0.0
+	var e := _training_done(Sim.tick(st, 60.0))
+	assert_true(e["ok"])
+	assert_true((e["revenue"] as BigNum).is_zero())
+
+
+func test_save_round_trip_mid_run_pays_the_same_burst() -> void:
+	var st := _earning_state()
+	Sim.start_training(st, "standard")
+	st.run["layers"][0]["training"]["fail"] = 0.0
+	Sim.tick(st, 20.0)
+	var st2 := GameState.from_dict(content, JSON.parse_string(JSON.stringify(Support.plain(st.to_dict()))))
+	assert_eq(st2.run["layers"][0]["training"]["revenue_seconds"], _def("standard").revenue_seconds)
+	var a := _training_done(Sim.tick(st, 40.0))
+	var b := _training_done(Sim.tick(st2, 40.0))
+	assert_true(Support.bn_near(a["revenue"], b["revenue"]), "same burst after reload")
+	assert_false((a["revenue"] as BigNum).is_zero(), "and it is paid")
+
+
+func test_pick_is_standard_with_no_ops_and_nothing_to_beat() -> void:
+	# Frontier fails 30% at 0 Ops, over the risk cap; standard predicts above the empty best.
+	assert_eq(Sim.pick_training(_earning_state()), "standard")
+
+
+func test_pick_is_frontier_once_ops_make_it_safe_enough() -> void:
+	var st := _earning_state()
+	st.run["layers"][1]["staff"]["ops"] = 4  # 30% x 0.6 = 18%, under the 20% cap
+	assert_eq(Sim.pick_training(st), "frontier")
+
+
+func test_pick_is_fine_tune_for_cash_when_nothing_beats_the_best() -> void:
+	var st := _earning_state()
+	st.run["layers"][2]["best"] = 1e9
+	assert_eq(Sim.pick_training(st), "fine_tune")
+
+
+func test_pick_is_empty_with_no_compute() -> void:
+	var st := _earning_state()
+	st.set_cur("compute", BigNum.new())
+	assert_eq(Sim.pick_training(st), "")
+
+
+func test_auto_train_starts_the_picked_run() -> void:
+	var st := _earning_state()
+	st.run["layers"][2]["best"] = 1e9
+	st.persist["automation"] = ["auto_train"]
+	var evs := Sim.tick(st, 1.0)
+	var auto := {}
+	for e in evs:
+		if e["kind"] == "auto_train":
+			auto = e
+	assert_eq(auto.get("id", ""), "fine_tune", "auto_train reports the run it started")
+	assert_eq(st.run["layers"][0]["training"]["type"], "fine_tune")
+
+
+func test_reset_mid_run_drops_the_run_and_pays_no_burst() -> void:
+	var st := _earning_state()
+	Sim.start_training(st, "standard")
+	var ld = Sim.layer_def(st, 1)
+	st.run["layers"][1]["life"] = BigNum.from_float(float(ld.threshold) * 4.0)  # gain 2
+	var r := Sim.perform_reset(st, 1)
+	assert_true(r["ok"], "the Funding Round reset is allowed")
+	assert_true((st.run["layers"][0]["training"] as Dictionary).is_empty(), "the run in flight is wiped")
+	assert_eq(int(st.persist["stats"]["trainings"]), 0, "no run was finished")
+	assert_true(Support.bn_near(st.cur("cash"), BigNum.from_float(GameState.START_CASH)), "cash is the bootstrap amount, no burst")
+	assert_eq(_training_done(Sim.tick(st, 120.0)), {}, "nothing finishes after the reset")

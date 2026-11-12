@@ -60,7 +60,7 @@ Every action returns `{ok: bool, reason: String, ...}`. Failures include a human
 
 The UI may call the pure statics below for read-only previews. Each `*_blocker` returns `""` when the action would succeed, otherwise the reason it would fail. Actions call the same blockers first, so the panel text and the action can't disagree.
 
-Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `MIN_TRAIN_SPEND` (100), `TRAIN_ENERGY`, `TRAIN_DATA`, `REFUND_SHARE` (0.5: a failed run returns this share of its spend), `SCORE_ROLL` (0.02: a run's score rolls +/- this), `FAIL_FLOOR` (0.4: Ops cut a run's fail chance to this share of its base at most), `AUTO_TRAIN_RUN` ("standard"), `DATA_RATE`, `ENERGY_RATE`, `ENERGY_CAP`, `DEBT_RATE`, `SLIDER_SAFE` (0.3), `EVENT_INTERVAL`, `EVENT_CHANCE`, `OFFLINE_CAP` (86400), `OFFLINE_EFF` (0.5), `OFFLINE_STEP` (60), `LEGACY_MULT`, `AUTO_RESET_MIN_SECONDS` (60).
+Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `MIN_TRAIN_SPEND` (100), `TRAIN_ENERGY`, `TRAIN_DATA`, `REFUND_SHARE` (0.5: a failed run returns this share of its spend), `SCORE_ROLL` (0.02: a run's score rolls +/- this), `FAIL_FLOOR` (0.4: Ops cut a run's fail chance to this share of its base at most), `PICK_BEST_MARGIN` (0.1: a run must predict this much above the best to be chased), `PICK_MAX_FAIL` (0.2: and fail at most this often), `DATA_RATE`, `ENERGY_RATE`, `ENERGY_CAP`, `DEBT_RATE`, `SLIDER_SAFE` (0.3), `EVENT_INTERVAL`, `EVENT_CHANCE`, `OFFLINE_CAP` (86400), `OFFLINE_EFF` (0.5), `OFFLINE_STEP` (60), `LEGACY_MULT`, `AUTO_RESET_MIN_SECONDS` (60).
 
 | Function | Returns / notes |
 |---|---|
@@ -85,9 +85,10 @@ Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `MIN_TRAIN_SPEND` (100), `TRA
 | `new_run(s)` | Starts a new run after the current one ends. |
 | `run_def(s, id)` | `TrainingRunDef` from `content/training_runs`, or null. |
 | `training_fail_factor(s) -> float` | Ops cut: `max(FAIL_FLOOR, 1 - sum of fail_per_hire x hires)`. |
-| `training_preview(s, id) -> Dictionary` | `id` is a run type (`fine_tune`, `standard`, `frontier`). Keys `ok`, `reason` ("unknown run type", "already training", "needs at least N compute", "not enough energy or data"), `id`, `title`, `spend`, `seconds`, `score_mult`, `base_fail`, `fail_factor`, `fail_chance` (base x Ops factor), `min_compute` (smallest stock at which the share meets `MIN_TRAIN_SPEND`), `predicted_score` (log10(spend) x training multiplier x `score_mult`, before the roll; 0 when the spend is zero), `bonus_now` and `bonus_if_success` (compute bonus before and after the predicted score lands), `factors` (see `training_factors`). |
+| `training_preview(s, id) -> Dictionary` | `id` is a run type (`fine_tune`, `standard`, `frontier`). Keys `ok`, `reason` ("unknown run type", "already training", "needs at least N compute", "not enough energy or data"), `id`, `title`, `spend`, `seconds`, `score_mult`, `base_fail`, `fail_factor`, `fail_chance` (base x Ops factor), `min_compute` (smallest stock at which the share meets `MIN_TRAIN_SPEND`), `predicted_score` (log10(spend) x training multiplier x `score_mult`, before the roll; 0 when the spend is zero), `bonus_now` and `bonus_if_success` (compute bonus before and after the predicted score lands), `factors` (see `training_factors`), `revenue_seconds` (the run type's cash burst length) and `revenue` (BigNum: the burst paid on success now, `revenue_seconds` x `cash_per_second`, before the run's own score). |
+| `pick_training(s) -> String` | The run the simulator and auto-train pick, or `""`. The highest predicted score among startable runs that beat the best by `PICK_BEST_MARGIN` and fail at most `PICK_MAX_FAIL`; otherwise the startable run with the most cash per minute, `(1 - fail) x revenue_seconds / seconds` (fine-tune), or `""` when none can start. Pure. |
 | `training_factors(s) -> Dictionary` | Keys `data`, `architecture`, `researcher`, `total`. `total` is the multiplier applied to the score. |
-| `start_training(s, id)` | Charges the spend up front (and energy/data after reset 3). Result adds `id`, `spend`, `seconds`. |
+| `start_training(s, id)` | Charges the spend up front (and energy/data after reset 3). Result adds `id`, `spend`, `seconds`. The run dict in `layers[0].training` holds `type`, `spend`, `log`, `left`, `fail`, `score_mult` and `revenue_seconds`. |
 | `layer_def(s, k)` | `LayerDef` for layer k, or null. |
 | `reset_preview(s, k) -> Dictionary` | Keys `layer`, `currency`, `gain`, `holding`, `highlight`, `allowed`, `reason`. |
 | `perform_reset(s, k)` | Result adds `layer`, `gain`, `currency`. |
@@ -101,8 +102,8 @@ Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `MIN_TRAIN_SPEND` (100), `TRA
 
 Event dicts returned by `tick`, each with a `kind` key:
 
-- `training_done` (`id` = run type, `ok`). Success adds `score`, `new_best` and `new_all_time`. Failure adds `refund` (BigNum, half the spend, already added to compute).
-- `auto_train`
+- `training_done` (`id` = run type, `ok`, `revenue` = BigNum cash burst, zero on failure). Success adds `score`, `new_best` and `new_all_time`. Failure adds `refund` (BigNum, half the spend, already added to compute). A success pays `revenue_seconds` of the cash rate at finish (before its own score lands), scaled by `eff` like income (offline 50%), added to cash and to every layer's `life`. A failure pays no burst; a run saved before the burst existed (no `revenue_seconds`) pays none.
+- `auto_train` (`id` = the run type `pick_training` chose and started)
 - `reset` (`layer`, `gain`)
 - `challenge_done` (`id`, `success`)
 - `rival_launched` (`id`)
@@ -169,7 +170,7 @@ Signals:
 | `offline_progress` | `summary: Dictionary` (the `Sim.offline` result plus `away`: real seconds away; emitted only for `away >= 60`) |
 | `save_notice` | `text: String`: the save was damaged or newer and was set aside, or a backup was restored. Emitted once, before `started`. |
 | `producer_bought` | `id: String, count: int` |
-| `training_started` | `run_type: String` (also emitted for auto-training, which starts `standard`) |
+| `training_started` | `run_type: String` (also emitted for auto-training, which starts the run `pick_training` chose) |
 | `training_finished` | `result: Dictionary` |
 | `staff_hired` | `role: String, count: int` |
 | `research_bought` | `id: String` |
@@ -204,7 +205,7 @@ Per-type keys:
 | `producers` | `ProducerDef` | `order`, `base_cost`, `base_output` |
 | `layers` | `LayerDef` | `index`, `currency`, `threshold`, `target_hours` (design target for the pacing report only; no game rule reads it) |
 | `staff` | `StaffDef` | `base_cost`, `cost_growth`, `bonus_key`, `bonus_per_hire`, `fail_per_hire` (cut to a training run's fail chance per hire; see `Sim.training_fail_factor`) |
-| `training_runs` | `TrainingRunDef` | `order`, `spend_share` (0..1 of current compute), `seconds`, `fail_chance`, `score_mult` |
+| `training_runs` | `TrainingRunDef` | `order`, `spend_share` (0..1 of current compute), `seconds`, `fail_chance`, `score_mult`, `revenue_seconds` (cash burst on success: seconds of cash income; 0 = none) |
 | `research` | `ResearchDef` | `cost`, `prereqs` (PackedStringArray), `branch`, `effects` (array of `{key, value}` multipliers) |
 | `automation` | `AutomationDef` | `order`, `cost` |
 | `rivals` | `RivalDef` | `launch_hours` |

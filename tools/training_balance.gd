@@ -1,107 +1,129 @@
 extends SceneTree
-## Training balance: which run type the simulator's own pick rule (tools/simulate.gd, _training) chooses in each game
-## phase, per Ops count, with the value it compares.
+## Training balance: the three run types compared in each game phase and Ops count, and the pick shares of a
+## whole-game simulation. Phases are the window medians tools/simulate.gd prints as "training picks by game window"
+## (seed 1, aligned). For each phase and Ops count a state is built (compute stock, training multiplier, generation
+## best, best ever = generation best, Ops staff), and each run type is priced with Sim.training_preview:
+##   score = survive x predicted score   (expected score a run adds to the best)
+##   cash  = survive x revenue_seconds / seconds   (cash burst per run second, as a fraction of base cash income)
+## survive = 1 - fail chance, with Ops applied. The pick column is Sim.pick_training, the rule auto-train uses.
+##
+## Gates (exit 1 on any failure):
+##   a. fine_tune has the most cash per minute, in every row
+##   b. frontier has the highest expected score, in every row
+##   c. standard sits strictly between fine_tune and frontier on both axes, in every row
+##   d. whole-game pick shares at seed 1 (tools/simulate.gd, aligned, 336 h): fine_tune >= 10%, frontier >= 10%,
+##      standard >= 5%. The simulator's PICKS line is the source.
 ##
 ##   $GODOT --headless --path . -s tools/training_balance.gd
-##
-## Phases are the simulator's pick states: tools/simulate.gd prints "training picks by game window" (seed 1, aligned);
-## log10 stock, training multiplier and generation best are the window medians.
-## For each run type: pred = (log10 stock + log10 spend share) x training multiplier x score_mult,
-## survive = 1 - fail chance (Ops applied), per_min = 60 / seconds.
-##   gain = survive x max(0, pred - best) x per_min   (score gained per run minute over the current best)
-##   raw  = survive x pred x per_min                  (used only when no run beats the best, as in the simulator)
-## The pick is the highest gain, or the highest raw when every gain is 0 (the table says which rule applied).
-##
-## Gate (exit 1 on violation):
-##   - WANT: each (phase, Ops) pick is the expected one by MARGIN over the runner-up.
-##   - every run type is the pick in at least one phase and Ops count.
 
 const PHASES := [
-	{"name": "early", "stock_log": 4.5, "train": 1.01, "best": 6.7},
-	{"name": "mid", "stock_log": 5.0, "train": 2.56, "best": 24.0},
-	{"name": "late", "stock_log": 4.4, "train": 3.03, "best": 23.3},
+	{"name": "early", "stock_log": 4.6, "train": 1.01, "best": 4.6},
+	{"name": "mid", "stock_log": 4.9, "train": 2.56, "best": 24.5},
+	{"name": "late", "stock_log": 4.4, "train": 3.03, "best": 21.4},
 ]
 const OPS := [0, 3, 8]
-const MARGIN := 0.15
-## Which run type must be the pick in which phase, at which Ops count.
-const WANT := [
-	{"phase": "early", "ops": 0, "id": "fine_tune"},
-	{"phase": "mid", "ops": 0, "id": "standard"},
-	{"phase": "late", "ops": 0, "id": "frontier"},
-	{"phase": "late", "ops": 8, "id": "frontier"},
-]
+const SEED := 1
+const FINE := "fine_tune"
+const STANDARD := "standard"
+const FRONTIER := "frontier"
+const FINE_SHARE_MIN := 0.10
+const FRONTIER_SHARE_MIN := 0.10
+const STANDARD_SHARE_MIN := 0.05
 
 
 func _initialize() -> void:
 	var content = load("res://src/autoload/content.gd").new()
 	content.load_all()
 	var runs: Array = content.get_all("training_runs")
+	runs.sort_custom(func(a, b) -> bool: return a.order < b.order)
+	var ok := true
 	var header := "%-6s %4s" % ["phase", "ops"]
 	for d in runs:
-		header += " %12s" % d.id
-	print(header + "   pick       rule    margin over runner-up")
-	var table := {}     # "phase/ops" -> {id: value}
-	var winners := {}
+		header += " | %-10s %6s" % [d.id, "cash"]
+	print(header + " | pick")
 	for ph in PHASES:
 		for n in OPS:
-			var any_gain := false
-			var parts := {}
-			for d in runs:
-				parts[d.id] = _values(content, d, ph, n)
-				any_gain = any_gain or float(parts[d.id]["gain"]) > 0.0
-			var key := "gain" if any_gain else "raw"
+			var s := _state(content, ph, n)
 			var vals := {}
-			for id in parts:
-				vals[id] = parts[id][key]
-			table["%s/%d" % [ph["name"], n]] = vals
-			var ranked := _ranked(vals)
-			var top: String = ranked[0]
-			winners[top] = true
-			var margin := "inf" if float(vals[ranked[1]]) <= 0.0 else \
-				"%.0f%%" % ((float(vals[top]) / float(vals[ranked[1]]) - 1.0) * 100.0)
 			var row := "%-6s %4d" % [ph["name"], n]
 			for d in runs:
-				row += " %12.4f" % float(vals[d.id])
-			print(row + "   %-10s %-5s  %s" % [top, key, margin])
-	var ok := true
-	for w in WANT:
-		var vals: Dictionary = table["%s/%d" % [w["phase"], w["ops"]]]
-		var ranked := _ranked(vals)
-		if ranked[0] != w["id"] or not _margin_ok(vals, ranked):
+				var p := Sim.training_preview(s, d.id)
+				var survive := 1.0 - float(p["fail_chance"])
+				vals[d.id] = {
+					"score": survive * float(p["predicted_score"]),
+					"cash": survive * float(d.revenue_seconds) / float(d.seconds),
+				}
+				row += " | %-10.2f %5.1f%%" % [float(vals[d.id]["score"]), float(vals[d.id]["cash"]) * 100.0]
+			print(row + " | " + Sim.pick_training(s))
+			ok = _check_row(vals, ph["name"], n) and ok
+	var shares := _seed_shares()
+	if shares.is_empty():
+		printerr("CHECK FAILED: could not read the PICKS line from tools/simulate.gd (seed %d)" % SEED)
+		ok = false
+	else:
+		var counts: Dictionary = shares["counts"]
+		var frac: Dictionary = shares["shares"]
+		print("pick shares, seed %d whole game: %s %.0f%% (%d), %s %.0f%% (%d), %s %.0f%% (%d)" % [
+			SEED, FINE, float(frac[FINE]) * 100.0, int(counts[FINE]),
+			STANDARD, float(frac[STANDARD]) * 100.0, int(counts[STANDARD]),
+			FRONTIER, float(frac[FRONTIER]) * 100.0, int(counts[FRONTIER])])
+		if float(frac[FINE]) < FINE_SHARE_MIN or float(frac[FRONTIER]) < FRONTIER_SHARE_MIN or float(frac[STANDARD]) < STANDARD_SHARE_MIN:
+			printerr("CHECK FAILED: pick shares outside fine_tune >= 10%, frontier >= 10%, standard >= 5%")
 			ok = false
-			printerr("CHECK FAILED: %s with %d Ops: %s is not the pick by %d%% (ranking %s)" % [
-				w["phase"], w["ops"], w["id"], int(MARGIN * 100.0), ", ".join(ranked)])
-	for d in runs:
-		if not winners.has(d.id):
-			ok = false
-			printerr("CHECK FAILED: %s is the pick nowhere" % d.id)
-	print("picks as wanted by %d%%, every run type picked somewhere: %s" % [int(MARGIN * 100.0), "yes" if ok else "NO"])
+	print("training balance: %s" % ("PASS" if ok else "FAIL"))
 	quit(0 if ok else 1)
 
 
-## Run type ids sorted by value, best first.
-func _ranked(vals: Dictionary) -> Array:
-	var ids := vals.keys()
-	ids.sort_custom(func(a, b): return float(vals[a]) > float(vals[b]))
-	return ids
-
-
-func _margin_ok(vals: Dictionary, ranked: Array) -> bool:
-	var runner := float(vals[ranked[1]])
-	return runner <= 0.0 or float(vals[ranked[0]]) >= runner * (1.0 + MARGIN)
-
-
-## Fail chance composed with n Ops, using the real staff formula.
-func _fail_chance(content, d, n: int) -> float:
+## The state a phase stands for, with n Ops staff.
+func _state(content, ph: Dictionary, n: int) -> GameState:
 	var s := GameState.new(content, 1)
+	s.set_cur("compute", BigNum.from_float(pow(10.0, float(ph["stock_log"]))))
+	s.run["layers"][0]["run_mult"]["training"] = float(ph["train"])
+	s.run["layers"][2]["best"] = float(ph["best"])
+	s.persist["best_all"] = float(ph["best"])
 	s.run["layers"][1]["staff"]["ops"] = n
-	return float(d.fail_chance) * Sim.training_fail_factor(s)
+	return s
 
 
-## gain and raw value (score units per minute) of run type d in phase ph with n Ops; see the header.
-func _values(content, d, ph: Dictionary, n: int) -> Dictionary:
-	var survive := 1.0 - _fail_chance(content, d, n)
-	var best := float(ph["best"])
-	var pred := (float(ph["stock_log"]) + log(float(d.spend_share)) / log(10.0)) * float(ph["train"]) * float(d.score_mult)
-	var per_min := 60.0 / float(d.seconds)
-	return {"gain": survive * maxf(0.0, pred - best) * per_min, "raw": survive * pred * per_min}
+## Gates a-c on one row. Prints the failures.
+func _check_row(vals: Dictionary, phase: String, n: int) -> bool:
+	var fine: Dictionary = vals[FINE]
+	var std: Dictionary = vals[STANDARD]
+	var fr: Dictionary = vals[FRONTIER]
+	var row_ok := true
+	if float(fine["cash"]) <= float(std["cash"]) or float(fine["cash"]) <= float(fr["cash"]):
+		printerr("CHECK FAILED (a): %s with %d Ops: fine_tune is not the best cash per minute" % [phase, n])
+		row_ok = false
+	if float(fr["score"]) <= float(std["score"]) or float(fr["score"]) <= float(fine["score"]):
+		printerr("CHECK FAILED (b): %s with %d Ops: frontier is not the highest expected score" % [phase, n])
+		row_ok = false
+	var between_score := float(fine["score"]) < float(std["score"]) and float(std["score"]) < float(fr["score"])
+	var between_cash := float(fr["cash"]) < float(std["cash"]) and float(std["cash"]) < float(fine["cash"])
+	if not (between_score and between_cash):
+		printerr("CHECK FAILED (c): %s with %d Ops: standard is not strictly between fine_tune and frontier" % [phase, n])
+		row_ok = false
+	return row_ok
+
+
+## Whole-game pick counts and shares from a seed-1 simulation (its PICKS line), or {} when it is missing.
+func _seed_shares() -> Dictionary:
+	var out: Array = []
+	OS.execute(OS.get_executable_path(), PackedStringArray([
+		"--headless", "--path", ProjectSettings.globalize_path("res://"), "-s", "res://tools/simulate.gd", "--",
+		"--hours=336", "--seed=%d" % SEED, "--ending=aligned"]), out, false)
+	var line := ""
+	for l in "\n".join(out).split("\n"):
+		if l.begins_with("PICKS "):
+			line = l
+	if line == "":
+		return {}
+	var counts := {}
+	var total := 0
+	for tok in line.substr(6).split(" "):
+		var kv := tok.split("=")
+		counts[kv[0]] = int(kv[1])
+		total += int(kv[1])
+	var shares := {}
+	for id in counts:
+		shares[id] = float(counts[id]) / float(maxi(total, 1))
+	return {"counts": counts, "shares": shares}

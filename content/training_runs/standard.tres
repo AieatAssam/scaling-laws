@@ -6,10 +6,11 @@
 script = ExtResource("1_s")
 id = "standard"
 title = "Standard run"
-description = "The default: a full training pass on half your compute."
+description = "The all-rounder: a full training pass on half your compute. Moderate score and a moderate cash burst."
 icon = "training"
 order = 2
 spend_share = 0.5
 seconds = 60.0
 fail_chance = 0.12
 score_mult = 1.0
+revenue_seconds = 12.0

@@ -11,7 +11,8 @@ const TRAIN_DATA := 2.0
 const REFUND_SHARE := 0.5        # a failed run returns this share of its spend to compute
 const SCORE_ROLL := 0.02         # run score is rolled up or down by this share
 const FAIL_FLOOR := 0.4          # staff can cut a run's fail chance to this share of its base at most
-const AUTO_TRAIN_RUN := "standard"   # run type that auto_train starts
+const PICK_BEST_MARGIN := 0.1    # pick_training: a run must predict this share above the best score to chase it
+const PICK_MAX_FAIL := 0.2       # pick_training: a run chasing the best must fail at most this often (Ops cut it)
 const DATA_RATE := 0.1           # data/sec once Paradigm Shift is done
 const ENERGY_RATE := 1.0
 const ENERGY_CAP := 100.0
@@ -325,7 +326,8 @@ static func training_fail_factor(s: GameState) -> float:
 
 ## What run type `id` would do now. Keys: ok, reason, id, title, spend, seconds, score_mult, base_fail, fail_factor,
 ## fail_chance (composed), min_compute, predicted_score (no roll), bonus_now and bonus_if_success (compute bonus
-## before and after the predicted score lands), factors.
+## before and after the predicted score lands), factors, revenue_seconds and revenue (cash burst on success at the
+## current cash rate: revenue_seconds x cash_per_second).
 static func training_preview(s: GameState, id: String) -> Dictionary:
 	var d = run_def(s, id)
 	if d == null:
@@ -343,6 +345,8 @@ static func training_preview(s: GameState, id: String) -> Dictionary:
 		# Smallest compute stock at which this share meets MIN_TRAIN_SPEND.
 		"min_compute": _big(MIN_TRAIN_SPEND / share) if share > 0.0 else BigNum.new(),
 		"predicted_score": predicted,
+		"revenue_seconds": float(d.revenue_seconds),
+		"revenue": cash_per_second(s).mul_f(float(d.revenue_seconds)),
 		"bonus_now": Rules.training_bonus(s),
 		"bonus_if_success": Rules.training_bonus_for(
 			maxf(float(s.run["layers"][2]["best"]), predicted), maxf(float(s.persist["best_all"]), predicted)),
@@ -370,14 +374,43 @@ static func start_training(s: GameState, id: String) -> Dictionary:
 		s.set_cur("data", s.cur("data").subtract(_big(TRAIN_DATA)))
 	s.run["layers"][0]["training"] = {
 		"type": id, "spend": spend.to_json(), "log": spend.log10(), "left": p["seconds"],
-		"fail": p["fail_chance"], "score_mult": p["score_mult"],
+		"fail": p["fail_chance"], "score_mult": p["score_mult"], "revenue_seconds": p["revenue_seconds"],
 	}
 	return {"ok": true, "id": id, "spend": spend, "seconds": p["seconds"]}
 
 
+## Run types that can chase the best score (see pick_training), best first. Pure: reads state only.
+## Picks the run with the highest predicted score when it beats the best by PICK_BEST_MARGIN and fails at most
+## PICK_MAX_FAIL of the time. Otherwise the startable run with the most cash per minute (fine-tune for cash), or "".
+## Used by auto_train and tools/simulate.gd, so the two agree.
+static func pick_training(s: GameState) -> String:
+	var bar := float(s.run["layers"][2]["best"]) * (1.0 + PICK_BEST_MARGIN)
+	var best_id := ""
+	var best_pred := -INF
+	var cash_id := ""
+	var cash_val := 0.0
+	for d in s.db.get_all("training_runs"):
+		var p := training_preview(s, d.id)
+		if not p["ok"]:
+			continue
+		var pred: float = p["predicted_score"]
+		if pred > bar and p["fail_chance"] <= PICK_MAX_FAIL and pred > best_pred:
+			best_pred = pred
+			best_id = d.id
+		var cash := (1.0 - float(p["fail_chance"])) * float(p["revenue_seconds"]) / float(p["seconds"])
+		if cash > cash_val:
+			cash_val = cash
+			cash_id = d.id
+	if best_id != "":
+		return best_id
+	return cash_id
+
+
 ## Finishes a run when its clock runs out. A failed run refunds REFUND_SHARE of its spend. A success scores
 ## log10(spend) × training multiplier × run score_mult × a roll of ±SCORE_ROLL, and only raises the bests.
-static func _train_tick(s: GameState, dt: float, evs: Array) -> void:
+## A success also pays a cash burst: revenue_seconds of the cash income rate at finish, scaled by eff like income
+## (offline 50%), and counted in every layer's life like income is.
+static func _train_tick(s: GameState, dt: float, eff: float, evs: Array) -> void:
 	var L0: Dictionary = s.run["layers"][0]
 	var t: Dictionary = L0["training"]
 	if t.is_empty():
@@ -391,8 +424,14 @@ static func _train_tick(s: GameState, dt: float, evs: Array) -> void:
 		s.persist["stats"]["failed"] = int(s.persist["stats"]["failed"]) + 1
 		var refund := BigNum.from_json(t["spend"]).mul_f(REFUND_SHARE)
 		s.add_cur("compute", refund)
-		evs.append({"kind": "training_done", "ok": false, "id": t["type"], "refund": refund})
+		evs.append({"kind": "training_done", "ok": false, "id": t["type"], "refund": refund, "revenue": BigNum.new()})
 		return
+	# The burst is priced at the rate before this run's own score lands, so the preview (which also uses the
+	# current rate) matches the payout. Saves from before the burst existed have no revenue_seconds: they pay none.
+	var revenue := cash_per_second(s).mul_f(float(t.get("revenue_seconds", 0.0)) * eff)
+	s.add_cur("cash", revenue)
+	for k in range(1, 5):
+		s.run["layers"][k]["life"] = (s.run["layers"][k]["life"] as BigNum).add(revenue)
 	var score := float(t["log"]) * Rules.mult(s, "training") * float(t["score_mult"]) \
 		* s.rng.randf_range(1.0 - SCORE_ROLL, 1.0 + SCORE_ROLL)
 	var L2: Dictionary = s.run["layers"][2]
@@ -401,7 +440,7 @@ static func _train_tick(s: GameState, dt: float, evs: Array) -> void:
 	L2["best"] = maxf(float(L2["best"]), score)
 	s.persist["best_all"] = maxf(float(s.persist["best_all"]), score)
 	evs.append({"kind": "training_done", "ok": true, "id": t["type"], "score": score,
-		"new_best": new_best, "new_all_time": new_all})
+		"new_best": new_best, "new_all_time": new_all, "revenue": revenue})
 
 
 # ---------------------------------------------------------------- resets
@@ -596,9 +635,9 @@ static func _automate(s: GameState, evs: Array) -> void:
 			buy_producer(s, id, max_affordable(s, id))
 			id = best_producer(s)
 	if "auto_train" in auto:
-		var r := start_training(s, AUTO_TRAIN_RUN)
-		if r["ok"]:
-			evs.append({"kind": "auto_train"})
+		var id := pick_training(s)
+		if id != "" and start_training(s, id)["ok"]:
+			evs.append({"kind": "auto_train", "id": id})
 	if "auto_fund" in auto:
 		_auto_reset(s, 1, evs)
 	if "auto_gen" in auto:
@@ -676,7 +715,7 @@ static func tick(s: GameState, dt: float, offline: bool = false) -> Array:
 		if L0["timed"][i]["left"] <= 0.0:
 			L0["timed"].remove_at(i)
 
-	_train_tick(s, dt, evs)
+	_train_tick(s, dt, eff, evs)
 	if s.resets(3) > 0:
 		s.add_cur("data", _big(DATA_RATE * dt * eff))
 		var energy := s.cur("energy").add(_big(ENERGY_RATE * dt * eff))

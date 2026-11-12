@@ -6,10 +6,11 @@
 script = ExtResource("1_s")
 id = "frontier"
 title = "Frontier push"
-description = "Everything on one huge, unstable run. Bigger runs diverge more: loss spikes, node failures."
+description = "Chase the benchmark: all your compute on one big, risky run. Highest score, no cash burst."
 icon = "training"
 order = 3
 spend_share = 1.0
-seconds = 120.0
+seconds = 60.0
 fail_chance = 0.3
 score_mult = 1.25
+revenue_seconds = 0.0

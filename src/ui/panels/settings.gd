@@ -3,9 +3,17 @@ extends Control
 ## Settings: reduce motion, UI scale, manual save, read-only run stats.
 
 const SCALES := [1.0, 1.25, 1.5]
+## Notation key (saved in persist.settings.notation) -> button label, all showing the value 1.234e14.
+const NOTATIONS := {"suffix": "123.40T", "scientific": "1.23e14", "engineering": "123.40e12"}
+const NOTATION_TIPS := {
+	"suffix": "Suffix notation\nNumbers use K, M, B, T, Qa... up to Dc, then scientific.",
+	"scientific": "Scientific notation\nNumbers are written as mantissa and exponent: 1.23e14.",
+	"engineering": "Engineering notation\nLike scientific, but the exponent is a multiple of three: 123.40e12.",
+}
 
 var _motion: CheckBox
 var _scale_buttons := {}  # float -> Button
+var _notation_buttons := {}  # notation key -> Button
 var _stats: Label
 var _saved: Label
 var _result: Label
@@ -55,6 +63,26 @@ func _ready() -> void:
 		Tip.attach(b, "UI scale %sx\nScales the whole interface. Use a larger scale on small phones." % s)
 		scale_row.add_child(b)
 		_scale_buttons[s] = b
+
+	var notation_lbl := Label.new()
+	notation_lbl.text = "Number notation"
+	page.add_child(notation_lbl)
+	var notation_row := HBoxContainer.new()
+	notation_row.add_theme_constant_override("separation", 6)
+	page.add_child(notation_row)
+	var notation_group := ButtonGroup.new()
+	for key in NOTATIONS:
+		var nb := Button.new()
+		nb.text = NOTATIONS[key]
+		nb.toggle_mode = true
+		nb.button_group = notation_group
+		nb.custom_minimum_size = Vector2(0, PanelKit.TOUCH_H)
+		nb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nb.clip_text = true
+		nb.pressed.connect(Game.set_setting.bind("notation", key))
+		Tip.attach(nb, NOTATION_TIPS[key])
+		notation_row.add_child(nb)
+		_notation_buttons[key] = nb
 
 	var save_btn := Button.new()
 	save_btn.text = "Save now"
@@ -115,6 +143,9 @@ func _refresh() -> void:
 	var cur := float(st.get("ui_scale", 1.0))
 	for s in _scale_buttons:
 		(_scale_buttons[s] as Button).set_pressed_no_signal(absf(cur - s) < 0.01)
+	var notation := String(st.get("notation", "suffix"))
+	for key in _notation_buttons:
+		(_notation_buttons[key] as Button).set_pressed_no_signal(key == notation)
 	var stats: Dictionary = Game.state.persist["stats"]
 	var secs := int(stats.get("time", 0.0))
 	_stats.text = "Runs %d  Resets %d  Trainings %d  Events %d  Play time %dh %02dm" % [
@@ -155,6 +186,7 @@ func _import() -> void:
 		_report(false, "Not a valid save.")
 		return
 	Game.state = GameState.from_dict(Content, data)
+	Game.apply_settings()
 	Game.save_now()
 	_paste.text = ""
 	get_tree().call_deferred("reload_current_scene")
@@ -174,6 +206,7 @@ func _confirm_reset() -> void:
 func _hard_reset() -> void:
 	SaveSystem.delete(Game.save_path)
 	Game.state = GameState.new(Content, randi())
+	Game.apply_settings()
 	Game.save_now()
 	get_tree().call_deferred("reload_current_scene")
 

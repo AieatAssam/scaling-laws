@@ -1,6 +1,6 @@
 extends SceneTree
 ## Dev: Training panel shot in the real main scene, unlocked with compute and a best score.
-## $GODOT --path . --resolution 390x844 -s tools/dev_training_shots.gd -- <out.png> <idle|run|mid|done|short>
+## $GODOT --path . --resolution 390x844 -s tools/dev_training_shots.gd -- <out.png> <idle|run|mid|done|short|rich>
 ## short: compute below the Fine-tune minimum, so the compute bar and the blocked Start show.
 ## Never touches the real save. Dismisses the benchmark toast so it does not cover the panel.
 
@@ -21,6 +21,8 @@ func _initialize() -> void:
 	st.set_cur("compute", BigNum.from_float(137.0 if mode == "short" else 1e12))
 	st.run["layers"][2]["best"] = 3.45
 	st.persist["best_all"] = 4.1
+	if mode == "rich":  # cash income x1e12: the widest cash burst numbers the stat line has to fit
+		st.run["layers"][0]["run_mult"]["cash"] = 1.0e12
 	for id in ["intern_laptop"]:
 		Sim.buy_producer(st, id, 1)
 	g.running = true

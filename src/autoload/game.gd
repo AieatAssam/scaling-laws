@@ -55,6 +55,7 @@ func start() -> void:
 	var d := SaveSystem.load_data(save_path)
 	if not d.is_empty():
 		state = GameState.from_dict(Content, d)
+	apply_settings()
 	if SaveSystem.last_notice != "":
 		save_notice.emit(SaveSystem.last_notice)
 	var saved_at := float(state.persist.get("saved_at", 0.0))
@@ -276,7 +277,14 @@ func new_run() -> Dictionary:
 
 func set_setting(key: String, value: Variant) -> void:
 	state.persist["settings"][key] = value
+	apply_settings()
 	settings_changed.emit(key, value)
+
+
+## Pushes the display settings that BigNum reads (number notation). Call after any change to state.persist.settings
+## or after replacing `state` (import, hard reset).
+func apply_settings() -> void:
+	BigNum.notation = BigNum.notation_from_key(String(state.persist["settings"].get("notation", "suffix")))
 
 
 func _dispatch(evs: Array) -> void:
@@ -285,7 +293,7 @@ func _dispatch(evs: Array) -> void:
 			"training_done":
 				training_finished.emit(e)
 			"auto_train":
-				training_started.emit(Sim.AUTO_TRAIN_RUN)
+				training_started.emit(e["id"])
 			"reset":
 				layer_reset.emit(e["layer"], e["gain"])
 			"challenge_done":

@@ -26,7 +26,7 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 		"best_all": 0.0,
 		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0},
 		"lifetime_resets": [0, 0, 0, 0],
-		"settings": {"reduce_motion": false},
+		"settings": {"reduce_motion": false, "notation": "suffix"},
 		"intro_seen": false,
 		"saved_at": 0.0,
 	}

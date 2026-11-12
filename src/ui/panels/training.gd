@@ -1,6 +1,7 @@
 extends PanelBase
-## Training: pick a run type (spend share, length, fail risk, score multiplier). A success scores; a failure refunds
-## half the spend. The rules live in the Help tab (Training topic); each row's tooltip has the numbers for that run.
+## Training: pick a run type (spend share, length, fail risk, score multiplier, cash burst). A success scores and pays
+## its cash burst; a failure refunds half the spend. The rules live in the Help tab (Training topic); each row's
+## tooltip has the numbers for that run.
 
 var _cards: Dictionary = {}    # run id -> {btn, stat, bar}
 var _runs: Array = []          # TrainingRunDef, by order then id
@@ -63,7 +64,8 @@ func wants_attention() -> bool:
 
 
 ## One full-width row per run type: name and Start button on top, a compact stat line under them.
-## The stat line is "spend / seconds / fail chance / predicted score"; a score above the best is marked with ^ in green.
+## The stat line is "spend / seconds / fail chance / predicted score"; a run with a cash burst swaps the spend share
+## for the burst ("+X"). A score above the best is marked with ^ in green.
 func _row(d) -> PanelContainer:
 	var id: String = d.id
 	var c := PanelKit.card()
@@ -128,7 +130,12 @@ func _tip(id: String) -> String:
 	lines.append("Score = log10(spend) x multiplier x%.2f x run score x%.2f, rolled +/-%d%%. Predicted now: %.2f." % [
 		total, d.score_mult, roundi(Sim.SCORE_ROLL * 100.0), float(p["predicted_score"])])
 	lines.append("If it works: compute bonus x%.2f -> x%.2f." % [float(p["bonus_now"]), float(p["bonus_if_success"])])
-	lines.append("Fail chance %s (base %s, Ops x%.2f). If it fails: no score, %s (%s of spend) back to compute." % [
+	if float(d.revenue_seconds) > 0.0:
+		lines.append("If it works: +%s cash burst (%ds of cash income now; half while away)." % [
+			(p["revenue"] as BigNum).format(), int(d.revenue_seconds)])
+	else:
+		lines.append("No cash burst.")
+	lines.append("Fail chance %s (base %s, Ops x%.2f). If it fails: no score or burst, %s (%s of spend) back to compute." % [
 		PanelKit.pct(float(p["fail_chance"])), PanelKit.pct(float(p["base_fail"])), float(p["fail_factor"]),
 		(p["spend"] as BigNum).mul_f(Sim.REFUND_SHARE).format(), PanelKit.pct(Sim.REFUND_SHARE)])
 	lines.append("Each doubling of spend adds %.2f to the score. Bigger runs score more but fail more often." % (
@@ -172,10 +179,13 @@ func _on_finished(r: Dictionary) -> void:
 	if r.get("ok", false):
 		var tag := ""
 		if r["new_all_time"]:
-			tag = " (all-time best)"
+			tag = " (all-time)"
 		elif r["new_best"]:
 			tag = " (best)"
-		_msg = "Done: score %.2f%s." % [float(r["score"]), tag]
+		var cash := ""
+		if (r["revenue"] as BigNum).compare(BigNum.new()) > 0:
+			cash = ", +%s cash" % (r["revenue"] as BigNum).format()
+		_msg = "Done: %.1f%s%s." % [float(r["score"]), tag, cash]
 		_msg_color = PanelKit.GREEN
 	else:
 		_msg = "Failed: %s returned." % (r["refund"] as BigNum).format()
@@ -212,7 +222,12 @@ func _refresh() -> void:
 		var score := float(p["predicted_score"])
 		var beats := score > best
 		var stat: Label = c.stat
-		stat.text = "%s %ds fail %s -> %s%s" % [PanelKit.pct(d.spend_share), int(d.seconds),
-			PanelKit.pct(float(p["fail_chance"])), BigNum.from_float(score).format(), " ^" if beats else ""]
+		var mark := " ^" if beats else ""
+		if float(d.revenue_seconds) > 0.0:  # short at phone width: the burst takes the spend share's place
+			stat.text = "%ds fail %s -> %.1f%s +%s" % [int(d.seconds), PanelKit.pct(float(p["fail_chance"])),
+				score, mark, (p["revenue"] as BigNum).format()]
+		else:
+			stat.text = "%s %ds fail %s -> %.1f%s" % [PanelKit.pct(d.spend_share), int(d.seconds),
+				PanelKit.pct(float(p["fail_chance"])), score, mark]
 		stat.add_theme_color_override("font_color", PanelKit.col(PanelKit.GREEN if beats else PanelKit.MUTED))
 	_best.text = "Best %s / multiplier x%.2f" % [BigNum.from_float(best).format(), Sim.training_factors(s)["total"]]

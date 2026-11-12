@@ -148,3 +148,164 @@ static func training_bonus(s: GameState) -> float:
 ## The same bonus for given bests, e.g. to preview a score before it lands.
 static func training_bonus_for(best: float, best_all: float) -> float:
 	return (1.0 + 0.05 * best) * (1.0 + 0.01 * best_all)
+
+
+# ---------------------------------------------------------------- progress toward goals
+
+## Goal kinds that rank first when within BIG_BONUS of the nearest goal (see next_goals).
+const BIG_KINDS := ["reset", "producer", "agi"]
+const BIG_BONUS := 0.10
+
+
+## Progress 0..1 toward condition `c`, for the goal rail and the benchmark bars. Exactly 1.0 when check() passes,
+## otherwise capped at 0.99 so a near miss never reads as done. Currency-like amounts use log scale.
+static func condition_progress(s: GameState, c: Dictionary) -> float:
+	if check(s, c):
+		return 1.0
+	var p := 0.0
+	match c["type"]:
+		"currency_gte":
+			p = _log_progress(s.cur(c["id"]), BigNum.from_float(float(c["value"])))
+		"compute_rate_gte":
+			p = _log_progress(Sim.compute_per_second(s), BigNum.from_float(float(c["value"])))
+		"owned_gte":
+			p = _linear(float(s.owned(c["id"])), float(c["value"]))
+		"resets_gte":
+			p = _linear(float(s.resets(int(c["layer"]))), float(c["value"]))
+		"training_best_gte":
+			p = _linear(float(s.run["layers"][2]["best"]), float(c["value"]))
+		"staff_gte":
+			p = _linear(float(s.run["layers"][1]["staff"].get(c["id"], 0)), float(c["value"]))
+		"slider_gte":
+			p = _linear(float(s.run["slider"]), float(c["value"]))
+		"time_played_gte":
+			p = _linear(float(s.persist["stats"]["time"]), float(c["value"]))
+		"debt_gte":
+			p = _linear(float(s.run["layers"][0]["debt"]), float(c["value"]))
+		"research_has", "benchmark_unlocked", "flag_set":
+			p = 0.0  # all-or-nothing
+		_:
+			push_error("Unknown condition type: %s" % c["type"])
+	return clampf(p, 0.0, 0.99)
+
+
+## Progress of a condition list: the minimum over its conditions (1.0 for an empty list).
+static func conditions_progress(s: GameState, conds: Array) -> float:
+	var p := 1.0
+	for c in conds:
+		p = minf(p, condition_progress(s, c))
+	return p
+
+
+static func _linear(have: float, need: float) -> float:
+	return 1.0 if need <= 0.0 else clampf(have / need, 0.0, 1.0)
+
+
+## Orders of magnitude of `b`, log10(1 + b): 0 for zero, so the bar moves evenly from 1 to 1e6 and beyond.
+static func _log1p10(b: BigNum) -> float:
+	if b.is_zero():
+		return 0.0
+	if b.exponent >= 15:
+		return b.log10()
+	return log(1.0 + b.to_float()) / log(10.0)
+
+
+static func _log_progress(have: BigNum, need: BigNum) -> float:
+	var top := _log1p10(need)
+	return 1.0 if top <= 0.0 else clampf(_log1p10(have) / top, 0.0, 1.0)
+
+
+static func _ceil_big(b: BigNum) -> BigNum:
+	var f := b.floor_value()
+	return f if f.compare(b) == 0 else f.add(BigNum.from_float(1.0))
+
+
+## Lifetime cash (layer k's `life`) at which a reset of layer k is worth it. reset_preview's highlight is
+## gain >= 2 and gain >= 2 x holding, with gain = floor(sqrt(life / threshold)); so the gain needed is
+## G = max(2, ceil(2 x holding)) and the life is threshold x G^2.
+static func reset_worth_life(s: GameState, k: int) -> BigNum:
+	var ld = Sim.layer_def(s, k)
+	var g := _ceil_big(s.cur(ld.currency).mul_f(2.0))
+	if g.compare(BigNum.from_float(2.0)) < 0:
+		g = BigNum.from_float(2.0)
+	return BigNum.from_float(float(ld.threshold)).multiply(g.multiply(g))
+
+
+## Seconds to cover `remaining` of lifetime at `rate` per second (0 when already covered).
+static func _secs(remaining: BigNum, rate: BigNum) -> float:
+	if remaining.compare(BigNum.new()) <= 0:
+		return 0.0
+	return remaining.divide(rate).to_float()
+
+
+## Reset ETA for layer k at the current income. Every layer's `life` grows by cash per second, so that is the rate.
+## {worth_now: bool, worth_in: float, next_in: float}, seconds. worth_in is 0 when worth it already; next_in is the
+## time until the gain rises by one. Both are INF when income is zero. An estimate: the rate may change.
+static func reset_eta(s: GameState, k: int) -> Dictionary:
+	var out := {"worth_now": false, "worth_in": INF, "next_in": INF}
+	var ld = Sim.layer_def(s, k)
+	if ld == null:
+		return out
+	var p := Sim.reset_preview(s, k)
+	var rate := Sim.cash_per_second(s)
+	var life: BigNum = s.run["layers"][k]["life"]
+	out["worth_now"] = p["highlight"]
+	if p["highlight"]:
+		out["worth_in"] = 0.0
+	if rate.is_zero():
+		return out
+	if not p["highlight"]:
+		out["worth_in"] = _secs(reset_worth_life(s, k).subtract(life), rate)
+	var g := int(p["gain"])
+	out["next_in"] = _secs(BigNum.from_float(float(ld.threshold) * float(g + 1) * float(g + 1)).subtract(life), rate)
+	return out
+
+
+static func _goal(kind: String, id: String, title: String, progress: float, hint: String) -> Dictionary:
+	return {"kind": kind, "id": id, "title": title, "progress": progress, "hint": hint}
+
+
+## The n nearest unmet goals: locked benchmarks, each reset layer's worth-it point, the next producer tier not yet
+## owned, the next milestone of each owned producer, and the current AGI stage once the Singularity is reachable.
+## Each is {kind, id, title, progress, hint}. A locked benchmark's title is its real name: the UI hides it.
+## Sorted by progress, except that a big goal (BIG_KINDS) within BIG_BONUS of the nearest ranks first.
+static func next_goals(s: GameState, n: int) -> Array:
+	var goals: Array = []
+	for d in s.db.get_all("benchmarks"):
+		if not (d.id in s.persist["benchmarks"]):
+			goals.append(_goal("benchmark", d.id, d.title, conditions_progress(s, d.conditions), d.description))
+	for k in range(1, 5):
+		var ld = Sim.layer_def(s, k)
+		if ld == null or (k > 1 and s.resets(k - 1) == 0) or Sim.reset_preview(s, k)["highlight"]:
+			continue
+		var p := Sim.reset_preview(s, k)
+		var hint := "Gain +%d %s on reset. Worth it once the gain is at least double what you hold." % [
+			int(p["gain"]), String(ld.currency).capitalize()]
+		goals.append(_goal("reset", ld.id, "%s reset" % ld.title,
+			_log_progress(s.run["layers"][k]["life"], reset_worth_life(s, k)), hint))
+	var producers: Array = s.db.get_all("producers")
+	for d in producers:
+		if s.owned(d.id) == 0:
+			var cost := Sim.cost_for(s, d.id, 1)
+			goals.append(_goal("producer", d.id, "Buy %s" % d.title, _log_progress(s.cur("cash"), cost),
+				"Costs %s cash. Each one makes %s compute/s." % [cost.format(), BigNum.from_float(float(d.base_output)).format()]))
+			break
+	for d in producers:
+		var owned := s.owned(d.id)
+		for m in Sim.MILESTONES:
+			if owned >= 1 and owned < m:
+				goals.append(_goal("milestone", d.id, "%s at %d" % [d.title, m], float(owned) / float(m),
+					"Doubles %s output at %d owned. You have %d." % [d.title, m, owned]))
+				break
+	var stages: Array = s.db.get_all("agi_stages")
+	var stage := int(s.run["stage"])
+	if stage < stages.size() and (s.resets(3) > 0 or s.resets(4) > 0):
+		var st = stages[stage]
+		goals.append(_goal("agi", st.id, st.title, conditions_progress(s, st.conditions), st.description))
+	goals.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return a["progress"] + _big_bonus(a) > b["progress"] + _big_bonus(b))
+	return goals.slice(0, n)
+
+
+static func _big_bonus(goal: Dictionary) -> float:
+	return BIG_BONUS if BIG_KINDS.has(goal["kind"]) else 0.0

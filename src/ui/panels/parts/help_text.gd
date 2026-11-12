@@ -104,9 +104,11 @@ static func _training(content, state: GameState) -> Array[String]:
 	runs.sort_custom(func(a, b) -> bool: return a.order < b.order if a.order != b.order else a.id < b.id)
 	for d in runs:
 		var p := Sim.training_preview(state, d.id)
-		out.append("- %s: %s of compute, %ds, score x%.2f, %s chance to fail, needs %s compute in stock" % [
+		var burst := ("cash burst %ds of income on success" % int(d.revenue_seconds)) if float(d.revenue_seconds) > 0.0 \
+			else "no cash burst"
+		out.append("- %s: %s of compute, %ds, score x%.2f, %s chance to fail, needs %s compute in stock, %s" % [
 			d.title, _num(float(d.spend_share) * 100.0) + "%", int(d.seconds), float(d.score_mult),
-			_num(float(p["fail_chance"]) * 100.0) + "%", (p["min_compute"] as BigNum).format()])
+			_num(float(p["fail_chance"]) * 100.0) + "%", (p["min_compute"] as BigNum).format(), burst])
 	return out
 
 

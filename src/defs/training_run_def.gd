@@ -1,6 +1,7 @@
 class_name TrainingRunDef
 extends ContentDef
 ## One training run type (content/training_runs/*.tres). Score = log10(spend) x training x score_mult x roll.
+## A success also pays a cash burst of revenue_seconds x the cash income rate (Sim._train_tick).
 
 ## Position in the Train tab and in the help table (ties sort by id).
 @export var order: int = 0
@@ -12,3 +13,5 @@ extends ContentDef
 @export var fail_chance: float = 0.12
 ## Multiplies the run's score: bigger, riskier runs score higher.
 @export var score_mult: float = 1.0
+## Cash burst on success, in seconds of current cash income (0 = none). Failure pays nothing.
+@export var revenue_seconds: float = 0.0

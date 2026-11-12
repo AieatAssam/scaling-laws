@@ -52,6 +52,8 @@ static func condition(c: Dictionary) -> String:
 			return "Flag: %s" % String(c["id"]).capitalize()
 		"debt_gte":
 			return "Debt >= %s" % num(c["value"])
+		"compute_rate_gte":
+			return "Compute >= %s/s" % BigNum.from_float(float(c["value"])).format()
 	return str(c)
 
 

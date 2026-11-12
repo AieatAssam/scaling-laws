@@ -68,11 +68,31 @@ func _row(d) -> HBoxContainer:
 	desc.theme_type_variation = &"MicroDim"
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(desc)
+	# Locked only: how close the requirements are, and what they are.
+	var progress := HBoxContainer.new()
+	progress.add_theme_constant_override("separation", 6)
+	text.add_child(progress)
+	var bar := PanelKit.bar(PanelKit.TEAL)
+	bar.custom_minimum_size = Vector2(0, 6)
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	progress.add_child(bar)
+	var pct := Label.new()
+	pct.theme_type_variation = &"MicroDim"
+	pct.custom_minimum_size = Vector2(28, 0)
+	pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	pct.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	progress.add_child(pct)
+	var req := Label.new()
+	req.theme_type_variation = &"MicroDim"
+	req.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.add_child(req)
 	var reward := Label.new()
 	reward.theme_type_variation = &"MicroDim"
 	reward.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(reward)
-	_rows[d.id] = {"def": d, "badge": badge, "query": query, "title": title, "desc": desc, "reward": reward}
+	_rows[d.id] = {"def": d, "badge": badge, "query": query, "title": title, "desc": desc, "reward": reward,
+		"progress": progress, "bar": bar, "pct": pct, "req": req}
 	Tip.attach(row, Callable(self, "_tip").bind(d.id))
 	return row
 
@@ -97,6 +117,13 @@ func _refresh() -> void:
 		(r["title"] as Label).text = str(d.title) if got else "???"
 		(r["desc"] as Label).text = str(d.description)
 		(r["reward"] as Label).text = ("Reward: " + Fx.effects_text(d.effects)) if got else "Reward: ?"
+		(r["progress"] as Control).visible = not got
+		(r["req"] as Label).visible = not got
+		if not got:
+			var p := clampf(Rules.conditions_progress(Game.state, d.conditions), 0.0, 1.0)
+			(r["bar"] as ProgressBar).value = p * 100.0
+			(r["pct"] as Label).text = "%d%%" % floori(p * 100.0)
+			(r["req"] as Label).text = "Requires: " + PanelText.conditions(d.conditions)
 	_count.text = "Earned %d / %d" % [earned.size(), _rows.size()]
 
 

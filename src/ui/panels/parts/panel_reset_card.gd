@@ -14,6 +14,7 @@ var layer: int = 0
 var _on_result: Callable
 var _gain: Label
 var _holding: Label
+var _eta: Label
 var _why: Label
 var _button: Button
 var _dialog: ConfirmationDialog
@@ -42,8 +43,10 @@ func setup(k: int, on_result: Callable) -> PanelResetCard:
 	v.add_child(head)
 	_gain = PanelKit.label("", PanelKit.GOLD)
 	_holding = PanelKit.label("", PanelKit.TEXT)
+	_eta = PanelKit.label("", PanelKit.MUTED)
 	v.add_child(_gain)
 	v.add_child(_holding)
+	v.add_child(_eta)
 	v.add_child(PanelKit.label(WIPES[k], PanelKit.MUTED))
 	_why = PanelKit.label("", PanelKit.MUTED)
 	v.add_child(_why)
@@ -64,6 +67,7 @@ func refresh() -> void:
 	var gain := int(p["gain"])
 	_gain.text = "Gain on reset: +%d %s" % [gain, cur]
 	_holding.text = "You hold: %s %s" % [(p["holding"] as BigNum).format(), cur]
+	_eta.text = _eta_text(Rules.reset_eta(Game.state, layer))
 	var allowed: bool = p["allowed"]
 	if not allowed:
 		_why.text = str(p["reason"])
@@ -90,7 +94,32 @@ func _tip() -> String:
 		lines.append(str(p["reason"]))
 	elif p["highlight"]:
 		lines.append("Worth it: the gain is at least double what you hold.")
+	lines.append("Est.: times assume cash income stays at today's rate.")
 	return "\n".join(lines)
+
+
+## "Est.: worth it in ~12m, next +1 in ~3m" (at the current cash rate). "now" once worth it; "—" when there is no income.
+func _eta_text(e: Dictionary) -> String:
+	var worth_in := float(e["worth_in"])
+	var next_in := float(e["next_in"])
+	if is_inf(worth_in) and is_inf(next_in):
+		return "Est.: —"
+	var worth := "worth it now" if e["worth_now"] else ("worth it: —" if is_inf(worth_in) else "worth it in ~%s" % _span(worth_in))
+	var nxt := "next +1: —" if is_inf(next_in) else "next +1 in ~%s" % _span(next_in)
+	return "Est.: %s, %s" % [worth, nxt]
+
+
+## Coarse time: "<1m", "12m", "3h", "5d", "over 100y".
+static func _span(sec: float) -> String:
+	if sec >= 3.15e9:
+		return "over 100y"
+	if sec < 60.0:
+		return "<1m"
+	if sec < 3600.0:
+		return "%dm" % roundi(sec / 60.0)
+	if sec < 86400.0:
+		return "%dh" % roundi(sec / 3600.0)
+	return "%dd" % roundi(sec / 86400.0)
 
 
 func _do_reset() -> void:

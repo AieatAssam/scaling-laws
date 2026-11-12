@@ -5,6 +5,10 @@ extends RefCounted
 
 const SUFFIXES := ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"]
 
+## How format() writes a value. Set from the player's setting by Game.apply_settings (a display choice only).
+enum Notation { SUFFIX, SCIENTIFIC, ENGINEERING }
+static var notation: Notation = Notation.SUFFIX
+
 var mantissa: float
 var exponent: int
 
@@ -147,10 +151,25 @@ func floor_value() -> BigNum:
 	return BigNum.new(floor(mantissa * pow(10.0, exponent)))
 
 
-## Suffix notation up to Dc, then scientific ("1.23e36").
+## Map a saved setting key ("suffix", "scientific", "engineering") to a Notation; anything else is suffix.
+static func notation_from_key(key: String) -> Notation:
+	match key:
+		"scientific":
+			return Notation.SCIENTIFIC
+		"engineering":
+			return Notation.ENGINEERING
+	return Notation.SUFFIX
+
+
+## Suffix notation up to Dc, then scientific ("1.23e36"). Scientific is always "d.dde<n>";
+## engineering uses exponents that are multiples of three ("123.40e12").
 func format() -> String:
 	if mantissa == 0.0:
 		return "0"
+	if notation == Notation.SCIENTIFIC:
+		return _sci()
+	if notation == Notation.ENGINEERING:
+		return _eng()
 	if exponent < -2:
 		return _sci()
 	var group := maxi(exponent, 0) / 3
@@ -172,6 +191,16 @@ func _sci() -> String:
 		sm /= 10.0
 		se += 1
 	return "%.2fe%d" % [sm, se]
+
+
+## "ddd.dde<exp>" with exp a multiple of three, rolling over when rounding reaches 1000.
+func _eng() -> String:
+	var group := int(floor(float(exponent) / 3.0))
+	var m := mantissa * pow(10.0, exponent - group * 3)
+	if roundf(absf(m) * 100.0) >= 100000.0:
+		group += 1
+		m /= 1000.0
+	return "%.2fe%d" % [m, group * 3]
 
 
 func to_json() -> Dictionary:

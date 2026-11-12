@@ -5,7 +5,7 @@ extends SceneTree
 ##
 ## Prints an unlock timeline and a pacing report. Exits 1 with "CHECK FAILED: ..." lines when a check fails.
 ## Times are game hours from the start of the run. The strategy: best-payback producers, staff, research on one
-## architecture branch (seed % 3), training run type with the best expected gain per minute, events by a simple score, slider set for the
+## architecture branch (seed % 3), training run type by Sim.pick_training (the same rule auto_train uses), events by a simple score, slider set for the
 ## target ending, automation, legacy, challenges. A layer is reset when it is highlighted (gain >= 2 and >= 2x its
 ## holding), or when its gain is >= 1 and has stopped rising for STALL_FACTOR times as long as it took to reach it.
 ## The strategy reads only economy state; LayerDef.target_hours is printed as the design target, nothing more.
@@ -281,36 +281,20 @@ func _automation() -> void:
 				break
 
 
-## Picks the run type with the most expected score gain per minute: P(success) × (predicted score − best this
-## generation)+ ÷ run minutes. While no type can beat the best, it takes the highest P(success) × predicted ÷ minutes.
+## Starts the run type Sim.pick_training chooses (the same rule auto_train uses).
 func _training() -> void:
 	if lazy or not (s.run["layers"][0]["training"] as Dictionary).is_empty():
 		return
-	var best_now := float(s.run["layers"][2]["best"])
-	var gain_id := ""
-	var gain_val := 0.0
-	var raw_id := ""
-	var raw_val := -INF
-	for d in content.get_all("training_runs"):
-		var p := Sim.training_preview(s, d.id)
-		if not p["ok"]:
-			continue
-		var per_min := 60.0 / float(p["seconds"])
-		var survive := 1.0 - float(p["fail_chance"])
-		var pred: float = p["predicted_score"]
-		var gain := survive * maxf(0.0, pred - best_now) * per_min
-		if gain > gain_val:
-			gain_val = gain
-			gain_id = d.id
-		if survive * pred * per_min > raw_val:
-			raw_val = survive * pred * per_min
-			raw_id = d.id
-	var pick := gain_id if gain_id != "" else raw_id
-	if pick != "":
-		picks.append([now(), pick, log(maxf(1.0, s.cur("compute").to_float())) / log(10.0),
-			Rules.mult(s, "training"), best_now, _staff_count("ops")])
-		Sim.start_training(s, pick)
+	var pick := Sim.pick_training(s)
+	if pick != "" and Sim.start_training(s, pick)["ok"]:
+		_record_pick(pick)
 		_log("train %s" % pick)
+
+
+## Logs a run start (manual or auto_train) for the pick report.
+func _record_pick(id: String) -> void:
+	picks.append([now(), id, log(maxf(1.0, s.cur("compute").to_float())) / log(10.0),
+		Rules.mult(s, "training"), float(s.run["layers"][2]["best"]), _staff_count("ops")])
 
 
 func _slider() -> void:
@@ -469,7 +453,8 @@ func _handle(evs: Array) -> void:
 				_unlock("first training run (%s)" % ("ok" if e["ok"] else "failed"), "first_training")
 				_log("training %s %s%s" % [e["id"], "ok" if e["ok"] else "failed", (" score %.2f" % e["score"]) if e["ok"] else ""])
 			"auto_train":
-				_log("auto-train started")
+				_record_pick(e["id"])
+				_log("auto-train %s" % e["id"])
 			"reset":
 				_on_reset(int(e["layer"]), int(e["gain"]), "auto")
 			"challenge_done":
@@ -726,6 +711,13 @@ func _report() -> int:
 	print("phase snapshots (state before each first reset; used to set training_balance.gd phases):")
 	for line in snaps:
 		print(line)
+	var totals := {}
+	for p in picks:
+		totals[p[1]] = int(totals.get(p[1], 0)) + 1
+	var pick_parts: Array = []
+	for d in content.get_all("training_runs"):
+		pick_parts.append("%s=%d" % [d.id, int(totals.get(d.id, 0))])
+	print("PICKS " + " ".join(pick_parts))   # whole-game pick counts; tools/training_balance.gd reads this line
 	print("training picks by game window (counts; medians of log10 stock, training x, generation best, ops):")
 	var spans := [["< 1 h", 0.0, HOUR], ["1-24 h", HOUR, DAY], ["1-5 d", DAY, 5.0 * DAY], ["> 5 d", 5.0 * DAY, INF]]
 	for w in spans:

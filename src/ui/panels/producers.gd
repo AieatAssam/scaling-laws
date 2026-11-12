@@ -12,8 +12,7 @@ const WIDE_PANEL := 440.0                # panel width from which the wide thumb
 var _order: Array = []         # producer ids in tier order
 var _rows := {}                # id -> {row, thumb, name, sub, bar, next, cost, buy}
 var _result: Label
-var _amount := 1
-var _amount_btns := {}         # amount -> Button
+var _picker: AmountPicker
 var _buyable := false
 
 
@@ -33,26 +32,9 @@ func _ready() -> void:
 	_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	page.add_child(_result)
 
-	var sel := HBoxContainer.new()
-	sel.add_theme_constant_override("separation", 6)
-	page.add_child(sel)
-	var lbl := Label.new()
-	lbl.text = "Buy"
-	lbl.theme_type_variation = &"MicroDim"
-	sel.add_child(lbl)
-	var group := ButtonGroup.new()
-	for a in AMOUNTS:
-		var b := Button.new()
-		b.text = "x%d" % a if a > 0 else "MAX"
-		b.toggle_mode = true
-		b.button_group = group
-		b.custom_minimum_size = Vector2(0, PanelKit.TOUCH_H)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(_set_amount.bind(a))
-		Tip.attach(b, "Buy %s per tap.\nApplies to every Buy button below. MAX buys as many as you can afford." % ("the most" if a < 0 else str(a)))
-		sel.add_child(b)
-		_amount_btns[a] = b
-	(_amount_btns[1] as Button).button_pressed = true
+	_picker = AmountPicker.new().setup("Buy", AMOUNTS, "Buy")
+	_picker.changed.connect(func(_a: int) -> void: _refresh())
+	page.add_child(_picker)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -184,14 +166,14 @@ func _tip(id: String) -> String:
 	return "\n".join(lines)
 
 
-func _set_amount(a: int) -> void:
-	_amount = a
-	_refresh()
+## B hotkey: the next amount in the x1 / x10 / MAX row.
+func cycle_amount() -> void:
+	_picker.cycle()
 
 
 ## Amount this row's button buys right now (max → affordable count, may be 0).
 func _count_for(id: String) -> int:
-	return Game.max_affordable(id) if _amount < 0 else _amount
+	return Game.max_affordable(id) if _picker.amount < 0 else _picker.amount
 
 
 func _refresh() -> void:
@@ -248,19 +230,19 @@ func _refresh() -> void:
 		var k := Game.max_affordable(id)
 		var buy := r["buy"] as Button
 		buy.disabled = n < 1 or k < n
-		buy.text = "Buy %s" % ("max" if _amount < 0 else str(_amount))
+		buy.text = "Buy %s" % ("max" if _picker.amount < 0 else str(_picker.amount))
 		var shown_n := maxi(n, 1)
 		(r["cost"] as Label).text = "Cost %s for %d" % [Game.producer_cost(id, shown_n).format(), shown_n]
-		if _amount < 0:
+		if _picker.amount < 0:
 			buy.text = "Buy max (%d)" % n
 		if not buy.disabled:
 			_buyable = true
 
 
 func _buy(id: String, btn: Button) -> void:
-	var r := Game.buy_producer(id, _amount)
+	var r := Game.buy_producer(id, _picker.amount)
 	var ok: bool = r.get("ok", false)
-	var n: int = r.get("count", _amount)
+	var n: int = r.get("count", _picker.amount)
 	_report(r, "Bought %d %s." % [n, PanelText.title_of("producers", id)])
 	if ok:
 		Fx.pop(btn)

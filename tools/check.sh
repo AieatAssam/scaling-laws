@@ -10,7 +10,7 @@ fi
 cd "$ROOT" || exit 1
 passed=0
 total=3
-[ "${1:-}" = --fast ] || total=4
+[ "${1:-}" = --fast ] || total=5
 
 run_check() {
   name=$1
@@ -47,6 +47,7 @@ fi
 
 if [ "${1:-}" != --fast ]; then
   run_check pacing "$GODOT" --headless --path . -s tools/simulate.gd -- --hours=336 --seed=1 --ending=aligned
+  run_check training_balance "$GODOT" --headless --path . -s tools/training_balance.gd
 fi
 
 printf 'SUMMARY: %s/%s checks passed\n' "$passed" "$total"

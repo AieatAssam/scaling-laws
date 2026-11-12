@@ -15,7 +15,7 @@ const TAB_LABELS := {
 }
 const TAB_TIPS := {
 	"producers": "Buy producers. Each one makes compute, the raw output everything else scales from.",
-	"training": "Spend compute on a 60 s training run. The score feeds Model Generation.",
+	"training": "Train models: Fine-tune for cash, Frontier for score, Standard for both. A success scores and pays a cash burst.",
 	"funding": "Hire staff with equity. Each hire multiplies a bonus to cash or compute.",
 	"generation": "Ship models: the alignment slider, Model Generation resets and the research tree.",
 	"paradigm": "Breakthroughs, data and energy, and the automation that runs the rest.",
@@ -106,6 +106,7 @@ func _build_shell() -> void:
 	col.add_theme_constant_override("separation", 4)
 	add_child(col)
 	col.add_child(_build_hud())
+	col.add_child(GoalRail.new())
 
 	_body = BoxContainer.new()
 	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
