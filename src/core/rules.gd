@@ -4,7 +4,7 @@ class_name Rules
 
 const CONDITION_TYPES := [
 	"owned_gte", "currency_gte", "resets_gte", "training_best_gte", "staff_gte", "research_has",
-	"slider_gte", "time_played_gte", "benchmark_unlocked", "flag_set", "debt_gte",
+	"slider_gte", "time_played_gte", "benchmark_unlocked", "flag_set", "debt_gte", "compute_rate_gte",
 ]
 const EFFECT_TYPES := [
 	"add_currency", "add_debt", "add_slider", "add_flag", "timed_mod", "run_mult", "perm_mult", "rival_progress",
@@ -42,6 +42,8 @@ static func check(s: GameState, c: Dictionary) -> bool:
 			return bool(s.run["flags"].get(c["id"], false))
 		"debt_gte":
 			return float(s.run["layers"][0]["debt"]) >= float(c["value"])
+		"compute_rate_gte":  # sustained output: compute per second after every multiplier, not a held stock
+			return Sim.compute_per_second(s).gte(BigNum.from_float(float(c["value"])))
 		_:
 			push_error("Unknown condition type: %s" % c["type"])
 			return false

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "meta_full_stack"
+title = "Full Stack Leaderboard"
+description = "Every producer owned at scale. The full stack is benchmarked end to end."
+icon = "benchmarks"
+badge = "diamond"
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "own_intern_laptop_25"}, {"type": "benchmark_unlocked", "id": "own_cloud_gpus_25"}, {"type": "benchmark_unlocked", "id": "own_server_rack_25"}, {"type": "benchmark_unlocked", "id": "own_data_centre_25"}, {"type": "benchmark_unlocked", "id": "own_custom_silicon_25"}, {"type": "benchmark_unlocked", "id": "own_hyperscale_campus_25"}, {"type": "benchmark_unlocked", "id": "own_fusion_plant_25"}, {"type": "benchmark_unlocked", "id": "own_orbital_cluster_25"}, {"type": "benchmark_unlocked", "id": "own_lunar_foundry_25"}, {"type": "benchmark_unlocked", "id": "own_dyson_swarm_25"}, {"type": "benchmark_unlocked", "id": "own_matrioshka_brain_25"}, {"type": "benchmark_unlocked", "id": "own_universe_simulator_25"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.03}])

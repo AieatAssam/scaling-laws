@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rg_export_memo"
+title = "Export Control Memo"
+description = "A memo lands on your desk: certain chips are now restricted. Your procurement team starts laughing, then stops."
+icon = "regulation"
+category = "regulation"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 3, "value": 1}])
+choices = Array[Dictionary]([{"label": "Comply to the letter", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": -5000.0}, {"type": "add_debt", "value": -1.0}, {"type": "add_flag", "id": "export_compliant"}])}, {"label": "Route via a subsidiary", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 5000.0}, {"type": "add_debt", "value": 3.0}])}])

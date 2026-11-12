@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "bt_data_pipeline"
+title = "Data Pipeline Finally Works"
+description = "Your curation pipeline ingests a billion tokens overnight. Half are duplicates, half are cat memes."
+icon = "breakthrough"
+category = "breakthrough"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "research_has", "id": "data_curation"}, {"type": "resets_gte", "layer": 3, "value": 1}])
+choices = Array[Dictionary]([{"label": "Scrape harder", "effects": Array[Dictionary]([{"type": "add_currency", "id": "data", "value": 500.0}, {"type": "add_debt", "value": 3.0}])}, {"label": "License the corpus", "effects": Array[Dictionary]([{"type": "add_currency", "id": "data", "value": 200.0}, {"type": "add_currency", "id": "equity", "value": -2.0}])}])

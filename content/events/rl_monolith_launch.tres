@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rl_monolith_launch"
+title = "Monolith Opens The Gates"
+description = "Monolith Group ships a model with a waitlist longer than the Earth's orbit. Their GPU farm has a moon base."
+icon = "rival_launch"
+category = "rival_launch"
+weight = 3.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "rival_monolith_launched"}, {"type": "resets_gte", "layer": 4, "value": 1}])
+choices = Array[Dictionary]([{"label": "Keep scaling", "effects": Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.03}, {"type": "add_debt", "value": 5.0}])}, {"label": "Lobby for a moratorium", "effects": Array[Dictionary]([{"type": "add_slider", "value": 0.1}, {"type": "add_currency", "id": "equity", "value": -3.0}])}])

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rl_kestrel_launch"
+title = "Kestrel Ships Its Model"
+description = "Kestrel Systems launches a model that beats yours on three benchmarks and one vibe check."
+icon = "rival_launch"
+category = "rival_launch"
+weight = 3.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "rival_kestrel_launched"}])
+choices = Array[Dictionary]([{"label": "Study their docs", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 3000.0}, {"type": "add_debt", "value": 2.0}])}, {"label": "Publish a rebuttal", "effects": Array[Dictionary]([{"type": "rival_progress", "id": "kestrel", "value": -0.1}, {"type": "add_currency", "id": "equity", "value": -1.0}])}])

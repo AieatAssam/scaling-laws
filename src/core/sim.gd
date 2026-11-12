@@ -22,6 +22,7 @@ const OFFLINE_CAP := 86400.0
 const OFFLINE_EFF := 0.5
 const OFFLINE_STEP := 60.0
 const LEGACY_MULT := 1.1
+const AUTO_RESET_MIN_SECONDS := 60.0   # minimum layer clock before an automatic reset of that layer
 
 
 static func _fail(reason: String) -> Dictionary:
@@ -81,6 +82,26 @@ static func producer_available(s: GameState, id: String) -> bool:
 	return false
 
 
+## Best tier to buy next: available tier with the lowest cost per unit of output. "" if none.
+## auto_buy waits on this tier when unaffordable instead of buying cheaper, worse tiers.
+static func best_producer(s: GameState) -> String:
+	var best := ""
+	var best_ratio := INF
+	for d in producers(s):
+		if not producer_available(s, d.id):
+			continue
+		var n := s.owned(d.id) + 1
+		var m := 1
+		for ms in MILESTONES:
+			if n >= ms:
+				m *= 2
+		var ratio := cost_for(s, d.id, 1).log10() - _log10(float(d.base_output) * m)
+		if ratio < best_ratio:
+			best_ratio = ratio
+			best = d.id
+	return best
+
+
 # ---------------------------------------------------------------- economy
 
 static func raw_rate(s: GameState) -> BigNum:
@@ -126,76 +147,118 @@ static func buy_producer(s: GameState, id: String, count: int = 1) -> Dictionary
 
 # ---------------------------------------------------------------- staff / research / automation / legacy
 
-static func hire(s: GameState, role: String, count: int = 1) -> Dictionary:
+## Cost of hiring `count` more of `role` at the current headcount.
+static func staff_cost(s: GameState, role: String, count: int = 1) -> BigNum:
 	var d = s.db.get_def("staff", role)
-	if d == null:
-		return _fail("unknown staff role")
+	return _series(_big(d.base_cost), d.cost_growth, int(s.run["layers"][1]["staff"].get(role, 0)), count)
+
+
+## Why `hire` would fail, or "" when it would succeed.
+static func hire_blocker(s: GameState, role: String, count: int = 1) -> String:
+	if s.db.get_def("staff", role) == null:
+		return "unknown staff role"
 	if s.resets(1) == 0:
-		return _fail("hiring unlocks after a Funding Round")
+		return "hiring unlocks after a Funding Round"
 	if count < 1:
-		return _fail("count must be >= 1")
+		return "count must be >= 1"
+	if s.cur("equity").compare(staff_cost(s, role, count)) < 0:
+		return "not enough equity"
+	return ""
+
+
+static func hire(s: GameState, role: String, count: int = 1) -> Dictionary:
+	var reason := hire_blocker(s, role, count)
+	if reason != "":
+		return _fail(reason)
 	var staff: Dictionary = s.run["layers"][1]["staff"]
-	var n := int(staff.get(role, 0))
-	var cost := _series(_big(d.base_cost), d.cost_growth, n, count)
-	if s.cur("equity").compare(cost) < 0:
-		return _fail("not enough equity")
+	var cost := staff_cost(s, role, count)
 	s.set_cur("equity", s.cur("equity").subtract(cost))
-	staff[role] = n + count
+	staff[role] = int(staff.get(role, 0)) + count
 	return {"ok": true, "count": count, "cost": cost}
 
 
-static func research(s: GameState, id: String) -> Dictionary:
+## Why `research` would fail, or "" when it would succeed.
+static func research_blocker(s: GameState, id: String) -> String:
 	var d = s.db.get_def("research", id)
 	if d == null:
-		return _fail("unknown research")
+		return "unknown research"
 	if s.resets(2) == 0:
-		return _fail("research unlocks after a Model Generation")
+		return "research unlocks after a Model Generation"
 	var L2: Dictionary = s.run["layers"][2]
 	if id in L2["research"]:
-		return _fail("already researched")
+		return "already researched"
 	for p in d.prereqs:
 		if not (p in L2["research"]):
-			return _fail("requires %s" % p)
+			return "requires %s" % p
 	if d.branch != "":
 		for r in Rules.owned_research(s):
 			if r.branch != "" and r.branch != d.branch:
-				return _fail("exclusive with the %s branch" % r.branch)
-	var cost := _big(float(d.cost))
-	if s.cur("insights").compare(cost) < 0:
-		return _fail("not enough insights")
+				return "exclusive with the %s branch" % r.branch
+	if s.cur("insights").compare(_big(float(d.cost))) < 0:
+		return "not enough insights"
+	return ""
+
+
+static func research(s: GameState, id: String) -> Dictionary:
+	var reason := research_blocker(s, id)
+	if reason != "":
+		return _fail(reason)
+	var L2: Dictionary = s.run["layers"][2]
+	var cost := _big(float(s.db.get_def("research", id).cost))
 	s.set_cur("insights", s.cur("insights").subtract(cost))
 	L2["research"].append(id)
 	return {"ok": true, "cost": cost}
 
 
-static func buy_automation(s: GameState, id: String) -> Dictionary:
+## Why `buy_automation` would fail, or "" when it would succeed.
+static func automation_blocker(s: GameState, id: String) -> String:
 	var d = s.db.get_def("automation", id)
 	if d == null:
-		return _fail("unknown automation")
+		return "unknown automation"
 	if s.resets(3) == 0:
-		return _fail("automation unlocks after a Paradigm Shift")
+		return "automation unlocks after a Paradigm Shift"
 	var owned: Array = s.persist["automation"]
 	if id in owned:
-		return _fail("already owned")
+		return "already owned"
 	for a in s.db.get_all("automation"):
 		if a.order < d.order and not (a.id in owned):
-			return _fail("requires %s" % a.id)
-	var cost := _big(float(d.cost))
-	if s.cur("breakthroughs").compare(cost) < 0:
-		return _fail("not enough breakthroughs")
+			return "requires %s" % a.id
+	if s.cur("breakthroughs").compare(_big(float(d.cost))) < 0:
+		return "not enough breakthroughs"
+	return ""
+
+
+static func buy_automation(s: GameState, id: String) -> Dictionary:
+	var reason := automation_blocker(s, id)
+	if reason != "":
+		return _fail(reason)
+	var cost := _big(float(s.db.get_def("automation", id).cost))
 	s.set_cur("breakthroughs", s.cur("breakthroughs").subtract(cost))
-	owned.append(id)
+	(s.persist["automation"] as Array).append(id)
 	return {"ok": true, "cost": cost}
 
 
-static func buy_legacy(s: GameState, key: String) -> Dictionary:
+## Legacy price of the next perk `key`: 2^n after n purchases of it.
+static func legacy_cost(s: GameState, key: String) -> BigNum:
+	return _big(pow(2.0, int(s.persist["legacy_perks"].get(key, 0))))
+
+
+## Why `buy_legacy` would fail, or "" when it would succeed.
+static func legacy_blocker(s: GameState, key: String) -> String:
 	if s.resets(4) == 0:
-		return _fail("legacy unlocks after the Singularity")
+		return "legacy unlocks after the Singularity"
+	if s.cur("legacy").compare(legacy_cost(s, key)) < 0:
+		return "not enough legacy"
+	return ""
+
+
+static func buy_legacy(s: GameState, key: String) -> Dictionary:
+	var reason := legacy_blocker(s, key)
+	if reason != "":
+		return _fail(reason)
 	var perks: Dictionary = s.persist["legacy_perks"]
 	var n := int(perks.get(key, 0))
-	var cost := _big(pow(2.0, n))
-	if s.cur("legacy").compare(cost) < 0:
-		return _fail("not enough legacy")
+	var cost := legacy_cost(s, key)
 	s.set_cur("legacy", s.cur("legacy").subtract(cost))
 	s.persist["perm_mult"][key] = float(s.persist["perm_mult"].get(key, 1.0)) * LEGACY_MULT
 	perks[key] = n + 1
@@ -213,19 +276,43 @@ static func set_slider(s: GameState, value: float) -> Dictionary:
 static func new_run(s: GameState) -> Dictionary:
 	if s.run["run_over"] == "":
 		return _fail("run not finished")
+	var legacy := s.cur("legacy")  # lives in layer 4 but is persistent: a new run must not wipe it
 	s.run = GameState.fresh_run()
+	s.set_cur("legacy", legacy)
 	s.persist["stats"]["runs"] = int(s.persist["stats"]["runs"]) + 1
 	return {"ok": true}
 
 
 # ---------------------------------------------------------------- training
 
+## Training multipliers by source. `total` is the full training multiplier applied to the score.
+static func training_factors(s: GameState) -> Dictionary:
+	var data := 1.0
+	var arch := 1.0
+	for r in Rules.owned_research(s):
+		for e in r.effects:
+			if e["key"] == "training":
+				if r.branch == "":
+					data *= float(e["value"])
+				else:
+					arch *= float(e["value"])
+	var researcher := 1.0
+	for st in s.db.get_all("staff"):
+		if st.bonus_key == "training":
+			researcher *= 1.0 + float(st.bonus_per_hire) * int(s.run["layers"][1]["staff"].get(st.id, 0))
+	return {"data": data, "architecture": arch, "researcher": researcher, "total": Rules.mult(s, "training")}
+
+
 static func training_preview(s: GameState, frac: float) -> Dictionary:
 	var spend: BigNum = s.cur("compute").mul_f(frac)
 	var energy_ok := s.resets(3) == 0 or (s.cur("energy").gte(_big(TRAIN_ENERGY)) and s.cur("data").gte(_big(TRAIN_DATA)))
+	var factors := training_factors(s)
 	var p := {
 		"ok": false, "reason": "", "spend": spend, "seconds": TRAIN_SECONDS,
 		"fail_chance": FAIL_BASE + FAIL_PER_FRAC * frac,
+		# Expected score without the ±5% roll: log10(spend) × total training multiplier.
+		"predicted_score": 0.0 if spend.is_zero() else spend.log10() * float(factors["total"]),
+		"factors": factors,
 	}
 	if not (s.run["layers"][0]["training"] as Dictionary).is_empty():
 		p["reason"] = "already training"
@@ -301,7 +388,8 @@ static func reset_preview(s: GameState, k: int) -> Dictionary:
 		reason = "finish reset %d first" % (k - 1)
 	return {
 		"layer": k, "currency": ld.currency, "gain": gain, "holding": holding,
-		"highlight": gain > 0 and _big(float(gain)).gte(holding.mul_f(2.0)),
+		# gain 1 is not worth a reset: without this, holding 0 makes every cycle highlight and auto_* churns.
+		"highlight": gain >= 2 and _big(float(gain)).gte(holding.mul_f(2.0)),
 		"allowed": reason == "", "reason": reason,
 	}
 
@@ -319,6 +407,7 @@ static func perform_reset(s: GameState, k: int) -> Dictionary:
 	s.add_cur(p["currency"], _big(float(p["gain"])))
 	s.run["resets_done"][k - 1] = int(s.run["resets_done"][k - 1]) + 1
 	s.persist["stats"]["resets"] = int(s.persist["stats"]["resets"]) + 1
+	s.persist["lifetime_resets"][k - 1] = int(s.persist["lifetime_resets"][k - 1]) + 1
 	return {"ok": true, "layer": k, "gain": p["gain"], "currency": p["currency"]}
 
 
@@ -369,17 +458,24 @@ static func _events_tick(s: GameState, dt: float, evs: Array) -> void:
 
 # ---------------------------------------------------------------- challenges (singularity)
 
-static func start_challenge(s: GameState, id: String) -> Dictionary:
-	var d = s.db.get_def("challenges", id)
-	if d == null:
-		return _fail("unknown challenge")
+## Why `start_challenge` would fail, or "" when it would succeed.
+static func challenge_blocker(s: GameState, id: String) -> String:
+	if s.db.get_def("challenges", id) == null:
+		return "unknown challenge"
 	if s.resets(4) == 0:
-		return _fail("regulation challenges unlock after the Singularity")
+		return "regulation challenges unlock after the Singularity"
 	if not (s.run["layers"][4]["challenge"] as Dictionary).is_empty():
-		return _fail("a challenge is already running")
+		return "a challenge is already running"
 	if id in s.run["challenges_done"]:
-		return _fail("already completed")
-	s.run["layers"][4]["challenge"] = {"id": id, "left": float(d.duration)}
+		return "already completed"
+	return ""
+
+
+static func start_challenge(s: GameState, id: String) -> Dictionary:
+	var reason := challenge_blocker(s, id)
+	if reason != "":
+		return _fail(reason)
+	s.run["layers"][4]["challenge"] = {"id": id, "left": float(s.db.get_def("challenges", id).duration)}
 	return {"ok": true}
 
 
@@ -396,15 +492,30 @@ static func _challenge_tick(s: GameState, dt: float, evs: Array) -> void:
 	for e in (d.reward if success else d.penalty):
 		Rules.apply(s, e)
 	s.run["challenges_done"].append(c["id"])
+	var passed: Dictionary = s.run.get("challenge_passed", {})
+	passed[c["id"]] = success
+	s.run["challenge_passed"] = passed
 	L4["challenge"] = {}
 	evs.append({"kind": "challenge_done", "id": c["id"], "success": success})
 
 
+## Cancels the running challenge: no reward, no penalty, and it stays available to enter again.
+static func abandon_challenge(s: GameState) -> Dictionary:
+	var c: Dictionary = s.run["layers"][4]["challenge"]
+	if c.is_empty():
+		return _fail("no challenge running")
+	s.run["layers"][4]["challenge"] = {}
+	return {"ok": true, "id": c["id"]}
+
+
 # ---------------------------------------------------------------- automation / benchmarks / AGI / rivals
 
+## Automatic reset: when highlighted. The layer clock is zeroed by any reset of the layer, so requiring
+## clock >= AUTO_RESET_MIN_SECONDS also spaces automatic resets of one layer apart.
 static func _auto_reset(s: GameState, k: int, evs: Array) -> void:
 	var p := reset_preview(s, k)
-	if p["allowed"] and p["highlight"]:
+	var due := float(s.run["layers"][k]["clock"]) >= AUTO_RESET_MIN_SECONDS
+	if p["allowed"] and p["highlight"] and due:
 		var r := perform_reset(s, k)
 		evs.append({"kind": "reset", "layer": k, "gain": r["gain"]})
 
@@ -412,10 +523,10 @@ static func _auto_reset(s: GameState, k: int, evs: Array) -> void:
 static func _automate(s: GameState, evs: Array) -> void:
 	var auto: Array = s.persist["automation"]
 	if "auto_buy" in auto:
-		for d in producers(s):
-			var n := max_affordable(s, d.id)
-			if n > 0 and producer_available(s, d.id):
-				buy_producer(s, d.id, n)
+		var id := best_producer(s)
+		while id != "" and max_affordable(s, id) > 0:
+			buy_producer(s, id, max_affordable(s, id))
+			id = best_producer(s)
 	if "auto_train" in auto:
 		var r := start_training(s, 0.25)
 		if r["ok"]:
@@ -449,6 +560,14 @@ static func _agi(s: GameState, evs: Array) -> void:
 				break
 
 
+## Singularity-layer clock (seconds) at which rival `id` launches. rival_progress > 0 speeds a rival up;
+## < 0 delays it (floored at 10% of its schedule).
+static func rival_launch_time(s: GameState, id: String) -> float:
+	var r = s.db.get_def("rivals", id)
+	var progress := float(s.run["rivals"].get(id, 0.0))
+	return float(r.launch_hours) * 3600.0 * maxf(0.1, 1.0 - progress)
+
+
 static func _rivals(s: GameState, evs: Array) -> void:
 	if s.resets(4) == 0:
 		return
@@ -457,10 +576,7 @@ static func _rivals(s: GameState, evs: Array) -> void:
 		var flag := "rival_%s_launched" % r.id
 		if bool(s.run["flags"].get(flag, false)):
 			continue
-		var progress := float(s.run["rivals"].get(r.id, 0.0))
-		# rival_progress > 0 speeds a rival up; < 0 delays it (floor at 10% of its schedule)
-		var at := float(r.launch_hours) * 3600.0 * maxf(0.1, 1.0 - progress)
-		if clock >= at:
+		if clock >= rival_launch_time(s, r.id):
 			s.run["flags"][flag] = true
 			evs.append({"kind": "rival_launched", "id": r.id})
 

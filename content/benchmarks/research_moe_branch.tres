@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "research_moe_branch"
+title = "Mixture of Experts Arena"
+description = "Finish the whole mixture-of-experts branch. Each expert has a vote."
+icon = "benchmarks"
+badge = "gold"
+conditions = Array[Dictionary]([{"type": "research_has", "id": "moe_base"}, {"type": "research_has", "id": "moe_experts"}, {"type": "research_has", "id": "moe_router"}, {"type": "research_has", "id": "moe_scale"}, {"type": "research_has", "id": "moe_sparse_train"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.02}])

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "reset_funding_1"
+title = "Funding Round Ablation"
+description = "Reset funding once. Ablate the cap table, keep the model."
+icon = "benchmarks"
+badge = "bronze"
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 1, "value": 1}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "cash", "value": 1.01}])

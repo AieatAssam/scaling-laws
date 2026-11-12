@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "research_inference_cache"
+title = "Cache Me If You Can"
+description = "Buy the inference cache. The same prompt, twice, costs nothing."
+icon = "benchmarks"
+badge = "silver"
+conditions = Array[Dictionary]([{"type": "research_has", "id": "inference_cache"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.01}])

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "alignment_max"
+title = "TruthfulQA, Maximum Score"
+description = "Alignment slider pinned at 100 percent. TruthfulQA is suspicious."
+icon = "benchmarks"
+badge = "diamond"
+conditions = Array[Dictionary]([{"type": "slider_gte", "value": 1.0}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.03}])

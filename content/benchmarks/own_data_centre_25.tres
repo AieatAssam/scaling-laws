@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "own_data_centre_25"
+title = "Campus Chinchilla Eval"
+description = "Twenty-five data centres. Your utility company wants a meeting."
+icon = "benchmarks"
+badge = "gold"
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "data_centre", "value": 25}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.02}])

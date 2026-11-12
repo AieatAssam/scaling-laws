@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "fd_vc_term_sheet"
+title = "Term Sheet With Teeth"
+description = "A growth fund wants a big round, a board seat and a clause nobody has read. It is 40 pages long."
+icon = "funding"
+category = "funding"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 1, "value": 1}])
+choices = Array[Dictionary]([{"label": "Sign the term sheet", "effects": Array[Dictionary]([{"type": "add_currency", "id": "equity", "value": 4.0}, {"type": "add_slider", "value": -0.05}])}, {"label": "Counter at a higher cap", "effects": Array[Dictionary]([{"type": "add_currency", "id": "equity", "value": 1.0}, {"type": "perm_mult", "key": "cash", "value": 1.02}])}])

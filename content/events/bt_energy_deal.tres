@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "bt_energy_deal"
+title = "Nuclear Power Purchase Deal"
+description = "A utility offers a reactor's worth of power if you sign a 30-year contract and stop asking about the weather."
+icon = "breakthrough"
+category = "breakthrough"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 3, "value": 1}])
+choices = Array[Dictionary]([{"label": "Sign the reactor PPA", "effects": Array[Dictionary]([{"type": "add_currency", "id": "energy", "value": 50.0}, {"type": "add_currency", "id": "equity", "value": -3.0}])}, {"label": "Stay on the grid", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 1.1, "seconds": 900.0}])}])

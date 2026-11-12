@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "pc_researcher_second"
+title = "Researcher Gets Two Offers"
+description = "Your star researcher has two offers and a deadline. The rival firm offered to name a GPU after her."
+icon = "poaching"
+category = "poaching"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "staff_gte", "id": "researcher", "value": 2}, {"type": "resets_gte", "layer": 3, "value": 1}])
+choices = Array[Dictionary]([{"label": "Signing bonus", "effects": Array[Dictionary]([{"type": "add_currency", "id": "breakthroughs", "value": -1.0}, {"type": "perm_mult", "key": "compute", "value": 1.03}])}, {"label": "Let the GPU be named", "effects": Array[Dictionary]([{"type": "run_mult", "key": "cash", "value": 1.03}, {"type": "add_debt", "value": 1.0}])}])

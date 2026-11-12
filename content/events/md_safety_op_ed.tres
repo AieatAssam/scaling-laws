@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "md_safety_op_ed"
+title = "Op-Ed Calls For A Pause"
+description = "A senior researcher publishes an op-ed asking labs to slow down. Your board asks what you think of it."
+icon = "media"
+category = "media"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "debt_gte", "value": 2.0}, {"type": "resets_gte", "layer": 2, "value": 1}])
+choices = Array[Dictionary]([{"label": "Sign the open letter", "effects": Array[Dictionary]([{"type": "add_debt", "value": -2.0}, {"type": "add_currency", "id": "equity", "value": -2.0}])}, {"label": "Call it FUD", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 3000.0}, {"type": "add_debt", "value": 2.0}])}])

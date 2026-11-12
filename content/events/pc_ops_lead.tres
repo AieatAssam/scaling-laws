@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "pc_ops_lead"
+title = "Ops Lead Wants Out"
+description = "Your ops lead has a job offer from a cloud giant and a folder of perfectly reasonable grievances."
+icon = "poaching"
+category = "poaching"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "staff_gte", "id": "ops", "value": 1}, {"type": "resets_gte", "layer": 2, "value": 1}])
+choices = Array[Dictionary]([{"label": "Fund a bonus pool", "effects": Array[Dictionary]([{"type": "add_currency", "id": "equity", "value": -3.0}, {"type": "run_mult", "key": "cash", "value": 1.05}])}, {"label": "Non-compete clause", "effects": Array[Dictionary]([{"type": "add_debt", "value": 2.0}, {"type": "add_currency", "id": "compute", "value": 2000.0}])}, {"label": "Accept the exit", "effects": Array[Dictionary]([{"type": "add_debt", "value": -1.0}, {"type": "add_currency", "id": "equity", "value": 1.0}])}])

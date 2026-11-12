@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "fd_sovereign_money"
+title = "Sovereign Fund Calls"
+description = "A sovereign wealth fund wants to bankroll the final push. Their terms include a seat, a flag and a pony."
+icon = "funding"
+category = "funding"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 4, "value": 1}])
+choices = Array[Dictionary]([{"label": "Accept the money", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 8000.0}, {"type": "add_debt", "value": 3.0}])}, {"label": "Decline politely", "effects": Array[Dictionary]([{"type": "add_debt", "value": -2.0}, {"type": "add_currency", "id": "equity", "value": 2.0}])}])

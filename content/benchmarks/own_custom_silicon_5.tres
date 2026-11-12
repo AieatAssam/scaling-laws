@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "own_custom_silicon_5"
+title = "Custom Chip Cup"
+description = "Five custom chips, zero compatible drivers, one proud engineer."
+icon = "benchmarks"
+badge = "silver"
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "custom_silicon", "value": 5}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.01}])

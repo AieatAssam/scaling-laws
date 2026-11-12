@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "pc_engineer_offer"
+title = "Engineer Gets A Better Offer"
+description = "Your best engineer has a recruiter's number on speed dial and a suspiciously good cheese plate."
+icon = "poaching"
+category = "poaching"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "staff_gte", "id": "engineer", "value": 1}, {"type": "resets_gte", "layer": 1, "value": 1}])
+choices = Array[Dictionary]([{"label": "Counter-offer", "effects": Array[Dictionary]([{"type": "add_currency", "id": "equity", "value": -2.0}, {"type": "perm_mult", "key": "compute", "value": 1.02}])}, {"label": "Wish them luck", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 2000.0}])}])

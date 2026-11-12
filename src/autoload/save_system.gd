@@ -19,7 +19,9 @@ func save(state: Dictionary, path: String = DEFAULT_PATH) -> bool:
 func load_data(path: String = DEFAULT_PATH) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+	# JSON.new().parse reports bad text through its return code; parse_string would also log an engine error.
+	var json := JSON.new()
+	var parsed = json.data if json.parse(FileAccess.get_file_as_string(path)) == OK else null
 	if not (parsed is Dictionary) or not parsed.has("state"):
 		push_error("SaveSystem: %s is not a valid save" % path)
 		return {}

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "bt_moe_scale"
+title = "Experts Are Waking Up"
+description = "Mixture-of-experts scaling shows a surprising jump. Nobody can explain why it works, only that it does."
+icon = "breakthrough"
+category = "breakthrough"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "research_has", "id": "moe_scale"}, {"type": "resets_gte", "layer": 2, "value": 1}])
+choices = Array[Dictionary]([{"label": "Scale the experts", "effects": Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.03}, {"type": "add_debt", "value": 1.0}])}, {"label": "Distill it smaller", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 1.15, "seconds": 600.0}, {"type": "add_currency", "id": "insights", "value": 1.0}])}])

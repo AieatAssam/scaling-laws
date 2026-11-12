@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rival_aurora"
+title = "Aurora Borealis Benchmark"
+description = "Rival Aurora launches. Race them or ignore them, you still noticed."
+icon = "benchmarks"
+badge = "silver"
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "rival_aurora_launched"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "cash", "value": 1.01}])

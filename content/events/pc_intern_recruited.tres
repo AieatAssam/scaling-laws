@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "pc_intern_recruited"
+title = "Intern Gets Recruited"
+description = "A rival lab found your intern on LinkedIn. The intern found the offer letter more interesting than your roadmap."
+icon = "poaching"
+category = "poaching"
+weight = 2.0
+cooldown = 1200.0
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "intern_laptop", "value": 1}, {"type": "time_played_gte", "value": 600.0}])
+choices = Array[Dictionary]([{"label": "Offer a fancy title", "effects": Array[Dictionary]([{"type": "add_currency", "id": "equity", "value": -1.0}, {"type": "perm_mult", "key": "compute", "value": 1.02}])}, {"label": "Let them go", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 1000.0}])}])

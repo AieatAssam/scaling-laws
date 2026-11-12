@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "staff_engineer_3"
+title = "HumanEval Hire Rate"
+description = "Three engineers hired. Their first pull requests all pass."
+icon = "benchmarks"
+badge = "bronze"
+conditions = Array[Dictionary]([{"type": "staff_gte", "id": "engineer", "value": 3}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "cash", "value": 1.01}])

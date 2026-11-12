@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "bt_sparse_win"
+title = "Sparse State Pays Off"
+description = "The state-space variant trains twice as fast on long contexts. The paper draft is titled 'Please Cite Us'."
+icon = "breakthrough"
+category = "breakthrough"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "research_has", "id": "ssm_state"}, {"type": "resets_gte", "layer": 2, "value": 1}])
+choices = Array[Dictionary]([{"label": "Patent it", "effects": Array[Dictionary]([{"type": "add_currency", "id": "equity", "value": 2.0}, {"type": "add_debt", "value": 1.0}])}, {"label": "Open the code", "effects": Array[Dictionary]([{"type": "add_slider", "value": 0.05}, {"type": "add_currency", "id": "insights", "value": 1.0}])}])

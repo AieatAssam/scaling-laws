@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "og_datacentre_flood"
+title = "Datacentre Floods"
+description = "A burst pipe floods the lower racks. The facilities manager is standing in a puddle, holding a clipboard."
+icon = "outage"
+category = "outage"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "data_centre", "value": 1}, {"type": "resets_gte", "layer": 4, "value": 1}])
+choices = Array[Dictionary]([{"label": "Emergency airlift", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": -6000.0}, {"type": "add_slider", "value": 0.05}])}, {"label": "Ride it on the spare", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 0.8, "seconds": 1200.0}, {"type": "add_debt", "value": 1.0}])}])

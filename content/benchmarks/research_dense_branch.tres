@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "research_dense_branch"
+title = "Dense Scaling Scoreboard"
+description = "Finish the whole dense branch. Chinchilla would approve, probably."
+icon = "benchmarks"
+badge = "gold"
+conditions = Array[Dictionary]([{"type": "research_has", "id": "dense_base"}, {"type": "research_has", "id": "dense_wide"}, {"type": "research_has", "id": "dense_deep"}, {"type": "research_has", "id": "dense_scale"}, {"type": "research_has", "id": "dense_rlhf"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.02}])

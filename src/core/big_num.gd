@@ -152,13 +152,26 @@ func format() -> String:
 	if mantissa == 0.0:
 		return "0"
 	if exponent < -2:
-		return "%.2fe%d" % [mantissa, exponent]
-	if exponent < 3:
-		return "%.2f" % to_float()
-	var group := exponent / 3
+		return _sci()
+	var group := maxi(exponent, 0) / 3
+	var m := mantissa * pow(10.0, exponent - group * 3)
+	# Two-decimal rounding can reach 1000 (999.999K): roll over to the next suffix instead.
+	if roundf(absf(m) * 100.0) >= 100000.0 and group + 1 < SUFFIXES.size():
+		group += 1
+		m /= 1000.0
 	if group < SUFFIXES.size():
-		return "%.2f%s" % [mantissa * pow(10.0, exponent - group * 3), SUFFIXES[group]]
-	return "%.2fe%d" % [mantissa, exponent]
+		return "%.2f%s" % [m, SUFFIXES[group]]
+	return _sci()
+
+
+## "d.dde<exp>", rolling over when rounding reaches 10.00.
+func _sci() -> String:
+	var sm := mantissa
+	var se := exponent
+	if roundf(absf(sm) * 100.0) >= 1000.0:
+		sm /= 10.0
+		se += 1
+	return "%.2fe%d" % [sm, se]
 
 
 func to_json() -> Dictionary:

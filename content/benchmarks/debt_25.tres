@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "debt_25"
+title = "Hallucination Hall of Fame"
+description = "Twenty-five debt. The model is confidently wrong about everything."
+icon = "benchmarks"
+badge = "platinum"
+conditions = Array[Dictionary]([{"type": "debt_gte", "value": 25.0}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.02}])

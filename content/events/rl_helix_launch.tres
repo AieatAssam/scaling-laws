@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rl_helix_launch"
+title = "Helix Drops A Price Cut"
+description = "Helix Labs slashes API prices by 60 percent and tweets a rocket emoji. Your finance team has started sweating."
+icon = "rival_launch"
+category = "rival_launch"
+weight = 3.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "rival_helix_launched"}])
+choices = Array[Dictionary]([{"label": "Undercut on price", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "cash", "value": 1.15, "seconds": 900.0}, {"type": "add_currency", "id": "equity", "value": -2.0}])}, {"label": "Ignore them", "effects": Array[Dictionary]([{"type": "run_mult", "key": "cash", "value": 1.02}])}])

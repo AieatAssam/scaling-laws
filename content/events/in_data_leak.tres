@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "in_data_leak"
+title = "Scraper Ate The Wrong Bucket"
+description = "Your crawler pulled a private bucket of medical scans. It is technically 'public' now, emotionally not."
+icon = "incident"
+category = "incident"
+weight = 2.0
+cooldown = 1200.0
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "server_rack", "value": 1}, {"type": "time_played_gte", "value": 900.0}])
+choices = Array[Dictionary]([{"label": "Patch it quietly", "effects": Array[Dictionary]([{"type": "add_debt", "value": 2.0}, {"type": "timed_mod", "key": "compute", "value": 1.1, "seconds": 600.0}])}, {"label": "Disclose and pause", "effects": Array[Dictionary]([{"type": "add_debt", "value": -2.0}, {"type": "add_currency", "id": "compute", "value": -3000.0}])}])

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "own_lunar_foundry_25"
+title = "Moonshot Eval Suite"
+description = "Twenty-five lunar foundries. The moonshot finally has a benchmark."
+icon = "benchmarks"
+badge = "platinum"
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "lunar_foundry", "value": 25}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.02}])

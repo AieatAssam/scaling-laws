@@ -15,6 +15,7 @@ signal automation_bought(id: String)
 signal legacy_bought(key: String)
 signal challenge_started(id: String)
 signal challenge_finished(id: String, success: bool)
+signal challenge_abandoned(id: String)
 signal event_offered(id: String)
 signal event_resolved(id: String, choice: int)
 signal benchmark_unlocked(id: String, badge: String)
@@ -112,6 +113,10 @@ func training_preview(frac: float) -> Dictionary:
 	return Sim.training_preview(state, frac)
 
 
+func staff_cost(role: String, count: int = 1) -> BigNum:
+	return Sim.staff_cost(state, role, count)
+
+
 # ---------------------------------------------------------------- actions
 
 func buy_producer(id: String, count: int = 1) -> Dictionary:
@@ -167,6 +172,14 @@ func start_challenge(id: String) -> Dictionary:
 	var r := Sim.start_challenge(state, id)
 	if r["ok"]:
 		challenge_started.emit(id)
+	return r
+
+
+func abandon_challenge() -> Dictionary:
+	var id := String(state.run["layers"][4]["challenge"].get("id", ""))
+	var r := Sim.abandon_challenge(state)
+	if r["ok"]:
+		challenge_abandoned.emit(id)
 	return r
 
 

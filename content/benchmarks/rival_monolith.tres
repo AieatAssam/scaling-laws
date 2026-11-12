@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rival_monolith"
+title = "Monolith Mega Eval"
+description = "Rival Monolith launches. It is very large and very slow to respond."
+icon = "benchmarks"
+badge = "platinum"
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "rival_monolith_launched"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "cash", "value": 1.02}])

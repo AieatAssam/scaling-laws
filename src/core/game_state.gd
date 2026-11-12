@@ -25,6 +25,7 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 		"perm_mult": {}, "legacy_perks": {}, "automation": [], "benchmarks": [],
 		"best_all": 0.0,
 		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0},
+		"lifetime_resets": [0, 0, 0, 0],
 		"settings": {"reduce_motion": false},
 		"saved_at": 0.0,
 	}
@@ -38,7 +39,7 @@ static func fresh_run() -> Dictionary:
 	layers[0]["cur"]["cash"] = BigNum.from_float(START_CASH)
 	return {
 		"layers": layers, "resets_done": [0, 0, 0, 0], "stage": 0, "slider": 0.5,
-		"flags": {}, "rivals": {}, "challenges_done": [], "run_over": "",
+		"flags": {}, "rivals": {}, "challenges_done": [], "challenge_passed": {}, "run_over": "",
 	}
 
 
@@ -104,6 +105,8 @@ static func from_dict(content_db, d: Dictionary) -> GameState:
 	var s := GameState.new(content_db, 1)
 	s.persist = d["persist"]
 	s.run = d["run"]
+	if not s.persist.has("lifetime_resets"):  # saves older than the counter: this run's resets are the best guess
+		s.persist["lifetime_resets"] = s.run["resets_done"].duplicate()
 	s.rng.state = String(d["rng"]).to_int()
 	var layers: Array = []
 	for L in s.run["layers"]:
@@ -134,3 +137,5 @@ func _normalize_ints() -> void:
 			persist["stats"][key] = int(persist["stats"][key])
 	for key in persist["legacy_perks"]:
 		persist["legacy_perks"][key] = int(persist["legacy_perks"][key])
+	for i in persist["lifetime_resets"].size():
+		persist["lifetime_resets"][i] = int(persist["lifetime_resets"][i])

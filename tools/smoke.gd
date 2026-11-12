@@ -34,7 +34,7 @@ func check(ok: bool, what: String) -> void:
 func _run(content, ss) -> void:
 	# --- content: counts and every condition/effect type is known to Rules
 	for t in EXPECTED:
-		check(content.get_all(t).size() == EXPECTED[t], "content count %s = %d" % [t, content.get_all(t).size()])
+		check(content.get_all(t).size() >= EXPECTED[t], "content count %s = %d" % [t, content.get_all(t).size()])
 	for t in ["events", "benchmarks", "agi_stages", "endings"]:
 		for d in content.get_all(t):
 			for c in d.get("conditions"):

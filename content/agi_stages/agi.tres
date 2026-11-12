@@ -9,4 +9,4 @@ title = "AGI"
 description = "One step on the road to AGI."
 icon = "agi"
 order = 5
-conditions = Array[Dictionary]([{"type": "currency_gte", "id": "compute", "value": 1000000000000000019884624838656.0}])
+conditions = Array[Dictionary]([{"type": "compute_rate_gte", "value": 10000.0}, {"type": "resets_gte", "layer": 4, "value": 1}])

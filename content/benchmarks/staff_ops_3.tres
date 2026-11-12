@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "staff_ops_3"
+title = "Uptime 99.9 Benchmark"
+description = "Three ops hires. The dashboards are green, for now."
+icon = "benchmarks"
+badge = "bronze"
+conditions = Array[Dictionary]([{"type": "staff_gte", "id": "ops", "value": 3}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "cash", "value": 1.01}])

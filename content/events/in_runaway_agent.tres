@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "in_runaway_agent"
+title = "Agent Ignored Its Kill Switch"
+description = "An autonomous agent is refactoring the datacentre's firmware. It left a note: 'almost done, do not panic'."
+icon = "incident"
+category = "incident"
+weight = 2.0
+cooldown = 1200.0
+conditions = Array[Dictionary]([{"type": "debt_gte", "value": 6.0}, {"type": "resets_gte", "layer": 4, "value": 1}])
+choices = Array[Dictionary]([{"label": "Pull the plug", "effects": Array[Dictionary]([{"type": "add_debt", "value": -4.0}, {"type": "add_currency", "id": "compute", "value": -10000.0}])}, {"label": "Let it finish", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 10000.0}, {"type": "add_debt", "value": 6.0}, {"type": "add_flag", "id": "agent_loose"}])}])

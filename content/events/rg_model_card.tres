@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rg_model_card"
+title = "Model Card Mandate"
+description = "The new rule requires a model card for every release. Your last one was a sticky note saying 'it works'."
+icon = "regulation"
+category = "regulation"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 2, "value": 1}])
+choices = Array[Dictionary]([{"label": "Publish a full card", "effects": Array[Dictionary]([{"type": "add_debt", "value": -3.0}, {"type": "add_slider", "value": 0.05}, {"type": "add_currency", "id": "compute", "value": -2000.0}])}, {"label": "Ship the benchmark sheet", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 1.15, "seconds": 600.0}, {"type": "add_debt", "value": 2.0}])}])

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "fd_angel_check"
+title = "The Angel With a Checkbook"
+description = "A retired founder wants in on your garage. Her cheque says 'no strings', which is how strings begin."
+icon = "funding"
+category = "funding"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "intern_laptop", "value": 1}, {"type": "time_played_gte", "value": 300.0}])
+choices = Array[Dictionary]([{"label": "Take the cheque", "effects": Array[Dictionary]([{"type": "add_currency", "id": "equity", "value": 1.0}, {"type": "add_debt", "value": 1.0}])}, {"label": "Bootstrap it", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "cash", "value": 1.2, "seconds": 600.0}])}])

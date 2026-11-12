@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "own_custom_silicon_25"
+title = "Silicon Sovereignty Suite"
+description = "Twenty-five custom chips. Tape-out day is now a holiday."
+icon = "benchmarks"
+badge = "gold"
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "custom_silicon", "value": 25}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.02}])

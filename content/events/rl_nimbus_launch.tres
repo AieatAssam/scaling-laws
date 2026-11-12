@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rl_nimbus_launch"
+title = "Nimbus Goes Public"
+description = "Nimbus Labs IPOs on the back of one demo and a keynote with a lot of fog. Its stock is absurdly high."
+icon = "rival_launch"
+category = "rival_launch"
+weight = 3.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "rival_nimbus_launched"}, {"type": "resets_gte", "layer": 3, "value": 1}])
+choices = Array[Dictionary]([{"label": "Race to the frontier", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 1.2, "seconds": 1200.0}, {"type": "add_debt", "value": 4.0}])}, {"label": "Let them burn cash", "effects": Array[Dictionary]([{"type": "rival_progress", "id": "nimbus", "value": -0.2}, {"type": "add_currency", "id": "compute", "value": 2000.0}])}])

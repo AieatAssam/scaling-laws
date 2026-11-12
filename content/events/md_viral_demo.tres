@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "md_viral_demo"
+title = "Demo Goes Viral"
+description = "Your model writes a symphony, a spreadsheet and an apology. The clip has 40 million views and one comment about lawyers."
+icon = "media"
+category = "media"
+weight = 2.0
+cooldown = 1800.0
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "first_model"}, {"type": "resets_gte", "layer": 4, "value": 1}])
+choices = Array[Dictionary]([{"label": "Livestream the demo", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": 5000.0}, {"type": "add_debt", "value": 2.0}])}, {"label": "Cut it to 30 seconds", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 1.15, "seconds": 900.0}])}])

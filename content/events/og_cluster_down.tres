@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EventDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/event_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "og_cluster_down"
+title = "Cluster Down, Blame Cron"
+description = "The one server rack went dark during a training run. Cron is the usual suspect and never the culprit."
+icon = "outage"
+category = "outage"
+weight = 2.0
+cooldown = 1200.0
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "server_rack", "value": 1}])
+choices = Array[Dictionary]([{"label": "Restore from backup", "effects": Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": -2000.0}])}, {"label": "Wait it out", "effects": Array[Dictionary]([{"type": "timed_mod", "key": "compute", "value": 0.8, "seconds": 600.0}])}])
