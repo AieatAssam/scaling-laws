@@ -72,6 +72,7 @@ func _ready() -> void:
 		nb.custom_minimum_size = Vector2(0, PanelKit.TOUCH_H)
 		nb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nb.clip_text = true
+		nb.theme_type_variation = &"MicroButton"
 		nb.pressed.connect(Game.set_setting.bind("notation", key))
 		Tip.attach(nb, NOTATION_TIPS[key])
 		notation_row.add_child(nb)
@@ -103,7 +104,7 @@ func _ready() -> void:
 	var keys_row := HBoxContainer.new()
 	keys_row.add_theme_constant_override("separation", 6)
 	page.add_child(keys_row)
-	var keys := PanelKit.label("1-9 switch tabs · B cycles buy amount · Space or Enter confirms a card · Esc closes it", PanelKit.TEXT)
+	var keys := PanelKit.caption("1-9 switch tabs · B cycles buy amount · Space or Enter confirms a card · Esc closes it")
 	keys.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	keys_row.add_child(keys)
 	keys_row.add_child(PanelHelp.button("hotkeys"))

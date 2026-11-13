@@ -9,7 +9,7 @@ var _open := ""
 
 
 func _build() -> void:
-	page.add_child(PanelKit.label("Tap a topic to read it. Locked topics show a hint.", PanelKit.MUTED))
+	page.add_child(PanelKit.caption("Tap a topic to read it. Locked topics show a hint."))
 	for d in Game.state.db.get_all("help"):
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 4)

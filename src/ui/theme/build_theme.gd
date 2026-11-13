@@ -67,6 +67,10 @@ func _build() -> Theme:
 	t.default_font = load(FONT)
 	t.default_font_size = 16
 
+	# Type scale. The pixel face is drawn on an 8 px grid, so only 8 and 16 stay crisp. Two sizes everywhere:
+	#   16 px  titles, names, values and buttons (default Label and Button, Heading, DimLabel, Value).
+	#   8 px   body and captions: MicroLabel (body text), MicroDim (muted caption), MicroValue (HUD value),
+	#          MicroButton (in-row action buttons). Long explanations go in Tip tooltips and the Help tab.
 	# Labels and type variations.
 	t.set_color("font_color", "Label", Fx.col(Fx.TEXT))
 	t.set_type_variation("DimLabel", "Label")
@@ -75,12 +79,14 @@ func _build() -> Theme:
 	t.set_color("font_color", "Heading", Fx.col(Fx.ACCENT))
 	t.set_type_variation("Value", "Label")
 	t.set_color("font_color", "Value", Fx.col(Fx.GOLD))
-	# 8px text (the font's native grid) for HUD rates and effect hints.
 	t.set_type_variation("MicroLabel", "Label")
 	t.set_font_size("font_size", "MicroLabel", 8)
 	t.set_type_variation("MicroDim", "Label")
 	t.set_font_size("font_size", "MicroDim", 8)
 	t.set_color("font_color", "MicroDim", Fx.col(Fx.MUTED))
+	t.set_type_variation("MicroValue", "Label")
+	t.set_font_size("font_size", "MicroValue", 8)
+	t.set_color("font_color", "MicroValue", Fx.col(Fx.GOLD))
 
 	# Buttons.
 	t.set_stylebox("normal", "Button", _box(Fx.BTN, Fx.BORDER))

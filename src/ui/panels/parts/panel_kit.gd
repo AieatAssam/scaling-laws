@@ -100,6 +100,13 @@ static func label(text: String, color: int = -1, wrap: bool = true) -> Label:
 	return l
 
 
+## 8 px muted caption: descriptions, status and effect lines. Titles and values stay 16 px.
+static func caption(text: String = "") -> Label:
+	var l := label(text)
+	l.theme_type_variation = &"MicroDim"
+	return l
+
+
 static func button(text: String, on_press: Callable, enabled: bool = true) -> Button:
 	var b := Button.new()
 	b.text = text

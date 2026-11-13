@@ -11,3 +11,5 @@ icon = "rushed"
 order = 3
 method = "ship"
 conditions = Array[Dictionary]([])
+legacy_payout = 1.0
+epilogue = "It ran the first day it was switched on. The post-mortem is still being written, and the cluster has not been switched off."

@@ -24,7 +24,7 @@ func test_effects_and_cap() -> void:
 	var desk := Desk.state(s)
 	desk["slots"].append({"id": "paper_02", "landmark": true})
 	assert_true(Desk.resolve(s, 0, 0)["ok"])
-	assert_almost_eq(float(s.run["layers"][0]["timed"][0]["value"]), 1.01, 0.00001)
+	assert_almost_eq(float(s.run["layers"][0]["timed"][0]["value"]), 1.6, 0.00001)  # paper_02 1.3 timed, landmark doubles the 0.3
 	desk["slots"].append({"id": "paper_02", "landmark": false})
 	Desk.resolve(s, 0, 0)
 	assert_eq(s.run["layers"][0]["timed"].size(), 1)

@@ -44,6 +44,13 @@ var _panels := {}  # id -> Control
 var _current := ""
 var _cash: Dictionary = {}     # chip: {value: TickLabel, rate: Label}
 var _compute: Dictionary = {}
+var _hud_row: HBoxContainer
+var _hud_flow: HFlowContainer
+var _headline: BoxContainer
+var _headline_scale: TickLabel
+var _headline_stage: Label
+var _headline_icon: TextureRect
+var _headline_line: Label
 var _extras := {}              # currency -> {box: Control, value: TickLabel}
 var _saved: Label
 var _stats_btn: Button             # HUD "Stats / 12%" button: one tap opens the Statistics overlay
@@ -141,53 +148,117 @@ func _build_shell() -> void:
 ## later currencies appear as they unlock. Chips wrap to a second row on narrow screens.
 func _build_hud() -> PanelContainer:
 	var hud := PanelContainer.new()
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	hud.add_child(row)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 0)
+	hud.add_child(stack)
+	_hud_row = HBoxContainer.new()
+	_hud_row.add_theme_constant_override("separation", 8)
+	stack.add_child(_hud_row)
 	var flow := HFlowContainer.new()
+	_hud_flow = flow
 	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	flow.add_theme_constant_override("h_separation", 16)
 	flow.add_theme_constant_override("v_separation", 2)
-	row.add_child(flow)
-	_cash = _chip("cash", true)
+	_hud_row.add_child(flow)
+	_cash = _chip("cash", true, true)
+	(_cash["value"] as TickLabel).theme_type_variation = &"MicroValue"
 	Tip.attach(_cash["box"], Callable(self, "_cash_tip"))
 	flow.add_child(_cash["box"])
-	_compute = _chip("compute", true)
+	_compute = _chip("compute", true, true)
+	(_compute["value"] as TickLabel).theme_type_variation = &"MicroValue"
 	Tip.attach(_compute["box"], Callable(self, "_compute_tip"))
 	flow.add_child(_compute["box"])
 	for c in HUD_EXTRA:
-		var ch := _chip(c, false)
+		var ch := _chip(c, false, true)
 		ch["box"].visible = false
 		Tip.attach(ch["box"], Callable(self, "_extra_tip").bind(c))
 		flow.add_child(ch["box"])
 		_extras[c] = ch
+	_headline = BoxContainer.new()
+	_headline.vertical = true
+	_headline.add_theme_constant_override("separation", 0)
+	_headline.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var scale_part := HBoxContainer.new()
+	scale_part.add_theme_constant_override("separation", 4)
+	var scale_icon := TextureRect.new()
+	scale_icon.texture = Fx.tex_fit("res://assets/icons/compute.png", Vector2i(16, 16))
+	scale_icon.custom_minimum_size = Vector2(16, 16)
+	scale_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	scale_part.add_child(scale_icon)
+	var scale_title := Label.new()
+	scale_title.text = "Scale"
+	scale_title.theme_type_variation = &"MicroLabel"
+	scale_part.add_child(scale_title)
+	_headline_scale = TickLabel.new()
+	_headline_scale.theme_type_variation = &"Value"
+	_headline_scale.suffix = "/s"
+	scale_part.add_child(_headline_scale)
+	Tip.attach(scale_part, "Lab scale\nCurrent compute rate (FLOP/s), after all multipliers.")
+	_headline.add_child(scale_part)
+	_headline_stage = Label.new()
+	_headline_stage.theme_type_variation = &"MicroLabel"
+	Tip.attach(_headline_stage, "Lab stage\nThe lab's current location, based on its highest producer tier.")
+	var stage_part := HBoxContainer.new()
+	stage_part.add_theme_constant_override("separation", 4)
+	stage_part.add_child(_headline_stage)
+	var metric := HBoxContainer.new()
+	metric.add_theme_constant_override("separation", 3)
+	_headline_icon = TextureRect.new()
+	_headline_icon.custom_minimum_size = Vector2(16, 16)
+	_headline_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	metric.add_child(_headline_icon)
+	_headline_line = Label.new()
+	_headline_line.theme_type_variation = &"MicroDim"
+	metric.add_child(_headline_line)
+	Tip.attach(metric, Callable(self, "_headline_tip"))
+	stage_part.add_child(metric)
+	_headline.add_child(stage_part)
+	Tip.attach(_headline, "The current stage score or AGI road progress.")
+	stack.add_child(_headline)
 	_stats_btn = Button.new()
 	_stats_btn.theme_type_variation = &"MicroButton"
 	_stats_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_stats_btn.pressed.connect(open_stats)
 	Tip.attach(_stats_btn, "Statistics\nCompletion, this run, the reset layers and all time. Also in Settings.")
-	row.add_child(_stats_btn)
+	_hud_row.add_child(_stats_btn)
 	_saved = Label.new()
 	_saved.theme_type_variation = &"MicroDim"
 	_saved.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	row.add_child(_saved)
+	_hud_row.add_child(_saved)
 	return hud
 
 
+func _headline_tip() -> String:
+	if int(Game.state.resets(4)) > 0:
+		return "AGI road\nStage requirements progress and the current ending trajectory."
+	return "Frontier reset\nCurrent layer currency and the gain available on reset. Highlighted when the gain is at least twice your holding."
+
+
+func _refresh_headline() -> void:
+	var h := Rules.headline(Game.state)
+	_headline_scale.set_target(h["scale"])
+	_headline_stage.text = str(h["stage_name"])
+	_headline_icon.texture = Fx.tex_fit("res://assets/icons/%s.png" % h["currency"], Vector2i(16, 16))
+	_headline_line.text = str(h["line"])
+	_headline_line.add_theme_color_override("font_color", Fx.col(Fx.ACCENT if h["highlight"] else Fx.MUTED))
+
+
 ## One HUD chip: icon + value on top, per-second rate underneath (hero chips only).
-func _chip(icon_name: String, with_rate: bool) -> Dictionary:
+## compact: 16 px icon and 8 px value, for the secondary currencies (they wrap in the HUD flow).
+func _chip(icon_name: String, with_rate: bool, compact := false) -> Dictionary:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 0)
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 6)
+	head.add_theme_constant_override("separation", 6 if not compact else 4)
 	box.add_child(head)
+	var px: int = 16 if compact else 32
 	var ic := TextureRect.new()
-	ic.texture = Fx.tex_fit("res://assets/icons/%s.png" % icon_name, Vector2i(32, 32))
-	ic.custom_minimum_size = Vector2(32, 32)
+	ic.texture = Fx.tex_fit("res://assets/icons/%s.png" % icon_name, Vector2i(px, px))
+	ic.custom_minimum_size = Vector2(px, px)
 	ic.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
 	head.add_child(ic)
 	var value := TickLabel.new()
-	value.theme_type_variation = &"Value"
+	value.theme_type_variation = &"MicroValue" if compact else &"Value"
 	head.add_child(value)
 	var rate: Label = null
 	if with_rate:
@@ -211,7 +282,7 @@ func _build_panels() -> void:
 		b.theme_type_variation = &"TabButton"
 		b.toggle_mode = true
 		b.button_group = _tab_group
-		b.icon = Fx.tex_fit("res://assets/icons/%s.png" % PANEL_ICONS[id], Vector2i(32, 32))
+		b.icon = Fx.tex_fit("res://assets/icons/%s.png" % PANEL_ICONS[id], Vector2i(16, 16))  # 16 px: nine tabs fit 360 px
 		b.add_theme_font_size_override("font_size", 8)
 		b.custom_minimum_size = Vector2(0, 40)  # width comes from the theme: nine icon tabs must fit 360 px
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -289,11 +360,20 @@ func _refresh_tabs() -> void:
 	_layout_tabs()
 
 
-## Tab labels show only where the tab is wide enough; the icon is always shown.
+## Tab labels show only where the tab is wide enough; the icon is always shown. The width is the bar's share per
+## shown tab, not the button's own width: a button sized by its label could never shrink back (a feedback loop).
 func _layout_tabs() -> void:
+	if _tabs.is_empty():
+		return
+	var shown := 0
+	for id in _tabs:
+		if (_tabs[id] as Button).visible:
+			shown += 1
+	var bar := (_tabs.values()[0] as Button).get_parent() as Control
+	var slot := bar.size.x / maxf(shown, 1.0)
 	for id in _tabs:
 		var b: Button = _tabs[id]
-		b.text = TAB_LABELS.get(id, "") if b.size.x >= TAB_LABEL_MIN_WIDTH else ""
+		b.text = TAB_LABELS.get(id, "") if slot >= TAB_LABEL_MIN_WIDTH else ""
 
 
 func _first_unlocked() -> String:
@@ -332,8 +412,14 @@ func _fit_base() -> void:
 func _on_resized() -> void:
 	var portrait := size.y > size.x
 	_body.vertical = portrait
-	_lab_slot.size_flags_stretch_ratio = 0.9 if portrait else 1.0
-	_panel_area.size_flags_stretch_ratio = 1.1 if portrait else 1.0
+	_lab_slot.size_flags_stretch_ratio = 0.35 if portrait else 1.0   # portrait: the panel gets most of the body (producer rows)
+	_panel_area.size_flags_stretch_ratio = 1.5 if portrait else 1.0
+	var target: Node = _hud_row.get_parent() if portrait else _hud_flow
+	_headline.vertical = portrait
+	_headline.add_theme_constant_override("separation", 0 if portrait else 8)
+	if _headline != null and _headline.get_parent() != target:
+		_headline.get_parent().remove_child(_headline)
+		target.add_child(_headline)
 	_apply_safe_area()
 
 
@@ -464,6 +550,7 @@ func _process(delta: float) -> void:
 		_stats_btn.text = "Stats\n%d%%" % roundi(float(Records.completion(Game.state)["percent"]))
 		(_cash["rate"] as Label).text = "+%s/s" % Game.cash_per_second().format()
 		(_compute["rate"] as Label).text = "+%s/s" % Game.compute_per_second().format()
+		_refresh_headline()
 		_refresh_extras()
 		_refresh_tabs()
 	if _saved_t > 0.0:

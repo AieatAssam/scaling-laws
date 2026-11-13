@@ -9,4 +9,4 @@ title = "Towards Reproducible Coin Flips"
 blurb = "Every coin flip reproduced a different result."
 conditions = Array[Dictionary]([{"type": "resets_gte", "layer": 4, "value": 1}])
 weight = 1.0
-choices = Array[Dictionary]([{"label": "Open-source", "effects": [{"type": "rival_progress", "id": "aurora", "value": -0.01}]}, {"label": "Productise", "effects": [{"type": "cash_seconds", "value": 2.0}]}])
+choices = Array[Dictionary]([{"label": "Open-source", "effects": [{"type": "rival_progress", "id": "aurora", "value": -0.01}]}, {"label": "Productise", "effects": [{"type": "cash_seconds", "value": 90.0}]}])

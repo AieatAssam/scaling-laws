@@ -68,25 +68,46 @@ func test_unknown_method_is_refused() -> void:
 	assert_eq(Endgame.start_choice(s, "vibes")["reason"], "unknown method")
 
 
-func test_full_suite_takes_four_hours_and_runs_offline_at_full_speed() -> void:
+func test_full_suite_takes_twelve_hours_and_runs_offline_at_full_speed() -> void:
 	_ready_stages(1)
 	assert_true(Endgame.start_choice(s, "full")["ok"])
-	assert_almost_eq(float(s.run["eval"]["left"]), 14400.0, 1e-9)
-	Sim.offline(s, 14400.0)
+	assert_almost_eq(float(s.run["eval"]["left"]), 43200.0, 1e-9)
+	Sim.offline(s, 43200.0)
 	assert_true(s.run["eval"].is_empty(), "finished at full speed, not at the offline 50%")
 	var choices: Array = s.run["agi_choices"]
 	assert_true(choices == ["full"] or float(s.run["eval_cooldown"]) > 0.0)
 
 
-func test_red_team_takes_two_hours() -> void:
+func test_red_team_takes_six_hours() -> void:
 	_ready_stages(1)
 	Endgame.start_choice(s, "redteam")
 	var evs: Array = []
-	Endgame.tick(s, 7199.0, evs)
+	Endgame.tick(s, 21599.0, evs)
 	assert_false(s.run["eval"].is_empty())
 	Endgame.tick(s, 1.0, evs)
 	assert_true(s.run["eval"].is_empty())
 	assert_eq(int(s.persist["redteam_uses"]), 1, "every red-team run counts, pass or fail")
+
+
+func test_agi_peak_requirements_survive_lower_layer_wipes_and_unlock_sequentially() -> void:
+	s.run["layers"][0]["owned"]["server_rack"] = 20
+	s.run["layers"][2]["best"] = 5.0
+	s.set_cur("energy", BigNum.from_float(90.0))
+	Endgame.track_peaks(s)
+	s.run["layers"][0]["owned"].clear()
+	s.run["layers"][2]["best"] = 0.0
+	s.set_cur("energy", BigNum.new())
+	assert_true(Rules.check(s, Endgame.stage_conditions(s, 1)[0]))
+	assert_true(Rules.check(s, Endgame.stage_conditions(s, 0)[0]))
+	s.run["peak_compute_rate"] = 5e10
+	assert_true(Rules.check(s, Endgame.stage_conditions(s, 2)[0]))
+	assert_true(Rules.check(s, Endgame.stage_conditions(s, 3)[0]))
+	assert_true(Rules.check(s, Endgame.stage_conditions(s, 4)[0]))
+	assert_gte(Rules.condition_progress(s, Endgame.stage_conditions(s, 1)[0]), 1.0)
+	s.run["stage"] = 0
+	var evs: Array = []
+	Endgame.unlock_stages(s, evs)
+	assert_eq(int(s.run["stage"]), 1, "only the next uncleared stage may unlock")
 
 
 func test_full_suite_failure_sets_the_cooldown() -> void:
@@ -95,7 +116,7 @@ func test_full_suite_failure_sets_the_cooldown() -> void:
 		st.run["stage"] = 1
 		Endgame.start_choice(st, "full")
 		var evs: Array = []
-		Endgame.tick(st, 14400.0, evs)
+		Endgame.tick(st, 43200.0, evs)
 		var failed := false
 		for e in evs:
 			failed = failed or e["kind"] == "agi_failed"
@@ -157,7 +178,7 @@ func test_each_method_reaches_its_ending() -> void:
 				if not Endgame.start_choice(st, m)["ok"]:
 					Endgame.tick(st, 3600.0, evs)
 					continue
-			Endgame.tick(st, 14400.0, evs)
+			Endgame.tick(st, 28800.0, evs)
 		assert_eq(st.run["run_over"], Endgame.ending_for(st, m).id, m)
 
 
@@ -280,23 +301,55 @@ func test_non_permanent_challenge_rewards_are_untouched() -> void:
 
 # ---------------------------------------------------------------- recklessness
 
-func test_ship_it_makes_bad_events_likelier_and_worse() -> void:
+func test_ship_it_makes_bad_events_costlier_not_likelier() -> void:
 	_ready_stages(2)
 	Endgame.start_choice(s, "ship")
 	Endgame.start_choice(s, "ship")
 	assert_eq(Endgame.reckless(s), 2)
 	var bad := Stub.new()
-	assert_almost_eq(Endgame.event_weight(s, bad), 2.0 * 2.0, 1e-9)
+	assert_almost_eq(Endgame.event_weight(s, bad), 2.0, 1e-9, "pool weight is unchanged")
+	assert_almost_eq(Endgame.rival_speed(s, "aurora"), 1.0 + Endgame.RECK_RIVAL * 2.0, 1e-9)
 	var good := Stub.new()
 	good.category = "news"
-	assert_almost_eq(Endgame.event_weight(s, good), 2.0, 1e-9)
 	var debt := {"type": "add_debt", "value": 10.0}
-	assert_almost_eq(float(Endgame.event_effect(s, bad, debt)["value"]), 15.0, 1e-9)
+	assert_eq(Endgame.event_effect(s, bad, debt), debt, "debt is production: never made worse")
 	var slide := {"type": "add_slider", "value": -0.1}
-	assert_almost_eq(float(Endgame.event_effect(s, bad, slide)["value"]), -0.15, 1e-9)
+	assert_almost_eq(float(Endgame.event_effect(s, bad, slide)["value"]), -0.15, 1e-9, "alignment loss x1.5")
+	s.run["slider"] = 0.35
+	assert_almost_eq(float(Endgame.event_effect(s, bad, {"type": "add_slider", "value": -0.2})["value"]), -0.05, 1e-9,
+		"recklessness cannot push alignment below the debt threshold")
+	var equity := {"type": "add_currency", "id": "equity", "value": -1.0}
+	assert_almost_eq(float(Endgame.event_effect(s, bad, equity)["value"]), -1.5, 1e-9, "reputation loss x1.5")
+	var compute := {"type": "add_currency", "id": "compute", "value": -1000.0}
+	assert_eq(Endgame.event_effect(s, bad, compute), compute, "compute is production: never made worse")
 	var timed := {"type": "timed_mod", "key": "rate", "value": 0.5, "seconds": 60.0}
-	assert_almost_eq(float(Endgame.event_effect(s, bad, timed)["value"]), 0.25, 1e-9, "a halving becomes a quartering")
-	assert_eq(Endgame.event_effect(s, good, debt), debt, "news events are not made worse")
+	assert_eq(Endgame.event_effect(s, bad, timed), timed, "timed production loss is never made worse")
+	assert_eq(Endgame.event_effect(s, good, slide), slide, "news events are not made worse")
+
+
+func test_ship_it_cuts_the_next_stage_requirement_by_thirty_percent() -> void:
+	var plain: Array = Endgame.stage_conditions(s, 1)
+	assert_eq(int(plain[0]["value"]), 20, "agentic coding needs 20 server racks")
+	_ready_stages(1)
+	assert_true(Endgame.start_choice(s, "ship")["ok"])
+	var cut: Array = Endgame.stage_conditions(s, 1)
+	assert_eq(int(cut[0]["value"]), 14, "30% off: 14 racks")
+	var gate := Endgame.stage_conditions(s, 4)
+	assert_almost_eq(float(gate[0]["value"]), 4e10 * 0.7, 1e-3, "compute rate cut too")
+	assert_eq(gate[1]["type"], "resets_gte", "reset gates are never cut")
+	assert_eq(int(gate[1]["value"]), 1)
+	s.run["agi_choices"].append("full")
+	assert_eq(int(Endgame.stage_conditions(s, 1)[0]["value"]), 20, "a full eval as the last decision cuts nothing")
+
+
+func test_ending_pays_its_legacy() -> void:
+	var st := Support.new_state(content, 3)
+	st.run["stage"] = 5
+	var before := st.cur("legacy").to_float()
+	for i in 5:
+		Endgame.start_choice(st, "ship")
+	assert_eq(st.run["run_over"], "rushed")
+	assert_almost_eq(st.cur("legacy").to_float() - before, float(content.get_def("endings", "rushed").legacy_payout), 1e-9)
 
 
 func test_no_ship_it_choices_leave_events_alone() -> void:

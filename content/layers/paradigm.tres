@@ -10,5 +10,5 @@ description = "Change the field. Unlocks data, energy and automation."
 icon = "breakthroughs"
 index = 3
 currency = "breakthroughs"
-threshold = 30000000000.0
+threshold = 2.0e11
 target_hours = 36.0

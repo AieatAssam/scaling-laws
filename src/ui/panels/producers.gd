@@ -1,27 +1,32 @@
 class_name ProducersPanel
 extends Control
-## Compute producers. Shows owned tiers, the buyable tier and one locked teaser (silhouette, "???").
-## Each row: room thumbnail, owned count, output/s, progress to the next milestone, and a buy button.
+## Compute producers. Shows owned tiers, the buyable tier and one locked teaser ("???").
+## Each row: name, room thumbnail, owned count, output/s, progress to the next milestone, and one buy button.
 ## The x1 / x10 / MAX selector sets how many each buy button buys.
-## Above the producers: launch cards (timed boosts with cooldowns). Below them: lab upgrades (bought once with cash).
+## Below the producers: launch squares (timed boosts with cooldowns), then lab upgrades, collapsed by default.
 
 const AMOUNTS := [1, 10, -1]   # -1 = max affordable
-const THUMB_SMALL := Vector2(96, 64)     # phone: half density of the 2x room art
-const THUMB_WIDE := Vector2(192, 128)    # desktop: room art (192x128) drawn 1:1, every texel visible
+const ART := Vector2i(192, 128)          # room art on disk
+const THUMB_SMALL := Vector2(48, 32)     # phone: room art at 1/4, every texel stays whole
+const THUMB_WIDE := Vector2(96, 64)      # desktop: 1/2
 const WIDE_PANEL := 440.0                # panel width from which the wide thumbnails are used
+const BUY_W := 128.0                    # fixed buy button width: "x10 12.3M" with the cash icon
+const LAUNCH_W := 78.0                   # four launch squares fit one row at 360 px
 
 var _order: Array = []         # producer ids in tier order
-var _rows := {}                # id -> {row, thumb, name, sub, bar, next, cost, buy}
+var _rows := {}                # id -> {row, thumb, name, sub, bar, buy, def}
 var _result: Label
 var _picker: AmountPicker
 var _buyable := false
 var _launch_flow: HFlowContainer
 var _launch_hint: Label
 var _launches := {}            # id -> {card, btn, bar, status, def}
-var _upgrade_flow: HFlowContainer
-var _upgrade_hint: Label
+var _upgrade_head: Button
+var _upgrade_box: VBoxContainer
 var _upgrade_owned: Label
+var _upgrade_hint: Label
 var _upgrades := {}            # id -> Button
+var _upgrades_open := false
 
 
 func _ready() -> void:
@@ -52,11 +57,10 @@ func _ready() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 6)
 	scroll.add_child(list)
-	_build_launches(list)
 	for d in Content.get_all("producers"):
 		_order.append(d.id)
-		var row := _row(d)
-		list.add_child(row)
+		list.add_child(_row(d))
+	_build_launches(list)
 	_build_upgrades(list)
 
 	var tm := Timer.new()
@@ -81,14 +85,16 @@ func _row(d) -> PanelContainer:
 	var card := PanelKit.card()
 	Tip.attach(card, Callable(self, "_tip").bind(id))
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 4)
+	v.add_theme_constant_override("separation", 2)
 	card.add_child(v)
 
+	var name_lbl := PanelKit.label("")   # 16 px title, wraps instead of clipping
+	v.add_child(name_lbl)
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	v.add_child(top)
 	var thumb := TextureRect.new()
-	thumb.texture = Fx.tex("res://assets/rooms/%s.png" % id, Vector2i(THUMB_WIDE))
+	thumb.texture = Fx.tex("res://assets/rooms/%s.png" % id, ART)
 	thumb.custom_minimum_size = THUMB_SMALL
 	thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -96,48 +102,33 @@ func _row(d) -> PanelContainer:
 	top.add_child(thumb)
 	var mid := VBoxContainer.new()
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mid.alignment = BoxContainer.ALIGNMENT_CENTER
 	mid.add_theme_constant_override("separation", 2)
 	top.add_child(mid)
-	var name_lbl := Label.new()
-	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long names wrap on phones instead of clipping
-	name_lbl.theme_type_variation = &"DimLabel"
-	mid.add_child(name_lbl)
 	var sub := Label.new()
 	sub.theme_type_variation = &"MicroDim"
 	sub.clip_text = true
 	mid.add_child(sub)
-
-	var prog := HBoxContainer.new()
-	prog.add_theme_constant_override("separation", 6)
-	v.add_child(prog)
-	var bar := PanelKit.bar(PanelKit.TEAL)
-	bar.custom_minimum_size = Vector2(0, 10)
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	prog.add_child(bar)
-	var next := Label.new()
-	next.theme_type_variation = &"MicroDim"
-	next.clip_text = true
-	next.custom_minimum_size.x = 120
-	prog.add_child(next)
-
 	var bottom := HBoxContainer.new()
 	bottom.add_theme_constant_override("separation", 6)
-	v.add_child(bottom)
-	var cost := Label.new()
-	cost.theme_type_variation = &"MicroDim"
-	cost.clip_text = true
-	cost.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bottom.add_child(cost)
-	var buy := PanelKit.button("", Callable(), false)
-	buy.custom_minimum_size = Vector2(120, PanelKit.TOUCH_H)
+	mid.add_child(bottom)
+	var bar := PanelKit.bar(PanelKit.TEAL)
+	bar.custom_minimum_size = Vector2(0, 8)
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bottom.add_child(bar)
+	var buy := Button.new()
+	buy.theme_type_variation = &"MicroButton"
+	buy.icon = load(PanelKit.ICON % "cash")
+	buy.expand_icon = true
+	buy.add_theme_constant_override("icon_max_width", 16)
+	buy.clip_text = true
+	buy.custom_minimum_size = Vector2(BUY_W, 20)
 	buy.size_flags_horizontal = Control.SIZE_SHRINK_END
+	buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	buy.pressed.connect(_buy.bind(id, buy))
 	bottom.add_child(buy)
 
-	_rows[id] = {"row": card, "thumb": thumb, "name": name_lbl, "sub": sub, "bar": bar, "next": next,
-		"cost": cost, "buy": buy, "def": d}
+	_rows[id] = {"row": card, "thumb": thumb, "name": name_lbl, "sub": sub, "bar": bar, "buy": buy, "def": d}
 	return card
 
 
@@ -206,14 +197,13 @@ func _refresh() -> void:
 		var open := i <= last_open
 		var owned := s.owned(id)
 		(r["thumb"] as TextureRect).modulate = Color.WHITE if open else Fx.col(Fx.DISABLED)
+		var buy := r["buy"] as Button
 		if not open:
 			(r["name"] as Label).text = "???"
-			(r["sub"] as Label).text = "Locked"
+			(r["sub"] as Label).text = "Needs %s" % PanelText.title_of("producers", _order[i - 1])
 			(r["bar"] as ProgressBar).visible = false
-			(r["next"] as Label).text = ""
-			(r["cost"] as Label).text = "Needs %s" % PanelText.title_of("producers", _order[i - 1])
-			(r["buy"] as Button).text = "Locked"
-			(r["buy"] as Button).disabled = true
+			buy.text = "Locked"
+			buy.disabled = true
 			continue
 
 		# Milestones: each one reached doubles this tier's output.
@@ -226,50 +216,47 @@ func _refresh() -> void:
 				next_ms = ms
 		var rate := Sim.producer_raw_rate(s, id).mul_f(mult)
 		(r["name"] as Label).text = str(d.title)
-		(r["sub"] as Label).text = "×%d owned · %s/s" % [owned, rate.format()]
+		var nxt := "×2 at %d" % next_ms if next_ms > 0 else "max ×%d" % m
+		(r["sub"] as Label).text = "×%d · %s/s · %s" % [owned, rate.format(), nxt]
 		var bar := r["bar"] as ProgressBar
 		bar.visible = next_ms > 0
 		if next_ms > 0:
 			bar.max_value = next_ms
 			bar.value = owned
-			(r["next"] as Label).text = "Next ×2 at %d" % next_ms
-		else:
-			(r["next"] as Label).text = "Max milestones ×%d" % m
 
 		var n := _count_for(id)
 		var k := Game.max_affordable(id)
-		var buy := r["buy"] as Button
 		buy.disabled = n < 1 or k < n
-		buy.text = "Buy %s" % ("max" if _picker.amount < 0 else str(_picker.amount))
 		var shown_n := maxi(n, 1)
-		(r["cost"] as Label).text = "Cost %s for %d" % [Game.producer_cost(id, shown_n).format(), shown_n]
-		if _picker.amount < 0:
-			buy.text = "Buy max (%d)" % n
+		buy.text = "x%d %s" % [shown_n, Game.producer_cost(id, shown_n).format()]
 		if not buy.disabled:
 			_buyable = true
 	_refresh_launches(s)
 	_refresh_upgrades(s)
 
 
-## Launch cards sit at the top of the list. Each shows once its conditions pass, with a cooldown bar and status.
+## Launch squares below the producers. Each shows once its conditions pass, with a cooldown bar and status.
 func _build_launches(list: VBoxContainer) -> void:
 	var box := PanelKit.section(list, "Launches", "breakthroughs")
 	_launch_flow = HFlowContainer.new()
-	_launch_flow.add_theme_constant_override("h_separation", 6)
-	_launch_flow.add_theme_constant_override("v_separation", 6)
+	_launch_flow.add_theme_constant_override("h_separation", 4)
+	_launch_flow.add_theme_constant_override("v_separation", 4)
 	box.add_child(_launch_flow)
 	_launch_hint = PanelKit.label("Launches unlock as you grow.", PanelKit.DIM)
 	box.add_child(_launch_hint)
 	for d in Content.get_all("launches"):
-		var card := PanelKit.card()
-		card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-		card.custom_minimum_size.x = 160
-		Tip.attach(card, Callable(self, "_launch_tip").bind(d.id))
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", _square_box())
+		card.custom_minimum_size.x = LAUNCH_W
 		var v := VBoxContainer.new()
-		v.add_theme_constant_override("separation", 3)
+		v.add_theme_constant_override("separation", 2)
 		card.add_child(v)
-		var btn := PanelKit.button(str(d.title), _fire.bind(d.id))
-		v.add_child(btn)
+		var title := Label.new()
+		title.theme_type_variation = &"MicroLabel"
+		title.text = str(d.title)
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(title)
 		var bar := PanelKit.bar(PanelKit.AMBER)
 		bar.custom_minimum_size = Vector2(0, 6)
 		bar.max_value = 1.0
@@ -278,9 +265,26 @@ func _build_launches(list: VBoxContainer) -> void:
 		var status := Label.new()
 		status.theme_type_variation = &"MicroDim"
 		status.clip_text = true
+		status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(status)
+		# Flat button over the whole square takes the tap; the square itself draws the frame.
+		var btn := Button.new()
+		btn.flat = true
+		btn.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		btn.pressed.connect(_fire.bind(d.id))
+		card.add_child(btn)
+		Tip.attach(btn, Callable(self, "_launch_tip").bind(d.id))
 		_launch_flow.add_child(card)
 		_launches[d.id] = {"card": card, "btn": btn, "bar": bar, "status": status, "def": d}
+
+
+func _square_box() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = PanelKit.col(PanelKit.PANEL)
+	sb.border_color = PanelKit.col(PanelKit.EDGE)
+	sb.set_border_width_all(1)
+	sb.set_content_margin_all(2)
+	return sb
 
 
 func _refresh_launches(s: GameState) -> void:
@@ -296,7 +300,7 @@ func _refresh_launches(s: GameState) -> void:
 		var left := Launches.cooldown_left(s, id)
 		var reason := Launches.blocker(s, id)
 		(r["bar"] as ProgressBar).value = 1.0 - clampf(left / float(d.cooldown), 0.0, 1.0)  # fills as the cooldown runs out
-		(r["status"] as Label).text = ("%s left" % PanelKit.hms(left)) if left > 0.0 else ("Ready" if reason == "" else reason)
+		(r["status"] as Label).text = PanelKit.hms(left) if left > 0.0 else ("Ready" if reason == "" else "Locked")
 		(r["btn"] as Button).disabled = reason != ""
 	_launch_hint.visible = not any
 
@@ -335,27 +339,38 @@ func _key_label(key: String) -> String:
 	return key
 
 
-## Upgrades section at the bottom of the list: buttons for unlocked, unbought upgrades; bought ones are a count.
+## Upgrades: one collapsed header with a count. Opening it lists the unlocked, unbought upgrades.
 func _build_upgrades(list: VBoxContainer) -> void:
-	var box := PanelKit.section(list, "Upgrades", "research")
+	_upgrade_head = PanelKit.button("", _toggle_upgrades)
+	list.add_child(_upgrade_head)
+	_upgrade_box = VBoxContainer.new()
+	_upgrade_box.add_theme_constant_override("separation", 4)
+	_upgrade_box.visible = false
+	list.add_child(_upgrade_box)
 	_upgrade_owned = Label.new()
 	_upgrade_owned.theme_type_variation = &"MicroDim"
-	box.add_child(_upgrade_owned)
-	_upgrade_flow = HFlowContainer.new()
-	_upgrade_flow.add_theme_constant_override("h_separation", 6)
-	_upgrade_flow.add_theme_constant_override("v_separation", 6)
-	box.add_child(_upgrade_flow)
-	_upgrade_hint = PanelKit.label("", PanelKit.DIM)
-	box.add_child(_upgrade_hint)
+	_upgrade_box.add_child(_upgrade_owned)
 	for d in Content.get_all("upgrades"):
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(150, PanelKit.TOUCH_H)
+		b.theme_type_variation = &"MicroButton"
+		b.icon = load(PanelKit.ICON % "cash")
+		b.expand_icon = true
+		b.add_theme_constant_override("icon_max_width", 16)
 		b.clip_text = true
+		b.custom_minimum_size = Vector2(0, 28)
 		b.text = "%s  %s" % [str(d.title), BigNum.from_float(float(d.cost)).format()]
 		b.pressed.connect(_buy_upgrade.bind(d.id, b))
 		Tip.attach(b, Callable(self, "_upgrade_tip").bind(d.id))
-		_upgrade_flow.add_child(b)
+		_upgrade_box.add_child(b)
 		_upgrades[d.id] = b
+	_upgrade_hint = PanelKit.label("", PanelKit.DIM)
+	_upgrade_box.add_child(_upgrade_hint)
+
+
+func _toggle_upgrades() -> void:
+	_upgrades_open = not _upgrades_open
+	_upgrade_box.visible = _upgrades_open
+	_refresh()
 
 
 func _refresh_upgrades(s: GameState) -> void:
@@ -372,6 +387,8 @@ func _refresh_upgrades(s: GameState) -> void:
 		b.disabled = reason != ""
 		if reason == "":
 			_buyable = true
+	var arrow := "-" if _upgrades_open else "+"
+	_upgrade_head.text = "%s Upgrades (%d)" % [arrow, shown] if shown > 0 else "%s Upgrades (done)" % arrow if owned >= _upgrades.size() else "%s Upgrades (none)" % arrow
 	_upgrade_hint.text = "All upgrades bought." if owned >= _upgrades.size() else "Next upgrades unlock as you grow."
 	_upgrade_hint.visible = shown == 0
 

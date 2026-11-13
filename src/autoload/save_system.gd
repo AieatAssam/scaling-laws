@@ -4,7 +4,7 @@ extends Node
 ## a file from a newer version is set aside as <path>.newer-<ms> and never overwritten. `last_notice` says
 ## what load_data had to do (empty when nothing happened); Game shows it to the player.
 
-const VERSION := 7
+const VERSION := 8
 const DEFAULT_PATH := "user://save.json"
 
 var last_notice := ""
@@ -80,6 +80,19 @@ func migrate(wrapper: Dictionary) -> Dictionary:
 		state = _v5_to_v6(state)
 	if v < 7:
 		state = _v6_to_v7(state)
+	if v < 8:
+		state = _v7_to_v8(state)
+	return state
+
+
+## Adds Singularity-run AGI maxima; GameState.from_dict seeds them from the loaded live values.
+static func _v7_to_v8(state: Dictionary) -> Dictionary:
+	var run: Dictionary = state.get("run", {})
+	if not run.has("peak_compute_rate"):
+		run["peak_compute_rate"] = 0.0
+	if not run.has("agi_peaks"):
+		run["agi_peaks"] = {"owned": {}, "energy": 0.0, "training_best": 0.0}
+	state["run"] = run
 	return state
 
 

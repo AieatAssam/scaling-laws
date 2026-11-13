@@ -11,3 +11,5 @@ icon = "aligned"
 order = 1
 method = "full"
 conditions = Array[Dictionary]([])
+legacy_payout = 3.0
+epilogue = "Five checked decisions, five published proofs. The model keeps its promises for years, and the lab keeps the receipts."

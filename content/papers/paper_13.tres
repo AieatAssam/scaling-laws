@@ -9,4 +9,4 @@ title = "Data Quality and Other Rumours"
 blurb = "Cleaner data produced fewer interesting excuses."
 conditions = Array[Dictionary]([])
 weight = 1.0
-choices = Array[Dictionary]([{"label": "Publish", "effects": [{"type": "generation_mult", "value": 0.002}]}, {"label": "Productise", "effects": [{"type": "cash_seconds", "value": 2.0}]}])
+choices = Array[Dictionary]([{"label": "Publish", "effects": [{"type": "generation_mult", "value": 0.02}]}, {"label": "Productise", "effects": [{"type": "cash_seconds", "value": 90.0}]}])

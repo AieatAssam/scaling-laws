@@ -22,6 +22,7 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 	rng = RandomNumberGenerator.new()
 	rng.seed = seed_value
 	persist = {
+		"eval_seed": seed_value,  # seeds each Endgame eval roll's own stream (see Endgame._finish_eval)
 		"perm_mult": {}, "legacy_perks": {}, "automation": [], "benchmarks": [],
 		"best_all": 0.0,
 		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0, "launches": 0, "news": 0, "moonshots": 0,
@@ -47,6 +48,7 @@ static func fresh_run() -> Dictionary:
 	layers[0]["cur"]["cash"] = BigNum.from_float(START_CASH)
 	return {
 		"layers": layers, "resets_done": [0, 0, 0, 0], "stage": 0, "slider": 0.5,
+		"peak_compute_rate": 0.0, "agi_peaks": {"owned": {}, "energy": 0.0, "training_best": 0.0},
 		"flags": {}, "rivals": {}, "challenges_done": [], "challenge_passed": {}, "run_over": "",
 		"launches": {}, "news": {"timer": News.FIRST_SECONDS, "chip": {}},
 		"agi_choices": [],     # one method per cleared AGI stage (see Endgame)
@@ -100,6 +102,7 @@ func resets(k: int) -> int:
 ## ---- Serialization (BigNum -> {mantissa, exponent}; RNG state as string to keep 64 bits) ----
 
 func to_dict() -> Dictionary:
+	Endgame.track_peaks(self)
 	var layers_out: Array = []
 	for L in run["layers"]:
 		var o: Dictionary = L.duplicate(false)
@@ -153,6 +156,7 @@ static func from_dict(content_db, d: Dictionary) -> GameState:
 		out_layers.append(L)
 	s.run["layers"] = out_layers
 	s._normalize_ints()
+	Endgame.track_peaks(s)
 	return s
 
 
@@ -174,6 +178,7 @@ static func _fill(saved: Dictionary, tmpl: Dictionary) -> void:
 
 ## JSON gives every number back as float; restore the fields that are integers.
 func _normalize_ints() -> void:
+	persist["eval_seed"] = int(persist.get("eval_seed", 1))
 	run["stage"] = int(run["stage"])
 	for i in run["resets_done"].size():
 		run["resets_done"][i] = int(run["resets_done"][i])

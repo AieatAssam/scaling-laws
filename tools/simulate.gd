@@ -12,7 +12,7 @@ extends SceneTree
 ##
 ## Gating checks:
 ##   First reset of each layer (game time):  Funding 20–45 min, Generation 3–6 h, Paradigm 24–48 h,
-##     Singularity 3–8 d.  The AGI ending must come between 8 d (192 h) and 14 d (336 h).
+##     Singularity 3–8 d.  The AGI ending must come between 9 d (216 h) and 14 d (336 h).
 ##   Cycles: a layer's cycle runs from its life being zeroed (own reset or a higher one) to its own reset.
 ##     Epoch 0 (no higher reset yet): the average of cycles 2.. must be at most CYCLE_SPEEDUP of the first (plus one
 ##     step), when the first is longer than two steps. Averaging keeps single-step jitter from failing the check.
@@ -20,7 +20,8 @@ extends SceneTree
 ##     rule needs gain >= 2x holding, so cycle length grows by design), and each epoch's first
 ##     cycle must beat epoch 0's first cycle of the same layer (kept bonuses pay off).
 ##   Generation policy: once the research tree is bought, Model Generation resets are skipped (insights have no use).
-##   Aligned policy: the slider stays at 0.5 until the Singularity, then goes to 0.9 (the aligned ending needs 0.9).
+##   Shared policy: the slider stays at 0.5 until the Singularity, then goes to 0.9, whatever the ending. Events are
+##     scored the same way for every ending. The --ending flag changes only the AGI stage method.
 ##   AGI policy: each stage is cleared by its target ending's method (aligned full suite, open_sourced red-team,
 ##     rushed ship it), so the majority of five choices gives that ending.
 ##   --probe: prints Generation and Paradigm reset decisions and compute/s crossings (diagnostics only, no gate).
@@ -45,8 +46,10 @@ const STALL_LIMIT := 7200.0
 const STALL_FACTOR := 4.0      # gain stalled when it has not risen for this many times the time it took to reach it
 const CYCLE_SPEEDUP := 0.9    # epoch 0: cycles 2.. must be at most this fraction of cycle 1
 const LATER_EPOCH_MIN_RATE := 0.7 # epochs > 0: cycles 2.. must earn at least this fraction of the first cycle's gain per hour
-const ENDING_EARLIEST := 192.0 * HOUR   # 8 d: the AGI ending must not come sooner
-const SLIDER_TARGET := {"aligned": 0.9, "rushed": 0.3, "open_sourced": 0.5}
+const ENDING_EARLIEST := 216.0 * HOUR   # 9 d: the AGI ending must not come sooner
+const ENDING_LATEST := 336.0 * HOUR     # 14 d
+const SLIDER_EARLY := 0.5   # every ending: alignment before the Singularity
+const SLIDER_LATE := 0.9    # every ending: alignment once the Singularity is reached
 const RESEARCH_COMMON := ["cluster_scheduler", "data_curation", "data_dedupe", "eval_harness", "mixed_precision", "inference_cache"]
 const RESEARCH_BRANCH := {
 	"dense": ["dense_base", "dense_wide", "dense_deep", "dense_rlhf", "dense_scale"],
@@ -129,7 +132,7 @@ func _parse_args() -> bool:
 		else:
 			print("unknown argument: " + a)
 			return false
-	if not SLIDER_TARGET.has(ending_target):
+	if not ["aligned", "open_sourced", "rushed"].has(ending_target):
 		print("--ending must be aligned, rushed or open_sourced")
 		return false
 	return true
@@ -394,7 +397,7 @@ func _record_pick(id: String) -> void:
 func _slider() -> void:
 	if s.resets(2) == 0:
 		return
-	var target: float = SLIDER_TARGET[ending_target] if (ending_target != "aligned" or s.resets(4) > 0) else 0.5
+	var target: float = SLIDER_LATE if s.resets(4) > 0 else SLIDER_EARLY
 	if absf(float(s.run["slider"]) - target) > 1e-6:
 		Sim.set_slider(s, target)
 
@@ -509,11 +512,9 @@ func _score_choice(ch: Dictionary) -> float:
 			"add_debt":
 				sc -= 2.0 * float(e["value"])
 			"add_slider":
-				var sign := 1.0 if ending_target == "aligned" else (-1.0 if ending_target == "rushed" else 0.0)
-				sc += sign * 5.0 * float(e["value"])
+				sc += 5.0 * float(e["value"])   # every ending plays the same choices: alignment is always preferred
 			"add_flag":
-				if e["id"] == "open_sourced":
-					sc += 100.0 if ending_target == "open_sourced" else -100.0
+				pass
 			"add_currency":
 				sc += 1.0 if float(e["value"]) > 0.0 else -0.5
 			"timed_mod", "run_mult", "perm_mult":
@@ -876,8 +877,8 @@ func _report() -> int:
 	if ending_id == "":
 		_problem("no AGI ending within %.1f h" % hours)
 	elif ending_t < ENDING_EARLIEST:
-		_problem("AGI ending %s at %s, before the 8 d floor" % [ending_id, _fmt(ending_t).strip_edges()])
-	elif ending_t > LIMIT_HOURS * HOUR:
+		_problem("AGI ending %s at %s, before the 9 d floor" % [ending_id, _fmt(ending_t).strip_edges()])
+	elif ending_t > ENDING_LATEST:
 		_problem("AGI ending %s at %s, after the 14 d limit" % [ending_id, _fmt(ending_t).strip_edges()])
 	elif ending_id != ending_target:
 		_problem("wanted ending %s, got %s" % [ending_target, ending_id])

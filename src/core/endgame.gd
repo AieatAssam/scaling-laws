@@ -11,18 +11,20 @@ extends RefCounted
 const METHODS := ["full", "redteam", "ship"]
 const TITLES := {"full": "Full eval suite", "redteam": "Community red-team", "ship": "Ship it"}
 const COUNTER := {"full": "Assurance", "redteam": "Openness", "ship": "Recklessness"}
-const FULL_SECONDS := 14400.0
+const FULL_SECONDS := 43200.0
 const FULL_BASE := 0.5
 const FULL_SLIDER := 0.4
 const FULL_OPS := 0.02
 const FULL_CAP := 0.97
 const FULL_COOLDOWN := 3600.0
-const RED_SECONDS := 7200.0
+const RED_SECONDS := 21600.0
 const RED_PASS := 0.7
 const RED_SPEED := 0.05          # rival speed per community red-team run, persistent (persist.redteam_uses)
-const RECK_WEIGHT := 0.5         # bad-event pool weight per Ship it choice in this run
-const RECK_SEVERITY := 0.25      # bad-event severity per Ship it choice in this run
+const SHIP_CUT := 0.7            # the stage after a Ship it choice needs 30% less of each numeric requirement
+const RECK_RIVAL := 0.1          # rival speed per Ship it choice in this run (rivals hear about the release)
+const RECK_SEVERITY := 0.25      # bad events: alignment and reputation losses per Ship it choice in this run
 const BAD_CATEGORIES := ["incident", "outage"]
+const RECK_CURRENCY := "equity"  # the reputation-like currency that bad events cost under recklessness
 const ACQUI_SPEED := 0.75
 const ACQUI_CASH_SECONDS := 7200.0
 const ACQUI_COOLDOWN := 3600.0
@@ -82,9 +84,56 @@ static func pending_index(s: GameState) -> int:
 	return idx if idx < int(s.run["stage"]) and idx < s.db.get_all("agi_stages").size() else -1
 
 
+## Conditions of the stage at `index` (0-based) as they now stand. A Ship it choice as the last decision cuts the next
+## stage's numeric requirements by SHIP_CUT; integer gates (resets_gte, owned counts stay whole) are cut the same way
+## except resets_gte, which is a layer-reset gate and never cut.
+static func stage_conditions(s: GameState, index: int) -> Array:
+	var stages: Array = s.db.get_all("agi_stages")
+	var conds: Array = stages[index].conditions
+	var choices: Array = s.run["agi_choices"]
+	var ship_cut: bool = not choices.is_empty() and choices.back() == "ship"
+	var out: Array = []
+	for c in conds:
+		var d: Dictionary = c.duplicate()
+		if ["compute_rate_gte", "owned_gte", "currency_gte", "training_best_gte"].has(d["type"]):
+			d["_agi_peak"] = true
+		if ship_cut and d["type"] != "resets_gte" and d.has("value"):
+			d["value"] = float(d["value"]) * SHIP_CUT
+		out.append(d)
+	return out
+
+
+## AGI milestones use maxima held for this Singularity run, across lower-layer wipes.
+static func track_peaks(s: GameState) -> void:
+	s.run["peak_compute_rate"] = maxf(float(s.run.get("peak_compute_rate", 0.0)), Sim.compute_per_second(s).to_float())
+	var peaks: Dictionary = s.run.get("agi_peaks", {"owned": {}, "energy": 0.0, "training_best": 0.0})
+	var owned: Dictionary = peaks.get("owned", {})
+	for d in s.db.get_all("agi_stages"):
+		for c in d.conditions:
+			match c["type"]:
+				"owned_gte":
+					owned[c["id"]] = maxi(int(owned.get(c["id"], 0)), s.owned(c["id"]))
+				"currency_gte":
+					if c["id"] == "energy":
+						peaks["energy"] = maxf(float(peaks.get("energy", 0.0)), s.cur("energy").to_float())
+				"training_best_gte":
+					peaks["training_best"] = maxf(float(peaks.get("training_best", 0.0)), float(s.run["layers"][2]["best"]))
+	peaks["owned"] = owned
+	s.run["agi_peaks"] = peaks
+
+
+static func peak_value(s: GameState, c: Dictionary):
+	match c["type"]:
+		"compute_rate_gte": return BigNum.from_float(float(s.run.get("peak_compute_rate", 0.0)))
+		"owned_gte": return int(s.run["agi_peaks"].get("owned", {}).get(c["id"], 0))
+		"currency_gte": return BigNum.from_float(float(s.run["agi_peaks"].get("energy", 0.0)))
+		"training_best_gte": return float(s.run["agi_peaks"].get("training_best", 0.0))
+	return null
+
+
 static func unlock_stages(s: GameState, evs: Array) -> void:
 	var stages: Array = s.db.get_all("agi_stages")
-	while int(s.run["stage"]) < stages.size() and Rules.check_all(s, stages[int(s.run["stage"])].conditions):
+	while int(s.run["stage"]) < stages.size() and int(s.run["stage"]) <= (s.run["agi_choices"] as Array).size() and Rules.check_all(s, stage_conditions(s, int(s.run["stage"]))):
 		s.run["stage"] = int(s.run["stage"]) + 1
 		evs.append({"kind": "agi_advanced", "index": s.run["stage"]})
 
@@ -145,6 +194,7 @@ static func start_choice(s: GameState, method: String) -> Dictionary:
 
 ## Unlocks AGI stages, then runs evaluations, the full-suite cooldown and the rival race. Full speed offline too (raw dt).
 static func tick(s: GameState, dt: float, evs: Array) -> void:
+	track_peaks(s)
 	unlock_stages(s, evs)
 	s.run["eval_cooldown"] = maxf(float(s.run["eval_cooldown"]) - dt, 0.0)
 	var ev: Dictionary = s.run["eval"]
@@ -165,7 +215,12 @@ static func _finish_eval(s: GameState, evs: Array) -> void:
 	s.run["eval"] = {}
 	var m := String(ev["method"])
 	var idx := int(ev["index"])
-	var passed := s.rng.randf() < pass_chance(s, m)
+	# Own stream per roll: the shared rng would shift every later event and desk draw by however many evals ran,
+	# so two endings with the same choices would drift apart. Seeded from the run seed and a roll counter.
+	s.persist["eval_rolls"] = int(s.persist.get("eval_rolls", 0)) + 1
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash([int(s.persist.get("eval_seed", 1)), int(s.persist["eval_rolls"])])
+	var passed := roll.randf() < pass_chance(s, m)
 	if m == "redteam":
 		s.persist["redteam_uses"] = int(s.persist.get("redteam_uses", 0)) + 1
 	if passed:
@@ -195,6 +250,7 @@ static func _clear(s: GameState, idx: int, m: String, evs: Array) -> void:
 			stats["solo_%s" % win] = int(stats.get("solo_%s" % win, 0)) + 1
 		var e = ending_for(s, win)
 		s.run["run_over"] = e.id
+		s.add_cur("legacy", BigNum.from_float(float(e.legacy_payout)))
 		evs.append({"kind": "ending", "id": e.id})
 
 
@@ -208,9 +264,10 @@ static func racing(s: GameState, r) -> bool:
 	return not flags.get("rival_%s_launched" % r.id, false) and not flags.get("outpaced_%s" % r.id, false)
 
 
-## Work per second of rival `id`: +RED_SPEED per red-team run (persistent), ×ACQUI_SPEED once acqui-hired.
+## Work per second of rival `id`: +RED_SPEED per red-team run (persistent), +RECK_RIVAL per Ship it this run,
+## ×ACQUI_SPEED once acqui-hired.
 static func rival_speed(s: GameState, id: String) -> float:
-	var sp := 1.0 + RED_SPEED * float(int(s.persist.get("redteam_uses", 0)))
+	var sp := (1.0 + RED_SPEED * float(int(s.persist.get("redteam_uses", 0)))) * (1.0 + RECK_RIVAL * float(reckless(s)))
 	if id in s.run["race"]["acqui"]:
 		sp *= ACQUI_SPEED
 	return sp
@@ -346,14 +403,13 @@ static func reckless(s: GameState) -> int:
 	return int(counts(s.run["agi_choices"])["ship"])
 
 
-static func event_weight(s: GameState, d) -> float:
-	var w := float(d.weight)
-	if BAD_CATEGORIES.has(d.category):
-		w *= 1.0 + RECK_WEIGHT * float(reckless(s))
-	return w
+## Pool weight of an event. Recklessness does not make events likelier: it makes their costs harsher (see event_effect).
+static func event_weight(_s: GameState, d) -> float:
+	return float(d.weight)
 
 
-## An event effect as applied: bad events' negative effects are scaled by severity.
+## An event effect as applied: bad events' alignment and reputation losses are scaled by severity. Extra alignment
+## loss stops at the slider value where debt starts, so recklessness cannot add a production penalty.
 static func event_effect(s: GameState, d, e: Dictionary) -> Dictionary:
 	var n := reckless(s)
 	if n == 0 or not BAD_CATEGORIES.has(d.category):
@@ -361,14 +417,9 @@ static func event_effect(s: GameState, d, e: Dictionary) -> Dictionary:
 	var sev := 1.0 + RECK_SEVERITY * float(n)
 	var v := float(e.get("value", 0.0))
 	var out: Dictionary = e.duplicate()
-	match e["type"]:
-		"add_debt":
-			if v > 0.0:
-				out["value"] = v * sev
-		"add_currency", "add_slider":
-			if v < 0.0:
-				out["value"] = v * sev
-		"timed_mod":
-			if v < 1.0:
-				out["value"] = 1.0 + (v - 1.0) * sev
+	var reputation: bool = e["type"] == "add_currency" and e.get("id", "") == RECK_CURRENCY
+	if e["type"] == "add_slider" and v < 0.0:
+		out["value"] = maxf(v * sev, Sim.SLIDER_SAFE - float(s.run["slider"]))
+	elif reputation and v < 0.0:
+		out["value"] = v * sev
 	return out

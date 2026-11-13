@@ -10,5 +10,5 @@ description = "Raise a round. Unlocks hiring."
 icon = "equity"
 index = 1
 currency = "equity"
-threshold = 100000.0
+threshold = 1.0e7
 target_hours = 0.5

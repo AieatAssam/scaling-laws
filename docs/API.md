@@ -48,7 +48,7 @@ Constant: `CURRENCY_LAYER`, which maps each currency to its reset layer (`cash`,
 
 `persist` keys: `perm_mult` (dict key → float), `legacy_perks` (dict), `automation` (array of ids), `benchmarks` (array of ids), `best_all` (float), `stats` (`runs`, `resets`, `time`, `trainings`, `failed`, `events`), `lifetime_resets` (4 ints, index = layer 1..4 minus one: every reset of that layer ever, across runs; `perform_reset` increments it; the lab shows one legacy prop per non-zero entry; saves without it backfill from `run.resets_done`), `settings` (dict), `intro_seen` (bool; new games start `false`, saves without the field backfill to `true`, every reset keeps it), `saved_at` (unix seconds).
 
-`run` keys: `layers` (5 dicts, index = layer), `resets_done` ([4] ints), `stage` (AGI stage index), `slider` (0..1, starts 0.5), `flags` (dict), `rivals` (id → progress), `challenges_done` (array), `challenge_passed` (id → bool, set when a challenge finishes; read with `.get`, since older saves may lack it), `run_over` (ending id or "").
+`run` keys: `layers` (5 dicts, index = layer), `resets_done` ([4] ints), `stage` (AGI stage index), `slider` (0..1, starts 0.5), `peak_compute_rate` and `agi_peaks` (best AGI requirement values since the last Singularity reset), `flags` (dict), `rivals` (id → progress), `challenges_done` (array), `challenge_passed` (id → bool, set when a challenge finishes; read with `.get`, since older saves may lack it), `run_over` (ending id or "").
 
 Each layer dict: `cur` (currency → BigNum), `life` (BigNum, cash earned since last reset), `clock` (seconds), `owned` (layer 0 only), `staff` (layer 1 only), `research` (layer 2 only, array of ids), `best` (layer 2 only, training score), `debt` (layer 0 only), `run_mult`, `timed` (layer 0 only), `training` (layer 0 only), `cooldowns` and `pending` (layer 0 only, event state), `event_timer`, `challenge` (layer 4 only).
 
@@ -139,7 +139,7 @@ Event dicts returned by `tick`, each with a `kind` key:
 
 ## SaveSystem (autoload `SaveSystem`)
 
-- `VERSION = 4`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. v3 → v4 (`_v3_to_v4`): adds `persist.records` (see Records) with `cycle_start` set to the migration time, so the first reset of each layer sets a baseline, not a record. A save with no version field counts as v0 (same migrations as v1).
+- `VERSION = 8`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. v3 → v4 (`_v3_to_v4`): adds `persist.records`. v7 → v8 adds Singularity-scoped AGI peak state. A save with no version field counts as v0.
 - `save(state: Dictionary, path=DEFAULT_PATH) -> bool`: writes `{"version", "state"}` as JSON. Before overwriting, copies the current file to `<path>.bak`, but only if it is a valid save, so a damaged file never replaces the backup. Refuses (`false`, `push_error`) to overwrite a file written by a newer version.
 - `load_data(path=DEFAULT_PATH) -> Dictionary`: returns the migrated state dict, or `{}` for a new game. Sets `last_notice: String` (empty when nothing needed reporting):
   - missing file: `{}`, no notice.
@@ -229,7 +229,7 @@ Per-type keys:
 | `automation` | `AutomationDef` | `order`, `cost` |
 | `rivals` | `RivalDef` | `launch_hours` |
 | `challenges` | `ChallengeDef` | `duration`, `goal`, `reward`, `penalty` (arrays of dicts) |
-| `agi_stages` | `AgiStageDef` | `order`, `conditions`. Stages advance in order; each stage's conditions are checked once the previous stage is done. AGI compute requirements are `compute_rate_gte` (sustained FLOP/s), never a held stock. |
+| `agi_stages` | `AgiStageDef` | `order`, `conditions`. Stages unlock sequentially after the previous stage is cleared. AGI rate, energy, training-best and owned-count requirements use the best reached since the last Singularity reset. |
 | `endings` | `EndingDef` | `order`, `conditions` |
 | `events` | `EventDef` | `category`, `weight`, `cooldown`, `conditions`, `choices` |
 | `benchmarks` | `BenchmarkDef` | `badge`, `conditions`, `effects` |
@@ -269,7 +269,7 @@ Example: `content/benchmarks/first_model.tres`, `garage_to_rack.tres`, `aligned_
 | `benchmark_unlocked` | `id` | benchmark `id` unlocked |
 | `flag_set` | `id` | run flag `id` set |
 | `debt_gte` | `value` | debt ≥ value |
-| `compute_rate_gte` | `value` | compute per second (after every multiplier) ≥ value, in FLOP/s. Rate, not a held stock: AGI stages use it, since resets wipe held compute. |
+| `compute_rate_gte` | `value` | compute per second (after every multiplier) ≥ value, in FLOP/s. AGI stages compare the peak rate since the last Singularity reset. |
 
 ### Effect dicts (allowed keys)
 
@@ -362,7 +362,7 @@ State: `persist.moonshots` = `{running: [{id, left}], done: [id]}`. `SaveSystem.
 
 The AGI road, the ending choice, the rival race and the regulation challenge tiers. `sim.gd` calls `Endgame.tick` once per tick and `Endgame.launch_seconds` for rival clocks; nothing else in the core holds this logic.
 
-- Methods: `ship` (instant, Ship it), `redteam` (2 h community red-team), `full` (4 h full eval suite, then a 1 h cooldown after a failure). `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
+- Methods: `ship` (instant, Ship it), `redteam` (6 h community red-team), `full` (12 h full eval suite, then a 1 h cooldown after a failure). `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
 - Evaluations: `run.eval = {method, index, left}`. Pass chance: red-team `RED_PASS` (0.7); full suite `FULL_BASE` + `FULL_SLIDER` × alignment slider + `FULL_OPS` per ops staff, capped at `FULL_CAP` (0.97). A pass clears the stage; a fail reopens it (the full suite then cools down).
 - Ending: `majority(choices)` picks the most-used method, ties going to the most recent choice. `ending_for(choices)` maps it to `aligned` (full), `open_sourced` (redteam) or `rushed` (ship). Run ends after the fifth stage clears.
 - Counters: Assurance = full picks, Openness = redteam picks, Recklessness = ship picks. Ship picks add bad-event weight (`RECK_WEIGHT`) and severity (`RECK_SEVERITY`) to the events pool.
@@ -373,7 +373,7 @@ The AGI road, the ending choice, the rival race and the regulation challenge tie
 
 ## Save version 7
 
-`SaveSystem.VERSION = 7`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached. `persist` gains `stats.evals_passed`, `stats.ships`, `stats.solo_full/solo_redteam/solo_ship`, `stats.tier_1..3`, `redteam_uses` and `challenge_mult`; run keys `agi_choices`, `eval`, `eval_cooldown` and `race` are wiped by a new run.
+`SaveSystem.VERSION = 8`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). `_v7_to_v8` adds `run.peak_compute_rate` and `run.agi_peaks`. A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached.
 
 ## Save version 5
 

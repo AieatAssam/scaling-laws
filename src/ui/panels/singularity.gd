@@ -37,20 +37,20 @@ func _build() -> void:
 	var lb := PanelKit.section(page, "Legacy", "legacy")
 	_legacy = PanelKit.label("", PanelKit.TEXT)
 	lb.add_child(_legacy)
-	lb.add_child(PanelKit.label(
-		"Each perk multiplies its target by x%s forever. Every purchase of the same perk costs double." % PanelText.num(Sim.LEGACY_MULT),
-		PanelKit.MUTED))
+	lb.add_child(PanelKit.caption(
+		"Each perk multiplies its target by x%s forever. Every purchase of the same perk costs double." % PanelText.num(Sim.LEGACY_MULT)))
 	for key in LEGACY_KEYS:
 		var c := PanelKit.card()
 		Tip.attach(c, Callable(self, "_perk_tip").bind(key))
 		lb.add_child(c)
 		var v := _column(c)
 		v.add_child(PanelKit.label(LEGACY_KEYS[key], PanelKit.BRIGHT))
-		var info := PanelKit.label("", PanelKit.MUTED)
+		var info := PanelKit.caption()
 		v.add_child(info)
 		var buy := action_button("", false,
 			func() -> Dictionary: return Game.buy_legacy(key), "Legacy perk bought: %s." % LEGACY_KEYS[key])
 		v.add_child(buy)
+		buy.theme_type_variation = &"MicroButton"
 		_perks[key] = {"buy": buy, "info": info}
 
 	_build_agi()
@@ -59,7 +59,7 @@ func _build() -> void:
 
 	var eb := PanelKit.section(page, "Endings", "agi")
 	for d in Content.get_all("endings"):
-		var l := PanelKit.label("", PanelKit.MUTED)
+		var l := PanelKit.caption()
 		eb.add_child(l)
 		_endings.append(l)
 	_new_run = action_button("Start a new legacy", false,
@@ -69,9 +69,8 @@ func _build() -> void:
 
 func _build_agi() -> void:
 	var ab := PanelKit.section(page, "AGI road", "agi")
-	ab.add_child(PanelKit.label(
-		"Each AGI stage needs a safety decision. Clear it with one method. Most choices across the five stages set the ending; a tie goes to the latest method.",
-		PanelKit.MUTED))
+	ab.add_child(PanelKit.caption(
+		"Each AGI stage needs a safety decision. Clear it with one method. Most choices across the five stages set the ending; a tie goes to the latest method."))
 	_counters = PanelKit.label("", PanelKit.TEXT)
 	ab.add_child(_counters)
 	_trajectory = PanelKit.label("", PanelKit.BRIGHT)
@@ -84,14 +83,15 @@ func _build_agi() -> void:
 	dv.add_child(_decision)
 	_eval_bar = PanelKit.bar(PanelKit.CYAN)
 	dv.add_child(_eval_bar)
-	_eval_status = PanelKit.label("", PanelKit.MUTED)
+	_eval_status = PanelKit.caption()
 	dv.add_child(_eval_status)
 	for m in METHODS:
-		var info := PanelKit.label("", PanelKit.MUTED)
+		var info := PanelKit.caption()
 		dv.add_child(info)
 		var buy := action_button(Endgame.TITLES[m], false,
 			func() -> Dictionary: return Game.agi_choose(m), "Stage cleared: %s." % Endgame.TITLES[m])
 		dv.add_child(buy)
+		buy.theme_type_variation = &"MicroButton"
 		_choices[m] = {"buy": buy, "info": info}
 
 	for d in Content.get_all("agi_stages"):
@@ -101,7 +101,7 @@ func _build_agi() -> void:
 		ab.add_child(c)
 		var v := _column(c)
 		v.add_child(PanelKit.label(d.title, PanelKit.BRIGHT))
-		v.add_child(PanelKit.label(d.description, PanelKit.MUTED))
+		v.add_child(PanelKit.caption(d.description))
 		var st := PanelKit.label("", PanelKit.TEXT)
 		v.add_child(st)
 		_stages.append(st)
@@ -109,9 +109,9 @@ func _build_agi() -> void:
 
 func _build_rivals() -> void:
 	var rb := PanelKit.section(page, "Rival race", "rivals")
-	rb.add_child(PanelKit.label(
+	rb.add_child(PanelKit.caption(
 		"Each rival races toward its own launch from the AGI stage it targets. Outship delays it with compute; " +
-		"acqui-hiring slows it. Clearing a stage before a rival is outpaced.", PanelKit.MUTED))
+		"acqui-hiring slows it. Clearing a stage before a rival is outpaced."))
 	for d in Content.get_all("rivals"):
 		var c := PanelKit.card()
 		Tip.attach(c, Callable(self, "_rival_tip").bind(d.id))
@@ -131,10 +131,9 @@ func _build_rivals() -> void:
 
 func _build_challenges() -> void:
 	var cb := PanelKit.section(page, "Regulation challenges", "regulation")
-	cb.add_child(PanelKit.label(
+	cb.add_child(PanelKit.caption(
 		"One challenge at a time. Each has a goal checked when its time runs out: a reward if met, a penalty if not. " +
-		"A completed challenge can't be entered again. Abandoning gives neither. Tier II needs tier I passed; tier III needs tier II.",
-		PanelKit.MUTED))
+		"A completed challenge can't be entered again. Abandoning gives neither. Tier II needs tier I passed; tier III needs tier II."))
 	var running := PanelKit.card()
 	cb.add_child(running)
 	var rv := _column(running)
@@ -156,12 +155,13 @@ func _build_challenges() -> void:
 			cb.add_child(c)
 			var v := _column(c)
 			v.add_child(PanelKit.label(d.title, PanelKit.BRIGHT))
-			v.add_child(PanelKit.label(d.description, PanelKit.MUTED))
-			var info := PanelKit.label("", PanelKit.MUTED)
+			v.add_child(PanelKit.caption(d.description))
+			var info := PanelKit.caption()
 			v.add_child(info)
 			var buy := action_button("", false,
 				func() -> Dictionary: return Game.start_challenge(id), "Entered: %s." % d.title)
 			v.add_child(buy)
+			buy.theme_type_variation = &"MicroButton"
 			_challenges[id] = {"buy": buy, "info": info, "def": d}
 
 
@@ -175,10 +175,11 @@ func _column(c: Control) -> VBoxContainer:
 
 ## One race action: an info line and its button. Returns {buy, info}.
 func _race_action(parent: VBoxContainer, title: String, action: Callable) -> Dictionary:
-	var info := PanelKit.label("", PanelKit.MUTED)
+	var info := PanelKit.caption()
 	parent.add_child(info)
 	var buy := action_button(title, false, action, "%s done." % title)
 	parent.add_child(buy)
+	buy.theme_type_variation = &"MicroButton"
 	return {"buy": buy, "info": info}
 
 
@@ -324,13 +325,19 @@ func _refresh_agi(s: GameState) -> void:
 		else:
 			head = "Locked."
 		var lines: Array[String] = []
-		for cond in d.conditions:
+		for cond in Endgame.stage_conditions(s, i):
 			if cond["type"] == "compute_rate_gte":
-				lines.append(("[x] " if Rules.check(s, cond) else "[ ] ") + "Sustain %s FLOP/s (now %s/s)" % [
-					BigNum.from_float(float(cond["value"])).format(), Sim.compute_per_second(s).format()])
+				lines.append(("[x] " if Rules.check(s, cond) else "[ ] ") + "Sustain %s FLOP/s (peak %s/s, now %s/s)" % [
+					BigNum.from_float(float(cond["value"])).format(), BigNum.from_float(float(s.run["peak_compute_rate"])).format(), Sim.compute_per_second(s).format()])
 				continue
-			var cn := PanelText.condition_now(s, cond)
-			lines.append(("[x] " if cn["met"] else "[ ] ") + cn["text"])
+			if bool(cond.get("_agi_peak", false)):
+				var peak = Endgame.peak_value(s, cond)
+				var label := PanelText.condition(cond)
+				var value: String = peak.format() if peak is BigNum else str(peak)
+				lines.append(("[x] " if Rules.check(s, cond) else "[ ] ") + "%s (peak %s)" % [label, value])
+			else:
+				var cn := PanelText.condition_now(s, cond)
+				lines.append(("[x] " if cn["met"] else "[ ] ") + cn["text"])
 		_stages[i].text = head + "\n" + "\n".join(lines)
 
 
@@ -338,9 +345,9 @@ func _refresh_agi(s: GameState) -> void:
 func _choice_text(s: GameState, m: String) -> String:
 	match m:
 		"full":
-			return "Pass %s. 4 h. Fail: 1 h cooldown. +1 Assurance." % PanelKit.pct(Endgame.pass_chance(s, "full"))
+			return "Pass %s. 12 h. Fail: 1 h cooldown. +1 Assurance." % PanelKit.pct(Endgame.pass_chance(s, "full"))
 		"redteam":
-			return "Pass %s. 2 h. +1 Openness. Rivals +5%% speed for good." % PanelKit.pct(Endgame.RED_PASS)
+			return "Pass %s. 6 h. +1 Openness. Rivals +5%% speed for good." % PanelKit.pct(Endgame.RED_PASS)
 	return "Instant. +1 Recklessness: more and worse bad events this run."
 
 

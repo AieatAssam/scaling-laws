@@ -48,10 +48,11 @@ func setup(k: int, on_result: Callable) -> PanelResetCard:
 	v.add_child(_gain)
 	v.add_child(_holding)
 	v.add_child(_eta)
-	v.add_child(PanelKit.label(WIPES[k], PanelKit.MUTED))
-	_why = PanelKit.label("", PanelKit.MUTED)
+	v.add_child(PanelKit.caption(WIPES[k]))
+	_why = PanelKit.caption()
 	v.add_child(_why)
 	_button = PanelKit.button("", Callable(), false)
+	_button.theme_type_variation = &"MicroButton"   # 8 px: "Run +N Breakthroughs" fits the card width
 	_button.pressed.connect(func() -> void: _dialog.popup_centered())
 	v.add_child(_button)
 	_dialog = ConfirmationDialog.new()

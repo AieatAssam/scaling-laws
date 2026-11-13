@@ -11,3 +11,5 @@ icon = "open_sourced"
 order = 2
 method = "redteam"
 conditions = Array[Dictionary]([])
+legacy_payout = 2.0
+epilogue = "The weights go up on a public mirror the same afternoon. Nobody agrees on what they mean, but everyone can read them."

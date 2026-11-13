@@ -9,4 +9,4 @@ title = "The Loss Landscape Has Snacks"
 blurb = "A smooth loss surface hides biscuit crumbs."
 conditions = Array[Dictionary]([])
 weight = 1.0
-choices = Array[Dictionary]([{"label": "Publish", "effects": [{"type": "timed_mod", "key": "cash", "value": 1.005, "seconds": 600.0}]}, {"label": "Productise", "effects": [{"type": "cash_seconds", "value": 2.0}]}, {"label": "Keep proprietary", "effects": [{"type": "timed_mod", "key": "training", "value": 1.005, "seconds": 900.0}]}])
+choices = Array[Dictionary]([{"label": "Publish", "effects": [{"type": "timed_mod", "key": "cash", "value": 1.3, "seconds": 600.0}]}, {"label": "Productise", "effects": [{"type": "cash_seconds", "value": 90.0}]}, {"label": "Keep proprietary", "effects": [{"type": "timed_mod", "key": "training", "value": 1.5, "seconds": 900.0}]}])

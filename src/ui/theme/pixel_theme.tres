@@ -301,9 +301,9 @@ anti_aliasing = false
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_7fdmf"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_v1r1a"]
-content_margin_left = 2.0
+content_margin_left = 6.0
 content_margin_top = 4.0
-content_margin_right = 2.0
+content_margin_right = 6.0
 content_margin_bottom = 4.0
 bg_color = Color(0.23921569, 0.24705882, 0.47843137, 1)
 border_width_left = 2
@@ -314,9 +314,9 @@ border_color = Color(0.2901961, 0.32941177, 0.40784314, 1)
 anti_aliasing = false
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_whtv0"]
-content_margin_left = 2.0
+content_margin_left = 6.0
 content_margin_top = 4.0
-content_margin_right = 2.0
+content_margin_right = 6.0
 content_margin_bottom = 4.0
 bg_color = Color(0.24705882, 0.8392157, 0.8117647, 1)
 border_width_left = 2
@@ -327,9 +327,9 @@ border_color = Color(0.2901961, 0.32941177, 0.40784314, 1)
 anti_aliasing = false
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bygbr"]
-content_margin_left = 2.0
+content_margin_left = 6.0
 content_margin_top = 4.0
-content_margin_right = 2.0
+content_margin_right = 6.0
 content_margin_bottom = 4.0
 bg_color = Color(0.078431375, 0.101960786, 0.18039216, 1)
 border_width_left = 2
@@ -340,9 +340,9 @@ border_color = Color(0.2901961, 0.32941177, 0.40784314, 1)
 anti_aliasing = false
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ruwsx"]
-content_margin_left = 2.0
+content_margin_left = 6.0
 content_margin_top = 4.0
-content_margin_right = 2.0
+content_margin_right = 6.0
 content_margin_bottom = 4.0
 bg_color = Color(0.24705882, 0.8392157, 0.8117647, 1)
 border_width_left = 2
@@ -446,6 +446,9 @@ MicroDim/colors/font_color = Color(0.49803922, 0.54509807, 0.6392157, 1)
 MicroDim/font_sizes/font_size = 8
 MicroLabel/base_type = &"Label"
 MicroLabel/font_sizes/font_size = 8
+MicroValue/base_type = &"Label"
+MicroValue/colors/font_color = Color(1, 0.7019608, 0.2784314, 1)
+MicroValue/font_sizes/font_size = 8
 Panel/styles/panel = SubResource("StyleBoxFlat_b04yd")
 PanelContainer/styles/panel = SubResource("StyleBoxFlat_jealq")
 PopupPanel/styles/panel = SubResource("StyleBoxFlat_x2t7y")

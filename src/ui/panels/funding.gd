@@ -17,7 +17,7 @@ func _build() -> void:
 	var box := PanelKit.section(page, "Staff", "hiring")
 	_equity = PanelKit.label("", PanelKit.TEXT)
 	box.add_child(_equity)
-	_hint = PanelKit.label("", PanelKit.MUTED)
+	_hint = PanelKit.caption()
 	box.add_child(_hint)
 	_picker = AmountPicker.new().setup("Hire", AMOUNTS, "Hire")
 	_picker.changed.connect(func(_a: int) -> void: _refresh())
@@ -35,16 +35,17 @@ func _build() -> void:
 		head.add_child(PanelKit.icon(role, 2.0, PanelKit.WORKER))
 		head.add_child(PanelKit.label(d.title, PanelKit.BRIGHT))
 		v.add_child(head)
-		var info := PanelKit.label("", PanelKit.MUTED)
+		var info := PanelKit.caption()
 		v.add_child(info)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
 		v.add_child(row)
 		var hire := PanelKit.button("", Callable(), false)
-		hire.custom_minimum_size = Vector2(120, PanelKit.TOUCH_H)
+		hire.custom_minimum_size = Vector2(128, PanelKit.TOUCH_H)
 		hire.size_flags_horizontal = Control.SIZE_SHRINK_END
 		hire.pressed.connect(_hire.bind(role, hire))
 		row.add_child(hire)
+		hire.theme_type_variation = &"MicroButton"
 		_staff[role] = {"hire": hire, "info": info, "def": d}
 
 

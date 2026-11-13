@@ -44,6 +44,7 @@ func _build() -> void:
 		var b := action_button(PanelKit.pct(p), false,
 			func() -> Dictionary: return Game.set_slider(p), "Alignment set to %s." % PanelKit.pct(p))
 		row.add_child(b)
+		b.theme_type_variation = &"MicroButton"
 		_presets.append(b)
 
 	var rb := PanelKit.section(page, "Research", "research")

@@ -3,7 +3,7 @@ extends VBoxContainer
 ## Research list grouped by branch. Each row shows cost, effects, status and a Buy button.
 
 const BRANCH_NAMES := {
-	"": "General", "dense": "Dense branch", "moe": "Mixture-of-experts branch", "ssm": "State-space branch",
+	"": "General", "dense": "Dense branch", "moe": "Mixture of experts branch", "ssm": "State-space branch",
 }
 
 var _rows: Dictionary = {}   # id -> {buy: Button, status: Label, cost: float}
@@ -42,12 +42,13 @@ func build(on_result: Callable) -> void:
 			info += " · Effects: " + (", ".join(fx) if not fx.is_empty() else "none")
 			if not pre.is_empty():
 				info += " · Needs: " + ", ".join(pre)
-			v.add_child(PanelKit.label(info, PanelKit.MUTED))
-			var status := PanelKit.label("", PanelKit.MUTED)
+			v.add_child(PanelKit.caption(info))
+			var status := PanelKit.caption()
 			v.add_child(status)
 			var buy := PanelKit.button("", Callable(), false)
 			buy.pressed.connect(func() -> void: _buy(id))
 			v.add_child(buy)
+			buy.theme_type_variation = &"MicroButton"
 			_rows[id] = {"buy": buy, "status": status, "cost": float(d.cost)}
 	refresh()
 

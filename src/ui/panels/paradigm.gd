@@ -19,12 +19,12 @@ func _build() -> void:
 	_stock = PanelKit.label("", PanelKit.TEXT)
 	box.add_child(_stock)
 	Tip.attach(_stock, Callable(self, "_meter_tip"))
-	_rates = PanelKit.label("", PanelKit.MUTED)
+	_rates = PanelKit.caption()
 	box.add_child(_rates)
 
 	var ab := PanelKit.section(page, "Automation", "automation")
-	ab.add_child(PanelKit.label(
-		"Automation only buys things for you. Each one is bought once and then runs on every tick.", PanelKit.MUTED))
+	ab.add_child(PanelKit.caption(
+		"Automation only buys things for you. Each one is bought once and then runs on every tick."))
 	for d in Content.get_all("automation"):
 		var id: String = d.id
 		var c := PanelKit.card()
@@ -33,24 +33,25 @@ func _build() -> void:
 		v.add_theme_constant_override("separation", 4)
 		c.add_child(v)
 		v.add_child(PanelKit.label(d.title, PanelKit.BRIGHT))
-		v.add_child(PanelKit.label(d.description, PanelKit.MUTED))
-		var status := PanelKit.label("", PanelKit.MUTED)
+		v.add_child(PanelKit.caption(d.description))
+		var status := PanelKit.caption()
 		v.add_child(status)
 		var buy := action_button("", false,
 			func() -> Dictionary: return Game.buy_automation(id), "Automation bought: %s." % d.title)
 		v.add_child(buy)
+		buy.theme_type_variation = &"MicroButton"
 		_autos[id] = {"buy": buy, "status": status, "cost": float(d.cost)}
 		Tip.attach(c, Callable(self, "_auto_tip").bind(id))
 
 	var mb := PanelKit.section(page, "Moonshots", "breakthroughs")
-	mb.add_child(PanelKit.label("Long projects, one at a time. A project runs in real time, even offline, and its reward lasts through every reset.", PanelKit.MUTED))
+	mb.add_child(PanelKit.caption("Long projects, one at a time. A project runs in real time, even offline, and its reward lasts through every reset."))
 	for i in 2:
 		var sl := PanelKit.label("", PanelKit.TEXT)
 		var sb := PanelKit.bar(PanelKit.TEAL)
 		mb.add_child(sl)
 		mb.add_child(sb)
 		_slots.append({"label": sl, "bar": sb})
-	_done = PanelKit.label("", PanelKit.MUTED)
+	_done = PanelKit.caption()
 	mb.add_child(_done)
 	Tip.attach(_done, Callable(self, "_done_tip"))
 	for d in Content.get_all("moonshots"):
@@ -64,12 +65,13 @@ func _build() -> void:
 		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(text)
 		text.add_child(PanelKit.label(d.title, PanelKit.BRIGHT))
-		var meta := PanelKit.label("", PanelKit.MUTED)
+		var meta := PanelKit.caption()
 		text.add_child(meta)
 		var btn := action_button("Start", false,
 			func() -> Dictionary: return Game.start_moonshot(id), "Moonshot started: %s." % d.title)
 		btn.size_flags_horizontal = Control.SIZE_SHRINK_END
-		btn.custom_minimum_size.x = 92.0
+		btn.custom_minimum_size.x = 56.0
+		btn.theme_type_variation = &"MicroButton"
 		row.add_child(btn)
 		_moons[id] = {"card": c, "meta": meta, "btn": btn}
 		Tip.attach(c, Callable(self, "_moon_tip").bind(id))

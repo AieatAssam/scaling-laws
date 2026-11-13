@@ -19,6 +19,11 @@ static func check_all(s: GameState, conds: Array) -> bool:
 
 
 static func check(s: GameState, c: Dictionary) -> bool:
+	if bool(c.get("_agi_peak", false)):
+		var peak = Endgame.peak_value(s, c)
+		if peak is BigNum:
+			return peak.compare(BigNum.from_float(float(c["value"]))) >= 0
+		return float(peak) >= float(c["value"])
 	match c["type"]:
 		"owned_gte":
 			return s.owned(c["id"]) >= int(c["value"])
@@ -159,6 +164,38 @@ static func training_bonus_for(best: float, best_all: float) -> float:
 	return (1.0 + 0.05 * best) * (1.0 + 0.01 * best_all)
 
 
+## The always-visible headline: compute rate, lab era and the current frontier objective.
+static func headline(s: GameState) -> Dictionary:
+	var stage_name := "Garage"
+	var top := -1
+	for i in LabData.IDS.size():
+		if s.owned(LabData.IDS[i]) > 0:
+			top = i
+	if top == 6: stage_name = "Office"
+	elif top == 7: stage_name = "Data centre"
+	elif top == 8: stage_name = "Orbit"
+	elif top == 9 or top == 10: stage_name = "Swarm"
+	elif top >= 11: stage_name = "Universe"
+
+	if s.resets(4) > 0:
+		var stages: Array = s.db.get_all("agi_stages")
+		var i := mini(int(s.run["stage"]), stages.size() - 1)
+		var progress := 1.0 if stages.is_empty() else conditions_progress(s, Endgame.stage_conditions(s, i))
+		var trajectory := Endgame.trajectory(s).to_lower().replace("-sourced", "")
+		return {"scale": Sim.compute_per_second(s), "stage_name": stage_name,
+			"line": "AGI %d/5 %d%%%s" % [mini(int(s.run["stage"]) + 1, 5), roundi(progress * 100.0), " (%s)" % trajectory if trajectory != "" else ""],
+			"highlight": false, "currency": "agi"}
+
+	var layer := 1
+	while layer < 4 and s.resets(layer) > 0:
+		layer += 1
+	var preview := Sim.reset_preview(s, layer)
+	var gain := BigNum.from_float(float(preview["gain"]))
+	return {"scale": Sim.compute_per_second(s), "stage_name": stage_name,
+		"line": "%s +%s on reset" % [(preview["holding"] as BigNum).format(), gain.format()],
+		"highlight": bool(preview["highlight"]), "currency": str(preview["currency"])}
+
+
 # ---------------------------------------------------------------- progress toward goals
 
 ## Goal kinds that rank first when within BIG_BONUS of the nearest goal (see next_goals).
@@ -172,6 +209,13 @@ static func condition_progress(s: GameState, c: Dictionary) -> float:
 	if check(s, c):
 		return 1.0
 	var p := 0.0
+	if bool(c.get("_agi_peak", false)):
+		var peak = Endgame.peak_value(s, c)
+		if peak is BigNum:
+			p = _log_progress(peak, BigNum.from_float(float(c["value"])))
+		else:
+			p = _linear(float(peak), float(c["value"]))
+		return clampf(p, 0.0, 0.99)
 	match c["type"]:
 		"currency_gte":
 			p = _log_progress(s.cur(c["id"]), BigNum.from_float(float(c["value"])))
@@ -313,7 +357,7 @@ static func next_goals(s: GameState, n: int) -> Array:
 	var stage := int(s.run["stage"])
 	if stage < stages.size() and (s.resets(3) > 0 or s.resets(4) > 0):
 		var st = stages[stage]
-		goals.append(_goal("agi", st.id, st.title, conditions_progress(s, st.conditions), st.description))
+		goals.append(_goal("agi", st.id, st.title, conditions_progress(s, Endgame.stage_conditions(s, stage)), st.description))
 	goals.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return a["progress"] + _big_bonus(a) > b["progress"] + _big_bonus(b))
 	return goals.slice(0, n)

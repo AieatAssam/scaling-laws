@@ -9,6 +9,10 @@ const LAYER_ART := ["", "funding", "generation", "paradigm", "singularity"]
 
 var _percent: Label
 var _overall: ProgressBar
+var _headline_scale: Label
+var _headline_stage: Label
+var _headline_icon: TextureRect
+var _headline_line: Label
 var _parts := {}   # part id -> {count: Label, bar: ProgressBar}
 var _v := {}       # row key -> value Label
 var _cells := {}   # layer k -> {resets, fastest, last, gain: Label, icon: TextureRect, holding: Label}
@@ -23,6 +27,38 @@ func _build() -> void:
 	head.theme_type_variation = &"Heading"
 	top.add_child(head)
 	top.add_child(PanelKit.button("Close", hide, true))
+	var headline := VBoxContainer.new()
+	headline.add_theme_constant_override("separation", 0)
+	page.add_child(headline)
+	var scale_row := HBoxContainer.new()
+	scale_row.add_theme_constant_override("separation", 4)
+	headline.add_child(scale_row)
+	var scale_icon := PanelKit.icon("compute", 0.5)
+	scale_row.add_child(scale_icon)
+	Tip.attach(scale_icon, "Lab scale\nCurrent compute rate (FLOP/s), after all multipliers.")
+	var scale_title := PanelKit.label("Lab scale", PanelKit.TEXT, false)
+	scale_title.theme_type_variation = &"MicroLabel"
+	scale_row.add_child(scale_title)
+	_headline_scale = PanelKit.label("", PanelKit.BRIGHT, false)
+	_headline_scale.theme_type_variation = &"Value"
+	_headline_scale.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scale_row.add_child(_headline_scale)
+	Tip.attach(scale_title, "Lab scale\nThe largest score: current compute output per second.")
+	_headline_stage = PanelKit.label("", PanelKit.BRIGHT, false)
+	_headline_stage.theme_type_variation = &"MicroLabel"
+	_headline_stage.add_theme_color_override("font_color", Fx.col(Fx.ACCENT))
+	scale_row.add_child(_headline_stage)
+	var stage_row := HBoxContainer.new()
+	stage_row.add_theme_constant_override("separation", 4)
+	headline.add_child(stage_row)
+	_headline_icon = PanelKit.icon("equity", 0.5)
+	stage_row.add_child(_headline_icon)
+	_headline_line = PanelKit.label("", PanelKit.TEXT, false)
+	_headline_line.theme_type_variation = &"MicroLabel"
+	stage_row.add_child(_headline_line)
+	Tip.attach(_headline_stage, "Lab stage\nThe lab's current location, based on its highest producer tier.")
+	Tip.attach(_headline_icon, Callable(self, "_headline_tip"))
+	Tip.attach(_headline_line, Callable(self, "_headline_tip"))
 
 	var comp := _section("Completion")
 	_percent = PanelKit.label("", PanelKit.BRIGHT, false)
@@ -150,6 +186,12 @@ func _cell(text: String, accent: bool) -> Label:
 
 func _refresh() -> void:
 	var s: GameState = Game.state
+	var headline := Rules.headline(s)
+	_headline_scale.text = "%s/s" % (headline["scale"] as BigNum).format()
+	_headline_stage.text = str(headline["stage_name"])
+	_headline_icon.texture = Fx.tex_fit("res://assets/icons/%s.png" % headline["currency"], Vector2i(16, 16))
+	_headline_line.text = str(headline["line"])
+	_headline_line.add_theme_color_override("font_color", Fx.col(Fx.ACCENT if headline["highlight"] else Fx.MUTED))
 	var p := s.persist
 	var stats: Dictionary = p["stats"]
 	var c := Records.completion(s)
@@ -190,6 +232,10 @@ func _refresh() -> void:
 	_v["success"].text = PanelKit.pct(float(trains - failed) / trains) if trains > 0 else "-"
 	_v["best_gen"].text = "%.2f" % float(s.run["layers"][2]["best"])
 	_v["best_all"].text = "%.2f" % float(p["best_all"])
+
+
+func _headline_tip() -> String:
+	return "AGI road\nStage requirements progress and the current ending trajectory." if Game.state.resets(4) > 0 else "Frontier reset\nCurrent layer currency and the gain available on reset. Highlighted when the gain is at least twice your holding."
 
 
 func _refresh_layers(s: GameState) -> void:

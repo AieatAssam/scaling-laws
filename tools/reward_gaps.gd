@@ -20,7 +20,8 @@ extends "res://tools/simulate.gd"
 
 const RG_BIG := ["tier", "automation", "moonshot", "reset", "agi", "ending", "unlock"]
 const RG_KINDS := ["tier", "milestone", "hire", "research", "automation", "legacy", "training", "benchmark",
-	"challenge", "rival", "upgrade", "launch", "paper", "moonshot", "reset", "agi", "ending", "unlock"]
+	"challenge", "rival", "upgrade", "launch", "paper", "moonshot", "reset", "agi", "ending", "unlock",
+	"news", "eval", "outpaced"]
 const RG_PHASES := [[0.0, 1.0], [1.0, 4.0], [4.0, 12.0], [12.0, 24.0], [24.0, 48.0], [48.0, 72.0], [72.0, 1e9]]
 const RG_PHASE_NAMES := ["0-1 h", "1-4 h", "4-12 h", "12-24 h", "day 2", "day 3", "day 4+"]
 const RG_TABS := ["", "Funding", "Generation", "Paradigm", "Singularity"]
@@ -48,6 +49,7 @@ var rg_dry_start := {"p": -1.0, "d": -1.0}
 var rg_dry_state := {"p": {}, "d": {}}
 var rg_evs := {}                    # event kind -> count seen by _handle
 var rg_end := 0.0
+var rg_news_seen := false
 
 
 # ---------------------------------------------------------------- hooks (every one calls super)
@@ -144,6 +146,15 @@ func _handle(evs: Array) -> void:
 				_reward("ending", "ENDING %s" % e["id"], true)
 			"moonshot_done":
 				_reward("moonshot", "moonshot %s" % e["id"], true)
+			"news":
+				if not rg_news_seen:
+					rg_news_seen = true
+					_reward("news", "first news caught (%s)" % e["id"], true)
+				_reward("news", "news caught (%s)" % e["id"], false)
+			"agi_cleared", "agi_failed":
+				_reward("eval", "%s %s stage %d" % [e["method"] if e.has("method") else e["kind"], e["kind"], int(e["index"])], false)
+			"rival_outpaced":
+				_reward("outpaced", "rival outpaced: %s" % e["id"], false)
 			"paper_resolved":
 				_reward("paper", "paper %s (choice %d)" % [e["id"], int(e["choice"])], false)
 	super._handle(evs)

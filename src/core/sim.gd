@@ -478,6 +478,7 @@ static func perform_reset(s: GameState, k: int) -> Dictionary:
 	var p := reset_preview(s, k)
 	if not p["allowed"]:
 		return _fail(p["reason"])
+	Endgame.track_peaks(s)
 	var keep := Moonshots.before_wipe(s, k)
 	for j in k:
 		s.run["layers"][j] = GameState.fresh_layer()
@@ -485,6 +486,9 @@ static func perform_reset(s: GameState, k: int) -> Dictionary:
 	Moonshots.after_wipe(s, k, keep)
 	var L: Dictionary = s.run["layers"][k]
 	if k == 2: L["desk"] = GameState.fresh_layer()["desk"]
+	if k == 4:
+		s.run["peak_compute_rate"] = 0.0
+		s.run["agi_peaks"] = {"owned": {}, "energy": 0.0, "training_best": 0.0}
 	L["life"] = BigNum.new()
 	L["clock"] = 0.0
 	s.add_cur(p["currency"], _big(float(p["gain"]) + Moonshots.bonus_gain(s, k)))

@@ -10,5 +10,5 @@ description = "Ship a new model. Unlocks research and the alignment slider."
 icon = "insights"
 index = 2
 currency = "insights"
-threshold = 7000000.0
+threshold = 1.0e9
 target_hours = 4.0
