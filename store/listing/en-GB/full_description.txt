@@ -1,0 +1,19 @@
+Scaling Laws is an idle game about building an AI lab from a garage.
+
+Start small. Rent a few Intern Laptops and switch on some Cloud GPUs. Compute builds up on its own, even while you are doing something else, and each purchase makes the next one worth more.
+
+Then put that compute to work:
+- Train models. Choose a training run, from a quick Fine-tune to a long Frontier run, and collect the results when it finishes.
+- Publish papers. Your research desk turns results into papers. Publish them, productise the good ones, or keep them proprietary.
+- Hire a team. Engineers, ops staff and researchers make every part of the lab work better. Hiring costs equity, so each hire is a choice.
+- Take a Funding Round when the lab is ready to start again. The equity you earn carries into the next push.
+
+Come back later. The lab keeps working while the game is closed. Time away is credited at half speed for up to 24 hours, and a summary shows what you earned while you were gone.
+
+Keep an eye on the numbers. The statistics screen shows how fast your lab grows, how long each run has lasted and what you have achieved in total.
+
+Scaling Laws is calm and self-paced. There are no timers to beat and no pressure to log in.
+
+There is much more beyond the first few hours: more ways to grow, more to research, and a lot of scale still to reach.
+
+No ads, no in-app purchases, no account. Works offline.
