@@ -1,0 +1,52 @@
+[
+  {
+    "file": "00_garage.ogg",
+    "title": "Flowerbed Fields [Loop]",
+    "author": "Zane Little Music",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://opengameart.org/content/flowerbed-fields-loop",
+    "from_stage": 0,
+    "changes": "converted WAV to OGG Vorbis, loudness normalised to -18 LUFS; not trimmed or faded (loop)"
+  },
+  {
+    "file": "01_startup.ogg",
+    "title": "Beyond cosmos",
+    "author": "Centurion_of_war",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://opengameart.org/content/beyond-cosmos",
+    "from_stage": 1,
+    "changes": "converted to OGG, loudness normalised to -18 LUFS; not trimmed or faded (loop)"
+  },
+  {
+    "file": "02_datacentre.ogg",
+    "title": "Cybermatic pulse (LOOP)",
+    "author": "Alexandr Zhelanov",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "source_url": "https://opengameart.org/content/cybermatic-pulse",
+    "from_stage": 2,
+    "changes": "seamless loop kept whole (3:54, not trimmed, no fade), loudness normalised, converted to OGG"
+  },
+  {
+    "file": "03_planetary.ogg",
+    "title": "Drifting Through the Nebula (Ambient)",
+    "author": "HitCtrl",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://opengameart.org/content/drifting-through-the-nebula-ambient",
+    "from_stage": 3,
+    "changes": "trimmed to 3:00 with 3 s fade-out, loudness normalised, converted to OGG"
+  },
+  {
+    "file": "04_beyond.ogg",
+    "title": "Biolumina",
+    "author": "Tsorthan Grove",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://opengameart.org/content/biolumina",
+    "from_stage": 4,
+    "changes": "trimmed to 3:00 with 3 s fade-out, loudness normalised, converted to OGG"
+  }
+]
