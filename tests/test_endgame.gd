@@ -99,7 +99,7 @@ func test_agi_peak_requirements_survive_lower_layer_wipes_and_unlock_sequentiall
 	s.set_cur("energy", BigNum.new())
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 1)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 0)[0]))
-	s.run["peak_compute_rate"] = 5e10
+	s.run["peak_compute_rate"] = 1.1e11
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 2)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 3)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 4)[0]))
@@ -319,7 +319,7 @@ func test_ship_it_makes_bad_events_costlier_not_likelier() -> void:
 	assert_almost_eq(float(Endgame.event_effect(s, bad, {"type": "add_slider", "value": -0.2})["value"]), -0.05, 1e-9,
 		"recklessness cannot push alignment below the debt threshold")
 	var equity := {"type": "add_currency", "id": "equity", "value": -1.0}
-	assert_almost_eq(float(Endgame.event_effect(s, bad, equity)["value"]), -1.5, 1e-9, "reputation loss x1.5")
+	assert_eq(Endgame.event_effect(s, bad, equity), equity, "equity losses cannot block engineer hires")
 	var compute := {"type": "add_currency", "id": "compute", "value": -1000.0}
 	assert_eq(Endgame.event_effect(s, bad, compute), compute, "compute is production: never made worse")
 	var timed := {"type": "timed_mod", "key": "rate", "value": 0.5, "seconds": 60.0}
@@ -334,12 +334,17 @@ func test_ship_it_cuts_the_next_stage_requirement_by_thirty_percent() -> void:
 	assert_true(Endgame.start_choice(s, "ship")["ok"])
 	var cut: Array = Endgame.stage_conditions(s, 1)
 	assert_eq(int(cut[0]["value"]), 14, "30% off: 14 racks")
+	assert_eq(int(Endgame.stage_conditions(s, 1, "full")[0]["value"]), 34, "preview uses the method that will clear the prior stage")
 	var gate := Endgame.stage_conditions(s, 4)
-	assert_almost_eq(float(gate[0]["value"]), 4e10 * 0.7, 1e-3, "compute rate cut too")
+	assert_almost_eq(float(gate[0]["value"]), 1e11 * 0.7, 1e-3, "compute rate cut too")
 	assert_eq(gate[1]["type"], "resets_gte", "reset gates are never cut")
 	assert_eq(int(gate[1]["value"]), 1)
-	s.run["agi_choices"].append("full")
-	assert_eq(int(Endgame.stage_conditions(s, 1)[0]["value"]), 20, "a full eval as the last decision cuts nothing")
+	s.run["agi_choices"] = ["full"]
+	assert_eq(int(Endgame.stage_conditions(s, 1)[0]["value"]), 34, "full suite raises the next numeric requirement by 70%")
+	assert_almost_eq(float(Endgame.stage_conditions(s, 3)[0]["value"]), Sim.ENERGY_CAP, 1e-3, "scaled energy cannot exceed its 100-unit cap")
+	assert_almost_eq(float(Endgame.stage_conditions(s, 4)[0]["value"]), 1e11 * 1.7, 1e-3, "full suite raises the final rate gate too")
+	s.run["agi_choices"] = ["redteam"]
+	assert_eq(int(Endgame.stage_conditions(s, 1)[0]["value"]), 20, "red-team leaves the next requirement at baseline")
 
 
 func test_ending_pays_its_legacy() -> void:

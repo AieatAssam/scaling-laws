@@ -21,10 +21,10 @@ const RED_SECONDS := 21600.0
 const RED_PASS := 0.7
 const RED_SPEED := 0.05          # rival speed per community red-team run, persistent (persist.redteam_uses)
 const SHIP_CUT := 0.7            # the stage after a Ship it choice needs 30% less of each numeric requirement
+const FULL_SCALE := 1.7          # a full suite raises the next stage's numeric requirements by 70%
 const RECK_RIVAL := 0.1          # rival speed per Ship it choice in this run (rivals hear about the release)
-const RECK_SEVERITY := 0.25      # bad events: alignment and reputation losses per Ship it choice in this run
+const RECK_SEVERITY := 0.25      # negative alignment event loss per Ship it choice in this run
 const BAD_CATEGORIES := ["incident", "outage"]
-const RECK_CURRENCY := "equity"  # the reputation-like currency that bad events cost under recklessness
 const ACQUI_SPEED := 0.75
 const ACQUI_CASH_SECONDS := 7200.0
 const ACQUI_COOLDOWN := 3600.0
@@ -84,21 +84,25 @@ static func pending_index(s: GameState) -> int:
 	return idx if idx < int(s.run["stage"]) and idx < s.db.get_all("agi_stages").size() else -1
 
 
-## Conditions of the stage at `index` (0-based) as they now stand. A Ship it choice as the last decision cuts the next
-## stage's numeric requirements by SHIP_CUT; integer gates (resets_gte, owned counts stay whole) are cut the same way
-## except resets_gte, which is a layer-reset gate and never cut.
-static func stage_conditions(s: GameState, index: int) -> Array:
+## Conditions of the stage at `index` (0-based) as they now stand. The last choice scales the next stage's numeric
+## requirements by SHIP_CUT / 1.0 / FULL_SCALE for ship / red-team / full; resource caps and resets_gte are unchanged.
+static func stage_conditions(s: GameState, index: int, previous_method: String = "") -> Array:
 	var stages: Array = s.db.get_all("agi_stages")
 	var conds: Array = stages[index].conditions
 	var choices: Array = s.run["agi_choices"]
-	var ship_cut: bool = not choices.is_empty() and choices.back() == "ship"
+	var requirement_scale := 1.0
+	var method := previous_method if previous_method != "" else String(choices.back()) if not choices.is_empty() else ""
+	if method != "":
+		requirement_scale = SHIP_CUT if method == "ship" else FULL_SCALE if method == "full" else 1.0
 	var out: Array = []
 	for c in conds:
 		var d: Dictionary = c.duplicate()
 		if ["compute_rate_gte", "owned_gte", "currency_gte", "training_best_gte"].has(d["type"]):
 			d["_agi_peak"] = true
-		if ship_cut and d["type"] != "resets_gte" and d.has("value"):
-			d["value"] = float(d["value"]) * SHIP_CUT
+		if d["type"] != "resets_gte" and d.has("value"):
+			d["value"] = float(d["value"]) * requirement_scale
+			if d["type"] == "currency_gte" and d["id"] == "energy":
+				d["value"] = minf(float(d["value"]), Sim.ENERGY_CAP)
 		out.append(d)
 	return out
 
@@ -398,28 +402,23 @@ static func challenge_effect(s: GameState, e: Dictionary) -> Dictionary:
 
 # ---------------------------------------------------------------- recklessness (bad events)
 
-## Ship it choices this run: more and worse bad events.
+## Ship it choices this run: worse alignment losses from bad events.
 static func reckless(s: GameState) -> int:
 	return int(counts(s.run["agi_choices"])["ship"])
 
 
-## Pool weight of an event. Recklessness does not make events likelier: it makes their costs harsher (see event_effect).
+## Pool weight of an event. Recklessness does not make events likelier.
 static func event_weight(_s: GameState, d) -> float:
 	return float(d.weight)
 
 
-## An event effect as applied: bad events' alignment and reputation losses are scaled by severity. Extra alignment
-## loss stops at the slider value where debt starts, so recklessness cannot add a production penalty.
+## Recklessness only worsens alignment losses; it cannot reduce production or hiring resources.
 static func event_effect(s: GameState, d, e: Dictionary) -> Dictionary:
 	var n := reckless(s)
 	if n == 0 or not BAD_CATEGORIES.has(d.category):
 		return e
-	var sev := 1.0 + RECK_SEVERITY * float(n)
-	var v := float(e.get("value", 0.0))
+	if e["type"] != "add_slider" or float(e.get("value", 0.0)) >= 0.0:
+		return e
 	var out: Dictionary = e.duplicate()
-	var reputation: bool = e["type"] == "add_currency" and e.get("id", "") == RECK_CURRENCY
-	if e["type"] == "add_slider" and v < 0.0:
-		out["value"] = maxf(v * sev, Sim.SLIDER_SAFE - float(s.run["slider"]))
-	elif reputation and v < 0.0:
-		out["value"] = v * sev
+	out["value"] = maxf(float(e["value"]) * (1.0 + RECK_SEVERITY * float(n)), Sim.SLIDER_SAFE - float(s.run["slider"]))
 	return out

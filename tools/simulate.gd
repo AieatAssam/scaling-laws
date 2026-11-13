@@ -6,8 +6,8 @@ extends SceneTree
 ## Prints an unlock timeline and a pacing report. Exits 1 with "CHECK FAILED: ..." lines when a check fails.
 ## Times are game hours from the start of the run. The strategy: best-payback producers, staff, research on one
 ## architecture branch (seed % 3), training run type by Sim.pick_training (the same rule auto_train uses), events by a simple score, slider set for the
-## target ending, automation, legacy, challenges. A layer is reset when it is highlighted (gain >= 2 and >= 2x its
-## holding), or when its gain is >= 1 and has stopped rising for STALL_FACTOR times as long as it took to reach it.
+## target ending, automation, legacy, challenges. A layer resets on a highlight (gain >= 2 and >= 2x holding), or on a
+## stalled gain in its first epoch; Funding keeps stall resets until the first Paradigm Shift.
 ## The strategy reads only economy state; LayerDef.target_hours is printed as the design target, nothing more.
 ##
 ## Gating checks:
@@ -20,8 +20,8 @@ extends SceneTree
 ##     rule needs gain >= 2x holding, so cycle length grows by design), and each epoch's first
 ##     cycle must beat epoch 0's first cycle of the same layer (kept bonuses pay off).
 ##   Generation policy: once the research tree is bought, Model Generation resets are skipped (insights have no use).
-##   Shared policy: the slider stays at 0.5 until the Singularity, then goes to 0.9, whatever the ending. Events are
-##     scored the same way for every ending. The --ending flag changes only the AGI stage method.
+##   Shared policy: the slider stays at 0.5 throughout. Events are scored the same way for every ending. The --ending
+##     flag changes only the AGI stage method.
 ##   AGI policy: each stage is cleared by its target ending's method (aligned full suite, open_sourced red-team,
 ##     rushed ship it), so the majority of five choices gives that ending.
 ##   --probe: prints Generation and Paradigm reset decisions and compute/s crossings (diagnostics only, no gate).
@@ -49,7 +49,7 @@ const LATER_EPOCH_MIN_RATE := 0.7 # epochs > 0: cycles 2.. must earn at least th
 const ENDING_EARLIEST := 216.0 * HOUR   # 9 d: the AGI ending must not come sooner
 const ENDING_LATEST := 336.0 * HOUR     # 14 d
 const SLIDER_EARLY := 0.5   # every ending: alignment before the Singularity
-const SLIDER_LATE := 0.9    # every ending: alignment once the Singularity is reached
+const SLIDER_LATE := 0.5    # every ending: shared slider policy throughout the run
 const RESEARCH_COMMON := ["cluster_scheduler", "data_curation", "data_dedupe", "eval_harness", "mixed_precision", "inference_cache"]
 const RESEARCH_BRANCH := {
 	"dense": ["dense_base", "dense_wide", "dense_deep", "dense_rlhf", "dense_scale"],
@@ -98,6 +98,9 @@ var picks: Array = []                                  # [seconds, run id, log10
 var upgrades_bought := 0                              # lab upgrades bought over the whole run (end state is wiped by Singularity)
 var moon_log: Array = []                              # [time, label] moonshot starts and completions, and automation buys (cadence line)
 var news_spawned := 0                                  # breaking-news headlines shown; the scripted player catches every other one
+var agi_timeline: Array = []
+var singularity_resets: Array = []
+var rival_timeline: Array = []
 
 
 func _initialize() -> void:
@@ -111,6 +114,8 @@ func _initialize() -> void:
 		cross_all.append(-1.0)
 		cross_post.append(-1.0)
 	branch = ["dense", "moe", "ssm"][absi(seed_value) % 3]
+	for i in content.get_all("agi_stages").size():
+		agi_timeline.append({"met": -1.0, "chosen": -1.0, "cleared": -1.0, "method": "", "failures": 0, "cooldowns": 0})
 	_run()
 	quit(_report())
 
@@ -429,6 +434,10 @@ func _agi() -> void:
 		return
 	var r := Endgame.start_choice(s, method)
 	if r["ok"]:
+		var stage := int(r["index"])
+		if float(agi_timeline[stage]["chosen"]) < 0.0:
+			agi_timeline[stage]["chosen"] = now()
+			agi_timeline[stage]["method"] = method
 		_handle(r["events"])
 
 
@@ -458,7 +467,11 @@ func _resets() -> void:
 			# bought, Model Generation insights have no use, so resetting it would only wipe the economy for them.
 			if k == 2 and _research_done():
 				continue
-			if not (p["highlight"] or _stalled(k)):
+			# Stall-reset only in epoch 0; after a higher reset wait for a worthwhile highlight.
+			var stall_reset := _stalled(k) and k < 4 and _epoch(k) == 0
+			if k == 1 and s.resets(3) == 0:
+				stall_reset = _stalled(k)
+			if not (p["highlight"] or stall_reset):
 				continue
 			var why := "highlight" if p["highlight"] else "stall"
 			if probe and k >= 1:
@@ -526,6 +539,8 @@ func _score_choice(ch: Dictionary) -> float:
 
 func _on_reset(k: int, gain: int, why: String) -> void:
 	var t := now()
+	if k == 4:
+		singularity_resets.append(t)
 	var tag := " (%s)" % why
 	cycles[k].append([t - float(cycle_start[k]), _epoch(k), t, gain])
 	if first_reset[k] < 0.0:
@@ -569,16 +584,30 @@ func _handle(evs: Array) -> void:
 			"challenge_done":
 				_log("challenge %s %s" % [e["id"], "succeeded" if e["success"] else "failed"])
 			"rival_launched":
+				rival_timeline.append({"id": String(e["id"]), "time": now(), "work_speed": Endgame.rival_speed(s, String(e["id"])),
+					"redteam_uses": int(s.persist.get("redteam_uses", 0)), "ships": Endgame.reckless(s)})
 				_unlock("rival launched: %s" % e["id"], "rival:" + e["id"])
 			"agi_cleared":
+				var stage := int(e["index"])
+				agi_timeline[stage]["cleared"] = now()
+				agi_timeline[stage]["clear_rate"] = Sim.compute_per_second(s).to_float()
+				agi_timeline[stage]["peak_rate"] = float(s.run.get("peak_compute_rate", 0.0))
 				_log("AGI stage %d cleared: %s" % [int(e["index"]) + 1, e["method"]])
 			"agi_failed":
+				var stage := int(e["index"])
+				agi_timeline[stage]["failures"] = int(agi_timeline[stage]["failures"]) + 1
+				if String(e["method"]) == "full":
+					agi_timeline[stage]["cooldowns"] = int(agi_timeline[stage]["cooldowns"]) + 1
 				_log("AGI stage %d: %s failed" % [int(e["index"]) + 1, e["method"]])
 			"rival_outpaced":
 				_log("rival outpaced: %s" % e["id"])
 			"rival_launched":
 				_log("rival launched: %s" % e["id"])
 			"agi_advanced":
+				var stage_index := int(e["index"]) - 1
+				if float(agi_timeline[stage_index]["met"]) < 0.0:
+					agi_timeline[stage_index]["met"] = now()
+					agi_timeline[stage_index]["peak_at_met"] = float(s.run.get("peak_compute_rate", 0.0))
 				var stage = content.get_all("agi_stages")[int(e["index"]) - 1]
 				_unlock("AGI stage %d: %s" % [e["index"], stage.id], "agi:%d" % int(e["index"]))
 			"ending":
@@ -615,6 +644,11 @@ func _snap(label: String) -> void:
 
 ## Detects unlocks that happen inside tick (auto-buy, auto-reset), checks cycles, idleness and numbers.
 func _observe() -> void:
+	var next_method := String({"aligned": "full", "open_sourced": "redteam", "rushed": "ship"}[ending_target])
+	for i in agi_timeline.size():
+		if float(agi_timeline[i]["met"]) < 0.0 and Rules.check_all(s, Endgame.stage_conditions(s, i, next_method if i > 0 else "")):
+			agi_timeline[i]["met"] = now()
+			agi_timeline[i]["peak_at_met"] = float(s.run.get("peak_compute_rate", 0.0))
 	var day := int(now() / DAY)
 	while peak_rate.size() <= day:
 		peak_rate.append(0.0)
@@ -715,6 +749,20 @@ func _report() -> int:
 		upgrades_bought, content.get_all("upgrades").size(),
 		int(s.persist["stats"]["launches"]), news_spawned, int(s.persist["stats"]["news"])])
 	_moon_report()
+	print("AGI TIMELINE (requirement met, method choice, clear; clear rate and Singularity-scoped peaks)")
+	for i in agi_timeline.size():
+		var a: Dictionary = agi_timeline[i]
+		var stage = content.get_all("agi_stages")[i]
+		var rate := float(a.get("clear_rate", 0.0))
+		print("  stage %d %s met %s chosen %s (%s) cleared %s failures %d full cooldowns %d/%.1f h clear rate %s peak-at-met %s peak-at-clear %s compute/s" % [
+			i + 1, stage.id, _opt_time(float(a["met"])), _opt_time(float(a["chosen"])), String(a["method"]), _opt_time(float(a["cleared"])),
+			int(a["failures"]), int(a["cooldowns"]), float(a["cooldowns"]) * Endgame.FULL_COOLDOWN / HOUR, BigNum.from_float(rate).format(),
+			BigNum.from_float(float(a.get("peak_at_met", 0.0))).format(), BigNum.from_float(float(a.get("peak_rate", 0.0))).format()])
+	print("  Singularity resets: %d; first %s" % [singularity_resets.size(), _opt_time(float(singularity_resets[0]) if not singularity_resets.is_empty() else -1.0)])
+	for r in rival_timeline:
+		print("  rival %s launched %s; penalty x%.2f (%d red-teams at +%.0f%% each, %d ships at +%.0f%% each)" % [
+			r["id"], _fmt(float(r["time"])), float(r["work_speed"]), int(r["redteam_uses"]), Endgame.RED_SPEED * 100.0,
+			int(r["ships"]), Endgame.RECK_RIVAL * 100.0])
 	print("first resets (game time); gain>=1 and gain>=2 are first reached, ignoring prerequisites:")
 	for k in range(1, 5):
 		var band: Array = BANDS[k]
@@ -784,6 +832,10 @@ func _report() -> int:
 					if rate_later < LATER_EPOCH_MIN_RATE * rate_first:
 						_problem("%s epoch %d: cycles 2.. earn %.2f/h, under %.2fx the first cycle's %.2f/h" % [
 							LAYER_NAMES[k], e, rate_later * HOUR, LATER_EPOCH_MIN_RATE, rate_first * HOUR])
+						var detail: Array = []
+						for i in d.size():
+							detail.append("%d@%.1fm" % [int(g[i]), float(d[i]) * 60.0])
+						print("  pacing detail %s epoch %d gains@minutes: %s" % [LAYER_NAMES[k], e, ", ".join(detail)])
 		# A later epoch's first cycle must beat epoch 0's first cycle of the same layer (kept bonuses pay off).
 		if first_of.has(0):
 			for e in first_of:

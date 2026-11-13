@@ -345,10 +345,10 @@ func _refresh_agi(s: GameState) -> void:
 func _choice_text(s: GameState, m: String) -> String:
 	match m:
 		"full":
-			return "Pass %s. 12 h. Fail: 1 h cooldown. +1 Assurance." % PanelKit.pct(Endgame.pass_chance(s, "full"))
+			return "Pass %s. 12 h. Next numeric requirement +70%% (up to its cap). Fail: 1 h cooldown. +1 Assurance." % PanelKit.pct(Endgame.pass_chance(s, "full"))
 		"redteam":
-			return "Pass %s. 6 h. +1 Openness. Rivals +5%% speed for good." % PanelKit.pct(Endgame.RED_PASS)
-	return "Instant. +1 Recklessness: more and worse bad events this run."
+			return "Pass %s. 6 h. Next requirement unchanged. +1 Openness. Rivals +5%% speed for good." % PanelKit.pct(Endgame.RED_PASS)
+	return "Instant. Next requirement −30%%. +1 Recklessness: harsher alignment losses this run."
 
 
 func _refresh_rivals(s: GameState) -> void:

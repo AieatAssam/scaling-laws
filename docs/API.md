@@ -362,16 +362,17 @@ State: `persist.moonshots` = `{running: [{id, left}], done: [id]}`. `SaveSystem.
 
 The AGI road, the ending choice, the rival race and the regulation challenge tiers. `sim.gd` calls `Endgame.tick` once per tick and `Endgame.launch_seconds` for rival clocks; nothing else in the core holds this logic.
 
-- Methods: `ship` (instant, Ship it), `redteam` (6 h community red-team), `full` (12 h full eval suite, then a 1 h cooldown after a failure). `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
+- Methods: `ship` (instant, Ship it), `redteam` (6 h community red-team), `full` (12 h full eval suite, then a 1 h cooldown after a failure). The previous stage's method scales the next stage's numeric requirements: ship ×0.7, red-team ×1.0, full ×1.7 (capped at a resource maximum); `resets_gte` is unchanged. `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
+- `stage_conditions(s, index, previous_method="")` returns a stage's live gates; `previous_method` previews the numeric scaling before that method is cleared.
 - Evaluations: `run.eval = {method, index, left}`. Pass chance: red-team `RED_PASS` (0.7); full suite `FULL_BASE` + `FULL_SLIDER` × alignment slider + `FULL_OPS` per ops staff, capped at `FULL_CAP` (0.97). A pass clears the stage; a fail reopens it (the full suite then cools down).
 - Ending: `majority(choices)` picks the most-used method, ties going to the most recent choice. `ending_for(choices)` maps it to `aligned` (full), `open_sourced` (redteam) or `rushed` (ship). Run ends after the fifth stage clears.
-- Counters: Assurance = full picks, Openness = redteam picks, Recklessness = ship picks. Ship picks add bad-event weight (`RECK_WEIGHT`) and severity (`RECK_SEVERITY`) to the events pool.
+- Counters: Assurance = full picks, Openness = redteam picks, Recklessness = ship picks. Ship picks raise negative alignment losses in bad events by `RECK_SEVERITY` per pick, clamped at the debt threshold; equity and production costs are unchanged.
 - Rivals: each rival races from its `outpace_stage` (`racing`). Its clock speeds up with `redteam_uses` (`RED_SPEED` per use). Clearing the stage first outpaces it (`rival_outpaced`, recorded in `persist.records.outpaced`). `outship(s, id)` cuts the remaining delay by `OUTSHIP_GAIN` of the gap, costs compute (`OUTSHIP_COST` × `OUTSHIP_COST_GROWTH` per use), cooldown `OUTSHIP_COOLDOWN` (1800 s). `acqui(s, id)` pays `ACQUI_CASH_SECONDS` of cash income into cash and layer 1–4 life, adds a researcher, and slows that rival by `ACQUI_SPEED`; cooldown `ACQUI_COOLDOWN`.
 - Challenge tiers: `tier_blocker(s, id)` requires the tier below to have been passed once ever (`challenge.requires`). `challenge_effect` multiplies the tier reward by `1.05 / 1.08 / 1.12` for tiers I/II/III; `persist.challenge_mult` caps at `CHALLENGE_CAP` (1.4).
 
 `Game` wraps the actions (`agi_choose`, `outship`, `acqui_hire`) and emits `agi_cleared`, `agi_failed`, `rival_outpaced` and `race_action`.
 
-## Save version 7
+## Save version 8
 
 `SaveSystem.VERSION = 8`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). `_v7_to_v8` adds `run.peak_compute_rate` and `run.agi_peaks`. A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached.
 
