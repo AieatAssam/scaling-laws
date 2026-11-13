@@ -122,6 +122,12 @@ func test_auto_upgrade_buys_every_unlocked_upgrade_only_when_owned() -> void:
 	assert_true(evs[0]["auto"])
 
 
+func test_late_producer_tiers_each_have_three_lab_upgrades() -> void:
+	for id in ["lunar_foundry", "dyson_swarm", "matrioshka_brain", "universe_simulator"]:
+		var tier_upgrades: Array = content.get_all("upgrades").filter(func(d): return d.target == id)
+		assert_eq(tier_upgrades.size(), 3, "%s has double, synergy and cost upgrades" % id)
+
+
 func test_save_round_trip_keeps_upgrades_and_their_effect() -> void:
 	Support.set_owned(s, "intern_laptop", 1)
 	Upgrades.buy(s, "intern_laptop_double")

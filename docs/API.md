@@ -50,7 +50,7 @@ Constant: `CURRENCY_LAYER`, which maps each currency to its reset layer (`cash`,
 - `resets(k) -> int`: resets of layer k (1..4) done this run.
 - `to_dict() -> Dictionary`, `static from_dict(content_db, d) -> GameState`
 
-`persist` keys: `perm_mult` (dict key → float), `legacy_perks` (dict), `automation` (array of ids), `benchmarks` (array of ids), `best_all` (float), `stats` (runs, resets, time, trainings, failed trainings, events, papers, landmarks, upgrades, launches, news, moonshots, evals passed/failed, ships and challenge-tier counts), `moonshots` (running and completed projects), `records`, `seen_reveals`, `reveals_seeded`, `lifetime_resets` (4 ints, index = layer 1..4 minus one: every reset of that layer ever, across runs; `perform_reset` increments it), `settings`, `intro_seen`, `saved_at` (unix seconds), and AGI eval seed data. Missing fields in older saves are filled from the current state template.
+`persist` keys: `perm_mult` (dict key → float), `legacy_perks` (dict), `automation` (array of ids), `benchmarks` (array of ids), `best_all` (float), `stats` (runs, resets, time, trainings, failed trainings, events, papers, landmarks, upgrades, launches, news, moonshots, evals passed/failed, ships and challenge-tier counts), `moonshots` (running and completed projects plus Research Programme level and progress), `records`, `seen_reveals`, `reveals_seeded`, `lifetime_resets` (4 ints, index = layer 1..4 minus one: every reset of that layer ever, across runs; `perform_reset` increments it), `settings`, `intro_seen`, `saved_at` (unix seconds), and AGI eval seed data. Missing fields in older saves are filled from the current state template.
 
 `run` keys: `layers` (5 dicts, index = layer), `resets_done` ([4] ints), `stage` (AGI stage index), `slider` (0..1, starts 0.5), `peak_compute_rate` and `agi_peaks` (best AGI requirement values since the last Singularity reset), `flags` (dict), `rivals` (id → progress), `challenges_done` (array), `challenge_passed` (id → bool, set when a challenge finishes; read with `.get`, since older saves may lack it), `run_over` (ending id or "").
 
@@ -64,7 +64,7 @@ Every action returns `{ok: bool, reason: String, ...}`. Failures include a human
 
 The UI may call the pure statics below for read-only previews. Each `*_blocker` returns `""` when the action would succeed, otherwise the reason it would fail. Actions call the same blockers first, so the panel text and the action can't disagree.
 
-Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `MIN_TRAIN_SPEND` (100), `TRAIN_ENERGY`, `TRAIN_DATA`, `REFUND_SHARE` (0.5: a failed run returns this share of its spend), `SCORE_ROLL` (0.02: a run's score rolls +/- this), `FAIL_FLOOR` (0.4: Ops cut a run's fail chance to this share of its base at most), `PICK_BEST_MARGIN` (0.1: a run must predict this much above the best to be chased), `PICK_MAX_FAIL` (0.2: and fail at most this often), `DATA_RATE`, `ENERGY_RATE`, `ENERGY_CAP`, `DEBT_RATE`, `SLIDER_SAFE` (0.3), `EVENT_INTERVAL`, `EVENT_CHANCE`, `OFFLINE_CAP` (86400), `OFFLINE_EFF` (0.5), `OFFLINE_STEP` (60), `LEGACY_MULT`, `AUTO_RESET_MIN_SECONDS` (60).
+Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `MIN_TRAIN_SPEND` (100), `TRAIN_ENERGY`, `TRAIN_DATA`, `REFUND_SHARE` (0.5: a failed run returns this share of its spend), `SCORE_ROLL` (0.02: a run's score rolls +/- this), `FAIL_FLOOR` (0.4: Ops cut a run's fail chance to this share of its base at most), `PICK_MAX_FAIL` (0.2: a chased run must fail at most this often; each run's `chase_margin` sets how far it must predict above the best), `PICK_NEAR_BEST` (0.45: Standard replaces a fail-blocked Frontier in the pick when it predicts within this share below the best), `DATA_RATE`, `ENERGY_RATE`, `ENERGY_CAP`, `DEBT_RATE`, `SLIDER_SAFE` (0.3), `EVENT_INTERVAL`, `EVENT_CHANCE`, `OFFLINE_CAP` (86400), `OFFLINE_EFF` (0.5), `OFFLINE_STEP` (60), `LEGACY_MULT`, `AUTO_RESET_MIN_SECONDS` (60).
 
 | Function | Returns / notes |
 |---|---|
@@ -90,7 +90,7 @@ Constants: `REVENUE`, `COST_GROWTH`, `MILESTONES`, `MIN_TRAIN_SPEND` (100), `TRA
 | `run_def(s, id)` | `TrainingRunDef` from `content/training_runs`, or null. |
 | `training_fail_factor(s) -> float` | Ops cut: `max(FAIL_FLOOR, 1 - sum of fail_per_hire x hires)`. |
 | `training_preview(s, id) -> Dictionary` | `id` is a run type (`fine_tune`, `standard`, `frontier`). Keys `ok`, `reason` ("unknown run type", "already training", "needs at least N compute", "not enough energy or data"), `id`, `title`, `spend`, `seconds`, `score_mult`, `base_fail`, `fail_factor`, `fail_chance` (base x Ops factor), `min_compute` (smallest stock at which the share meets `MIN_TRAIN_SPEND`), `predicted_score` (log10(spend) x training multiplier x `score_mult`, before the roll; 0 when the spend is zero), `bonus_now` and `bonus_if_success` (compute bonus before and after the predicted score lands), `factors` (see `training_factors`), `revenue_seconds` (the run type's cash burst length) and `revenue` (BigNum: the burst paid on success now, `revenue_seconds` x `cash_per_second`, before the run's own score). |
-| `pick_training(s) -> String` | The run the simulator and auto-train pick, or `""`. The highest predicted score among startable runs that beat the best by `PICK_BEST_MARGIN` and fail at most `PICK_MAX_FAIL`; otherwise the startable run with the most cash per minute, `(1 - fail) x revenue_seconds / seconds` (fine-tune), or `""` when none can start. Pure. |
+| `pick_training(s) -> String` | The run the simulator and auto-train pick, or `""`. The highest predicted score among startable runs that beat the best by their own `chase_margin` and fail at most `PICK_MAX_FAIL`. Fallback: if Frontier fails above `PICK_MAX_FAIL` and Standard's predicted score is at least `(1 - PICK_NEAR_BEST)` x best (`PICK_NEAR_BEST` = 0.45), pick Standard. Otherwise the startable run with the most cash per second, `(1 - fail) x revenue_seconds / seconds` (fine-tune), or `""` when none can start. Pure. |
 | `training_factors(s) -> Dictionary` | Keys `data`, `architecture`, `researcher`, `total`. `total` is the multiplier applied to the score. |
 | `start_training(s, id)` | Charges the spend up front (and energy/data after reset 3). Result adds `id`, `spend`, `seconds`. The run dict in `layers[0].training` holds `type`, `spend`, `log`, `left`, `fail`, `score_mult` and `revenue_seconds`. |
 | `layer_def(s, k)` | `LayerDef` for layer k, or null. |
@@ -143,7 +143,7 @@ Event dicts returned by `tick`, each with a `kind` key:
 
 ## SaveSystem (autoload `SaveSystem`)
 
-- `VERSION = 9`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. v3 → v4 (`_v3_to_v4`): adds `persist.records`. v7 → v8 adds Singularity-scoped AGI peak state. v8 → v9 adds lifetime offline-credit and training-burst cash totals. A save with no version field counts as v0.
+- `VERSION = 10`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. v3 → v4 (`_v3_to_v4`): adds `persist.records`. v7 → v8 adds Singularity-scoped AGI peak state. v8 → v9 adds lifetime offline-credit and training-burst cash totals; v9 → v10 adds Research Programme level and progress. A save with no version field counts as v0.
 - `save(state: Dictionary, path=DEFAULT_PATH) -> bool`: writes `{"version", "state"}` as JSON. Before overwriting, copies the current file to `<path>.bak`, but only if it is a valid save, so a damaged file never replaces the backup. Refuses (`false`, `push_error`) to overwrite a file written by a newer version.
 - `load_data(path=DEFAULT_PATH) -> Dictionary`: returns the migrated state dict, or `{}` for a new game. Sets `last_notice: String` (empty when nothing needed reporting):
   - missing file: `{}`, no notice.
@@ -178,7 +178,7 @@ Automation runs inside `tick` and emits no `producer_bought` for auto-buy, so th
 
 Read helpers also include `staff_cost(role, count=1) -> BigNum`.
 
-Actions (each returns the Sim result dict and emits its signal only on `ok`): `buy_producer(id, count=1)`, `start_training(run_type)`, `hire(role, count=1)`, `research(id)`, `set_slider(value)`, `buy_automation(id)`, `buy_legacy(key)`, `start_challenge(id)`, `abandon_challenge()`, `resolve_event(choice)`, `reset_layer(layer)`, `new_run()`, `agi_choose(method)` (`ship`, `redteam` or `full`; the last two start an evaluation), `outship(id)`, `acqui_hire(id)`.
+Actions (each returns the Sim result dict and emits its signal only on `ok`): `buy_producer(id, count=1)`, `start_training(run_type)`, `hire(role, count=1)`, `research(id)`, `set_slider(value)`, `buy_automation(id)`, `buy_legacy(key)`, `start_challenge(id)`, `abandon_challenge()`, `resolve_event(choice)`, `reset_layer(layer)`, `new_run()`, `agi_choose(method)` (`ship`, `redteam` or `full`; the last two start an evaluation), `start_moonshot(id)`, `start_research_programme()`, `outship(id)`, `acqui_hire(id)`.
 `set_setting(key, value)` writes `persist.settings` and emits `settings_changed`.
 
 Signals:
@@ -226,7 +226,7 @@ Per-type keys:
 | Type (folder) | Def | Keys |
 |---|---|---|
 | `producers` | `ProducerDef` | `order`, `base_cost`, `base_output` |
-| `layers` | `LayerDef` | `index`, `currency`, `threshold`, `target_hours` (design target for the pacing report only; no game rule reads it) |
+| `layers` | `LayerDef` | `index`, `currency`, `threshold`, `target_hours` (design target for the pacing report only; no game rule reads it; Singularity content threshold is 1.34e12 lifetime cash) |
 | `staff` | `StaffDef` | `base_cost`, `cost_growth`, `bonus_key`, `bonus_per_hire`, `fail_per_hire` (cut to a training run's fail chance per hire; see `Sim.training_fail_factor`) |
 | `training_runs` | `TrainingRunDef` | `order`, `spend_share` (0..1 of current compute), `seconds`, `fail_chance`, `score_mult`, `revenue_seconds` (cash burst on success: seconds of cash income; 0 = none) |
 | `research` | `ResearchDef` | `cost`, `prereqs` (PackedStringArray), `branch`, `effects` (array of `{key, value}` multipliers) |
@@ -361,17 +361,18 @@ Long real-time projects on the Paradigm panel. Defs: `content/moonshots/*.tres` 
 - `Moonshots.all(s)`, `done(s, id)`, `running(s)`, `is_running(s, id)`, `slots(s)`, `time_left(s, id)`
 - `Moonshots.blocker(s, id)` -> `""` or `"unknown moonshot"`, `"done"`, `"running"`, `"locked"`, `"needs <Title>"`, `"no free project slot"`, `"not enough breakthroughs"`, `"not enough cash"`
 - `Moonshots.start(s, id)` -> `{ok, ...}`; spends breakthroughs and cash; `Game.start_moonshot` wraps it
-- `Moonshots.tick(s, dt, evs)`: counts down; a finished one applies its effects, adds to `persist.stats.moonshots`, and emits `moonshot_done` (`Game.moonshot_finished`)
+- `Moonshots.tick(s, dt, evs)`: counts down regular projects; a finished project applies its effects, adds to `persist.stats.moonshots`, and emits `moonshot_done` (`Game.moonshot_finished`). Research Programme completion increments its level and persistent compute multiplier and emits the same event with id `research_programme`.
+- Research Programme: `programme_level(s)`, `programme_cost(s)`, `programme_hours(s)`, `programme_left(s)`, `programme_blocker(s)`, `start_programme(s)`. Available after the first Paradigm Shift; it runs separately from the project slots, costs `0.35 × 1.4^level` Breakthroughs, takes 4–8h and grants a permanent compounding +3% compute per level, capped at 25. `Game.start_research_programme()` wraps the start action and emits `moonshot_started`.
 - Hooks read by other systems: `producer_cost_mult`, `cooldown_mult`, `staff_cost_mult`, `fail_mult`, `chip_mult`, `desk_slots`, `threshold_for` (Funding and Generation gain bonuses), `bonus_gain` (Paradigm, Singularity), `parts` (AGI road compute)
 - `Moonshots.before_wipe(s, k)` / `after_wipe(s, k, keep)`: called by `Sim.perform_reset`. On a Funding Round (k = 1) they keep the training run when `second_cluster` is done, and the early lab upgrades (order ≤ `LAB_KEEP_ORDER`) when `institutional_memory` is done
 
-State: `persist.moonshots` = `{running: [{id, left}], done: [id]}`. `SaveSystem._v5_to_v6` adds it when missing.
+State: `persist.moonshots` = `{running: [{id, left}], done: [id], programme: {level, left}}`. `SaveSystem._v5_to_v6` adds moonshot state and `_v9_to_v10` adds the programme fields.
 
 ## Endgame (static, pure: `src/core/endgame.gd`)
 
-The AGI road, the ending choice, the rival race and the regulation challenge tiers. `sim.gd` calls `Endgame.tick` once per tick and `Endgame.launch_seconds` for rival clocks; nothing else in the core holds this logic.
+The AGI road, the ending choice, the rival race and the regulation challenge tiers. `sim.gd` calls `Endgame.tick` once per tick and `Endgame.launch_seconds` for rival clocks; nothing else in the core holds this logic. The final stage's compute-rate requirement is 5e12/s.
 
-- Methods: `ship` (instant, Ship it), `redteam` (6 h community red-team), `full` (12 h full eval suite, then a 1 h cooldown after a failure). The previous stage's method scales the next stage's resource requirements: ship ×0.7, red-team ×1.0, full ×1.85 (capped at a resource maximum); reset gates are unchanged. The final stage starts no earlier than day 9 after Ship, day 9.5 after Red-team, or day 11 after Full eval. `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
+- Methods: `ship` (instant, Ship it), `redteam` (6 h community red-team), `full` (12 h full eval suite, then a 1 h cooldown after a failure). The previous stage's method scales the next stage's resource requirements: ship ×0.001, red-team ×1.0, full ×1.85 (capped at a resource maximum); reset gates are unchanged. The final stage starts no earlier than day 9 after Ship, day 9.5 after Red-team, or day 11 after Full eval. `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
 - `stage_conditions(s, index, previous_method="")` returns a stage's live gates; `previous_method` previews the numeric scaling before that method is cleared.
 - Evaluations: `run.eval = {method, index, left}`. Pass chance: red-team `RED_PASS` (0.7); full suite `FULL_BASE` + `FULL_SLIDER` × alignment slider + `FULL_OPS` per ops staff, capped at `FULL_CAP` (0.97). A pass clears the stage; a fail reopens it (the full suite then cools down).
 - Ending: `majority(choices)` picks the most-used method, ties going to the most recent choice. `ending_for(choices)` maps it to `aligned` (full), `open_sourced` (redteam) or `rushed` (ship). Run ends after the fifth stage clears.
@@ -379,11 +380,11 @@ The AGI road, the ending choice, the rival race and the regulation challenge tie
 - Rivals: each rival races from its `outpace_stage` (`racing`). Its clock speeds up with `redteam_uses` (`RED_SPEED` per use). Clearing the stage first outpaces it (`rival_outpaced`, recorded in `persist.records.outpaced`). `outship(s, id)` cuts the remaining delay by `OUTSHIP_GAIN` of the gap, costs compute (`OUTSHIP_COST` × `OUTSHIP_COST_GROWTH` per use), cooldown `OUTSHIP_COOLDOWN` (1800 s). `acqui(s, id)` pays `ACQUI_CASH_SECONDS` of cash income into cash and layer 1–4 life, adds a researcher, and slows that rival by `ACQUI_SPEED`; cooldown `ACQUI_COOLDOWN`.
 - Challenge tiers: `tier_blocker(s, id)` requires the tier below to have been passed once ever (`challenge.requires`). `challenge_effect` multiplies the tier reward by `1.05 / 1.08 / 1.12` for tiers I/II/III; `persist.challenge_mult` caps at `CHALLENGE_CAP` (1.4).
 
-`Game` wraps the actions (`agi_choose`, `outship`, `acqui_hire`) and emits `agi_cleared`, `agi_failed`, `rival_outpaced` and `race_action`.
+`Game` wraps the actions (`agi_choose`, `start_moonshot`, `start_research_programme`, `outship`, `acqui_hire`) and emits `agi_cleared`, `agi_failed`, `rival_outpaced` and `race_action`.
 
-## Save version 9
+## Save version 10
 
-`SaveSystem.VERSION = 9`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). `_v7_to_v8` adds `run.peak_compute_rate` and `run.agi_peaks`. `_v8_to_v9` adds lifetime offline-credit and training-burst cash totals to `persist.records`. A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached.
+`SaveSystem.VERSION = 10`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). `_v7_to_v8` adds `run.peak_compute_rate` and `run.agi_peaks`. `_v8_to_v9` adds lifetime offline-credit and training-burst cash totals to `persist.records`. `_v9_to_v10` adds Research Programme level and progress to `persist.moonshots`. A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached.
 
 ## Save version 5
 

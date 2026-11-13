@@ -232,6 +232,6 @@ func test_a_v5_save_gains_empty_moonshot_state() -> void:
 	state["persist"]["stats"].erase("moonshots")
 	var save: SaveSystem = autofree(SaveScript.new())
 	var migrated: Dictionary = save.migrate({"version": 5, "state": state})
-	assert_eq(migrated["persist"]["moonshots"], {"running": [], "done": []})
+	assert_eq(migrated["persist"]["moonshots"], {"running": [], "done": [], "programme": {"level": 0, "left": 0.0}})
 	assert_eq(int(migrated["persist"]["stats"]["moonshots"]), 0)
 	assert_eq(Moonshots.all(GameState.from_dict(content, migrated)).size(), content.get_all("moonshots").size())

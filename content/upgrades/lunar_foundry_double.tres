@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "lunar_foundry_double"
+title = "Regolith Payroll"
+description = "The Moon's first union is the procurement team."
+icon = "compute"
+order = 25
+cost = 1342177280.0
+kind = "double"
+target = "lunar_foundry"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "lunar_foundry", "value": 1}])

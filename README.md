@@ -1,25 +1,55 @@
 # Scaling Laws
 
-A pixel-art incremental game about running an AI lab from a garage to AGI. Godot 4.7, GDScript.
+A pixel-art idle game about growing an AI lab, one purchase and grant application at a time.
 
-**Play in the browser:** https://aieatassam.github.io/scaling-laws/ ·
-**Downloads:** [Releases](https://github.com/AieatAssam/scaling-laws/releases) (macOS, Windows, Linux, Web, Android debug APK)
+![The lab and producer list on desktop](docs/screenshots/01-lab-desktop.png)
 
-Twelve producer tiers lead from an intern laptop to a universe simulator. Train fine-tune,
-standard and frontier runs for score and success cash bursts; hire staff, research papers at the
-desk, and buy run-scoped lab upgrades. Four reset layers unlock launch boosts, breaking-news
-rewards, permanent moonshots and automation. At the Singularity, full safety evaluations,
-community red-teaming or shipping early decide the ending; race rival labs and take three tiers of
-regulation challenges. The HUD highlights Scale and the current goal; Statistics tracks completion,
-records and lifetime counters. A first-run intro, contextual tooltips, Help, and one-time "New:"
-cards explain systems as they unlock. Touch and mouse drag-scroll panels. Desktop shortcuts: 1–9
-select tabs, B cycles producer buy amount, Space/Enter confirms a dialog. See [SPEC.md](SPEC.md)
-for the game design and [docs/API.md](docs/API.md) for code details. Saves use versioned migrations
-and keep a rolling backup for recovery.
+## Play
 
-## Run
+- [Play in your browser](https://aieatassam.github.io/scaling-laws/)
+- Downloads from the [latest release](https://github.com/AieatAssam/scaling-laws/releases/latest): [macOS ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Windows ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Linux ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [web build ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Android APK](https://github.com/AieatAssam/scaling-laws/releases/latest)
 
-Open the folder in Godot 4.7 and press Play, or:
+Desktop builds are unsigned or ad-hoc signed. The macOS build is not notarized: right-click and choose Open, or run `xattr -dr com.apple.quarantine "Scaling Laws.app"`. On Windows, keep the `.exe` and `.pck` together. On Linux, run `chmod +x ScalingLaws.x86_64` and keep the `.pck` beside it. The Android download is a debug-signed arm64 APK; enable "install unknown apps" to sideload it.
+
+## What kind of game is it?
+
+Scaling Laws is an idle/incremental game built for a run that can unfold over several days. Play in short check-ins: buy equipment, start work, make a few choices, then leave the lab to its important spreadsheets. Progress continues while you are away, at 50% efficiency for up to 24 hours.
+
+The game has several layers of resets, revealed as you play. Each trades some current progress for benefits that stay with the lab.
+
+## How the first hour plays
+
+- Buy compute producers. They make compute, and compute earns cash. The next machine is always just expensive enough to feel like a sensible decision.
+- Start a training run when you have compute to spare. Fine-tuning is quick and safe for cash; Standard runs balance score and cash; Frontier runs risk more for a higher score. Successful runs improve production.
+- When your first Funding Round is ready, take it. It resets cash, compute, producers and any active training, then gives you Equity and unlocks hiring. Staff add cash or compute bonuses.
+- Later, ship a model to open research. The research desk brings you papers with choices, because apparently the lab needed more review meetings.
+
+## Controls
+
+- Touch or click buttons and tabs.
+- Drag within a panel to scroll it.
+- Desktop: `1`-`9` select visible tabs; `B` cycles producer buy amounts; `Space` or `Enter` confirms an open card; `Esc` closes the top dialog.
+
+## Screenshots
+
+Phone captures are exactly 360x640 and upscaled 3x with nearest-neighbour filtering (1080x1920). The desktop capture is 1280x720.
+
+<p align="center">
+  <img src="docs/screenshots/02-producers.png" width="270" alt="Producer list on phone">
+  <img src="docs/screenshots/03-training.png" width="270" alt="A training run in progress">
+  <img src="docs/screenshots/04-research-desk.png" width="270" alt="A paper on the research desk">
+  <img src="docs/screenshots/05-stats.png" width="270" alt="Early run statistics">
+</p>
+
+## Saves
+
+The versioned JSON save lives at `user://save.json` in Godot's per-user storage. The game keeps a rolling `user://save.json.bak` backup for recovery and migrates older saves when needed.
+
+## For developers
+
+### Build from source
+
+Open this folder in Godot 4.7.2 and press Play, or run:
 
 ```sh
 GODOT=/Applications/Godot.app/Contents/MacOS/Godot
@@ -27,61 +57,9 @@ $GODOT --path . --import   # once, on a fresh checkout
 $GODOT --path .
 ```
 
-Release builds are unsigned or ad-hoc signed:
+Run the project checks with `tools/check.sh`. The project layout and design live in [SPEC.md](SPEC.md); code-facing APIs are documented in [docs/API.md](docs/API.md).
 
-- **macOS** — not notarized. Right-click → Open, or `xattr -dr com.apple.quarantine "Scaling Laws.app"`.
-- **Windows** — keep the `.exe` and `.pck` in the same folder.
-- **Linux** — `chmod +x ScalingLaws.x86_64`, with the `.pck` beside it.
-- **Android** — debug-signed arm64 APK; enable "install unknown apps".
+CI runs checks on pushes to `main` and on pull requests.
+Pushing a `vX.Y.Z` tag builds the desktop and web downloads, attempts the Android APK build, publishes a GitHub Release and deploys the web build to Pages; update the version in `project.godot` and `export_presets.cfg` first.
 
-## Test
-
-```sh
-# Import resources and scripts first
-$GODOT --headless --path . --import
-# GUT unit tests (economy, progression, UI helpers, saves, offline, events, content)
-$GODOT --headless --path . -s addons/gut/gut_cmdln.gd -gconfig=res://.gutconfig.json -gexit
-# Core smoke test
-$GODOT --headless --path . -s tools/smoke.gd
-# Pacing simulator: 14 days with a scripted strategy
-$GODOT --headless --path . -s tools/simulate.gd -- --hours=336 --seed=1 --ending=aligned
-# Focused pacing and balance reports
-$GODOT --headless --path . -s tools/reward_gaps.gd
-$GODOT --headless --path . -s tools/training_balance.gd
-# Check ending ordering in the source data
-tools/ending_order.sh
-# Full suite (or --fast to skip long pacing reports)
-tools/check.sh
-```
-
-`tools/check.sh` runs import, GUT and smoke checks; without `--fast` it also runs the simulator and training balance report. It fails on Godot script parse/load errors even if the runner exits successfully. CI runs the checks on every push. Pushing a `vX.Y.Z` tag builds every platform, publishes a
-GitHub Release and deploys the web build to Pages; bump `config/version` in `project.godot` and
-the version fields in `export_presets.cfg` to match the tag first.
-
-## Adding content
-
-Everything is a Godot Resource under `content/<type>/*.tres` (producers, layers, staff, research,
-events, benchmarks, rivals, challenges, AGI stages, endings). Drop in a new `.tres`; no code
-needed. The condition and effect keys are listed in `docs/API.md`.
-
-## Art
-
-All sprites were generated through the Codex CLI image tool and post-processed (pixel-grid
-detection, one colour per cell, quantised to the shared palette in `art/palette.hex`, chroma key
-removed). Commands and the prompt recipe are in [art/README.md](art/README.md).
-
-## What remains for Android
-
-The game is pointer-first and responsive (360x640 base viewport, portrait and landscape), and CI
-produces an arm64 debug APK. A real Android release still needs:
-
-- Install and play on a physical device. Pause/resume offline credit, Android Back and safe-area
-  insets are implemented, but still need device verification.
-- A release keystore and signing config (CI signs with a throwaway debug key), plus an AAB for Play.
-- Adaptive launcher icons; only a single PNG icon exists.
-- A 32-bit ARM / x86_64 build if those devices matter (only arm64-v8a is exported).
-
-## Licence
-
-Code is MIT (see [LICENSE](LICENSE)). The bundled font is Press Start 2P under the SIL Open Font
-Licence (`assets/fonts/`).
+Code is MIT licensed; see [LICENSE](LICENSE). The bundled Press Start 2P font is under the SIL Open Font License. Sprites were generated with the Codex CLI image tool and processed into the shared palette; the recipe is in [art/README.md](art/README.md).

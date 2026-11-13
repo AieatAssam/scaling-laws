@@ -165,9 +165,9 @@ func _handle(evs: Array) -> void:
 			"ending":
 				_reward("ending", "ENDING %s" % e["id"], true)
 			"moonshot_done":
-				if _novel("moonshot:" + e["id"]):
-					_reward("moonshot", "moonshot %s" % e["id"], true)
-					rg_completion_timeline.append([now(), "moonshot " + e["id"]])
+				var novel := _novel("moonshot:" + e["id"])
+				_reward("moonshot", "moonshot %s" % e["id"], novel)
+				rg_completion_timeline.append([now(), "moonshot " + e["id"]])
 			"paper_offered":
 				if _novel("paper:" + e["id"]):
 					_reward("paper", "first paper offered: %s" % e["id"], true)
@@ -220,6 +220,7 @@ func _report() -> int:
 	_rg_gap_section("longest gaps between novel (first-of-kind) moments:", "novel")
 	_rg_novel_per_day()
 	_rg_completion_timeline()
+	_rg_late_purchase_completion_gap()
 	_rg_phase_table()
 	_rg_dry_section("p", "purchase-dry stretches (nothing affordable to buy), longest first:")
 	_rg_dry_section("d", "decision-dry stretches (nothing to buy or decide), longest first:")
@@ -457,6 +458,30 @@ func _rg_completion_timeline() -> void:
 			count += 1
 	var first_delay := "none" if first_moonshot < 0.0 else _rg_len(first_moonshot - maxf(0.0, rg_first_paradigm))
 	print("  post-Paradigm completions: %d; longest consecutive gap %.2f h; first moonshot delay %s" % [count, longest / HOUR, first_delay])
+
+
+func _rg_late_purchase_completion_gap() -> void:
+	var moments: Array = [{"t": 24.0 * HOUR, "label": "hour 24"}]
+	for r in rg_rewards:
+		var kind: String = r["kind"]
+		var label: String = r["label"]
+		var late_upgrade := label.begins_with("upgrade lunar_foundry_") or label.begins_with("upgrade dyson_swarm_") or label.begins_with("upgrade matrioshka_brain_") or label.begins_with("upgrade universe_simulator_")
+		if float(r["t"]) >= 24.0 * HOUR and (kind == "automation" or kind == "moonshot" or late_upgrade):
+			moments.append({"t": r["t"], "label": label})
+	moments.append({"t": rg_end, "label": "run end"})
+	var longest := 0.0
+	var from_label := "hour 24"
+	var to_label := "run end"
+	var previous: Dictionary = moments[0]
+	for moment in moments.slice(1):
+		var gap := float(moment["t"]) - float(previous["t"])
+		if gap > longest:
+			longest = gap
+			from_label = String(previous["label"])
+			to_label = String(moment["label"])
+		previous = moment
+	print("late engagement (hour 24 onward; automation, moonshot completion, tier 9-12 upgrade): longest gap %.2f h (%s -> %s)" % [
+		longest / HOUR, from_label, to_label])
 
 
 func _rg_dry_in(key: String, a: float, b: float) -> float:

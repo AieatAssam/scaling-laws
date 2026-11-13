@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "dyson_swarm_double"
+title = "Stellar Procurement"
+description = "The Sun signed an exclusive supply agreement."
+icon = "compute"
+order = 28
+cost = 10737418240.0
+kind = "double"
+target = "dyson_swarm"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "dyson_swarm", "value": 1}])

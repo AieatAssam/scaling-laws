@@ -51,7 +51,7 @@ func test_below_minimum_spend_is_refused() -> void:
 func test_start_deducts_spend_and_sets_the_run_length() -> void:
 	var r := Sim.start_training(s, "standard")
 	assert_true(r["ok"])
-	assert_true(Support.bn_near(s.cur("compute"), BigNum.from_float(1e6 * 0.5)), "half compute left")
+	assert_true(Support.bn_near(s.cur("compute"), BigNum.from_float(1e6 * (1.0 - _def("standard").spend_share))), "the rest of compute left")
 	assert_eq(s.run["layers"][0]["training"]["left"], _def("standard").seconds)
 	assert_eq(s.run["layers"][0]["training"]["type"], "standard")
 	assert_false(Sim.start_training(s, "fine_tune")["ok"], "one run at a time")
@@ -139,14 +139,16 @@ func test_same_seed_gives_same_score() -> void:
 
 
 func test_failure_refunds_half_the_spend_and_scores_nothing() -> void:
+	var share := float(_def("standard").spend_share)
 	Sim.start_training(s, "standard")
 	s.run["layers"][0]["training"]["fail"] = 1.0
-	assert_true(Support.bn_near(s.cur("compute"), BigNum.from_float(0.5e6)), "spend taken up front")
+	assert_true(Support.bn_near(s.cur("compute"), BigNum.from_float(1e6 * (1.0 - share))), "spend taken up front")
 	var e := _training_done(Sim.tick(s, 60.0))
 	assert_false(e["ok"])
 	assert_false(e.has("score"))
-	assert_true(Support.bn_near(e["refund"], BigNum.from_float(0.25e6)), "refund is half the spend")
-	assert_true(Support.bn_near(s.cur("compute"), BigNum.from_float(0.75e6)), "compute = kept half + refund")
+	assert_true(Support.bn_near(e["refund"], BigNum.from_float(1e6 * share * Sim.REFUND_SHARE)), "refund is half the spend")
+	assert_true(Support.bn_near(s.cur("compute"), BigNum.from_float(1e6 * (1.0 - share * (1.0 - Sim.REFUND_SHARE)))),
+		"compute = kept rest + refund")
 	assert_eq(float(s.run["layers"][2]["best"]), 0.0, "failed run does not score")
 	assert_eq(float(s.persist["best_all"]), 0.0)
 	assert_eq(s.persist["stats"]["failed"], 1)
@@ -296,10 +298,38 @@ func test_pick_is_frontier_once_ops_make_it_safe_enough() -> void:
 	assert_eq(Sim.pick_training(st), "frontier")
 
 
+func test_standard_is_chased_when_it_only_matches_the_best() -> void:
+	# Standard's chase_margin is 0: predicting just above the best is enough (frontier is risk-blocked at 0 Ops).
+	var st := _earning_state()
+	var pred := float(Sim.training_preview(st, "standard")["predicted_score"])
+	st.run["layers"][2]["best"] = pred * 0.99
+	assert_eq(Sim.pick_training(st), "standard")
+
+
+func test_frontier_is_not_chased_inside_its_own_margin() -> void:
+	# Frontier needs 3% over the best (chase_margin 0.03). Predicting 2% over is not enough, so it falls to cash.
+	var st := _earning_state()
+	st.run["layers"][1]["staff"]["ops"] = 4  # safe enough on fail rate, so only the margin can stop it
+	var pred := float(Sim.training_preview(st, "frontier")["predicted_score"])
+	st.run["layers"][2]["best"] = pred / 1.02
+	assert_eq(Sim.pick_training(st), "fine_tune")
+
+
 func test_pick_is_fine_tune_for_cash_when_nothing_beats_the_best() -> void:
 	var st := _earning_state()
 	st.run["layers"][2]["best"] = 1e9
 	assert_eq(Sim.pick_training(st), "fine_tune")
+
+
+func test_risk_blocked_frontier_picks_standard_when_standard_is_near_the_best() -> void:
+	# Frontier fails 30% at 0 Ops, over the cap. Standard predicts inside PICK_NEAR_BEST below the best, so it is
+	# picked over the cash run; further below the best, cash wins.
+	var st := _earning_state()
+	var pred := float(Sim.training_preview(st, "standard")["predicted_score"])
+	st.run["layers"][2]["best"] = pred / (1.0 - 0.5 * Sim.PICK_NEAR_BEST)
+	assert_eq(Sim.pick_training(st), "standard")
+	st.run["layers"][2]["best"] = pred / (1.0 - 1.5 * Sim.PICK_NEAR_BEST)
+	assert_eq(Sim.pick_training(st), "fine_tune", "outside the near band, cash wins")
 
 
 func test_pick_is_empty_with_no_compute() -> void:

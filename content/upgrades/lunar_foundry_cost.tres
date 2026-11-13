@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "lunar_foundry_cost"
+title = "Launch Budget Review"
+description = "Every payload gets a committee and a cost center."
+icon = "compute"
+order = 27
+cost = 3355443200.0
+kind = "cost"
+target = "lunar_foundry"
+source = ""
+value = 0.10
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "lunar_foundry", "value": 25}])

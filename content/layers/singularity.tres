@@ -10,5 +10,5 @@ description = "Pass the point of no return. Unlocks rivals, regulation and AGI."
 icon = "legacy"
 index = 4
 currency = "legacy"
-threshold = 1.2e12
+threshold = 1.34e12
 target_hours = 96.0

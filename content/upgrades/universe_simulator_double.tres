@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "universe_simulator_double"
+title = "Reality Sandboxing"
+description = "Production runs safely outside the production universe."
+icon = "compute"
+order = 34
+cost = 687194767360.0
+kind = "double"
+target = "universe_simulator"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "universe_simulator", "value": 1}])

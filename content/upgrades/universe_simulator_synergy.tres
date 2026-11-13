@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "universe_simulator_synergy"
+title = "Physics CI Pipeline"
+description = "Every constant passes review, eventually."
+icon = "compute"
+order = 35
+cost = 1030792151040.0
+kind = "synergy"
+target = "universe_simulator"
+source = "matrioshka_brain"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "universe_simulator", "value": 10}])

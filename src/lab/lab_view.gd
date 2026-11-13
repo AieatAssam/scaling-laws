@@ -26,6 +26,7 @@ var pixel_k := 2               # physical pixels per art pixel (always even, see
 var px := 1.0                  # physical pixels per view pixel
 var cover := 0.0               # 0..1 opacity of the cover drawn over the view during a zoom change
 var bld := Vector2(52, 196)    # centre of the building in art pixels (effects aim here)
+var _tall := 1                 # floors in the stage 0 building, set by _target
 var shown: Array[int] = []     # producer counts currently drawn
 var build_t: Array[float] = []
 var snap: Array[int] = []      # counts frozen while a reset collapses
@@ -264,6 +265,23 @@ func view_c() -> Vector2:
 	return _clamp_c(shown_c + pan, shown_r, _art_view())
 
 
+## After a drag in stage 0 that cannot show the whole building: the window's bottom snaps to the nearest room edge.
+func _snap_pan() -> void:
+	var v := _art_view()
+	if shown_stage != 0 or shown_r.size.y <= v.y:
+		return
+	var c := view_c()
+	var bottom := c.y + v.y * 0.5
+	var best := INF
+	for e in _room_edges():
+		var inside := e >= shown_r.position.y + v.y and e <= shown_r.end.y
+		if inside and absf(e - bottom) < absf(best - bottom):
+			best = e
+	if best == INF:
+		return
+	pan = _clamp_c(Vector2(c.x, best - v.y * 0.5), shown_r, v) - shown_c
+
+
 ## Drag by rel view px: moves the picture with the finger, never past the framing.
 func _pan_by(rel: Vector2) -> void:
 	var c := _clamp_c(view_c() - rel / unit(), shown_r, _art_view())
@@ -340,10 +358,41 @@ func _target() -> Dictionary:
 	var bot_y := LabData.GY + LabData.GROUND_H
 	bld = Vector2(x1 * 0.5, LabData.GY - float(tall) * LabData.FLOOR.y * 0.5)
 	var r := Rect2(x0 - MARGIN, top_y - MARGIN, x1 - x0 + 2.0 * MARGIN, bot_y - top_y + 2.0 * MARGIN)
-	var centre := r.get_center()
+	_tall = tall
 	if _too_small(r.size):
-		centre = _newest_in(0, centre)
-	return {"c": centre, "r": r, "stage": 0}
+		# The window may rise a full view above the framing, so its bottom can rest on any room edge.
+		var v := _art_view()
+		var ext := Rect2(r.position - Vector2(0, v.y), r.size + Vector2(0, v.y))
+		return {"c": _room_centre(), "r": ext, "stage": 0}
+	return {"c": r.get_center(), "r": r, "stage": 0}
+
+
+## Stage 0 when the view cannot show the whole building: the window's bottom rests on the lowest room edge that still
+## keeps the newest room whole, so no room is cut at the bottom. Falls back to the newest room's centre.
+func _room_centre() -> Vector2:
+	var c := counts()
+	var newest := 0
+	for i in 6:
+		if c[i] > 0:
+			newest = i
+	var v := _art_view()
+	var room_top: float = LabData.floor_origin(newest).y
+	var room_bottom: float = room_top + LabData.FLOOR.y
+	var edge := -INF
+	for e in _room_edges():
+		if e >= room_bottom and e - v.y <= room_top:
+			edge = maxf(edge, e)
+	if edge == -INF:
+		return tier_art_pos(newest)
+	return Vector2(tier_art_pos(newest).x, edge - v.y * 0.5)
+
+
+## Art-pixel y of the stage 0 room edges: the ground's bottom and each floor line from the ground up to _tall floors.
+func _room_edges() -> Array[float]:
+	var out: Array[float] = [float(LabData.GY + LabData.GROUND_H)]
+	for k in range(_tall + 1):
+		out.append(float(LabData.GY) - float(k) * LabData.FLOOR.y)
+	return out
 
 
 ## True when the view cannot show the whole framing s at the current scale (phones, small windows).
@@ -421,6 +470,8 @@ func _gui_input(event: InputEvent) -> void:
 				var hi: int = LabData.TIER_STAGE[top] if top >= 0 else 0
 				stage = stage + 1 if stage < hi else 0
 				pan = Vector2.ZERO
+			else:
+				_snap_pan()
 			_press = Vector2.INF
 		accept_event()
 	elif (drag != null or (motion != null and motion.device != -1 and (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0)) and _press != Vector2.INF:

@@ -9,12 +9,14 @@ title = "Moonshots"
 icon = "breakthroughs"
 order = 55
 conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_paradigm_1"}])
-hint = "Breakthroughs start a project. It runs in real time, even offline, and pays a reward that lasts through every reset."
+hint = "Breakthroughs start projects and the repeatable Research Programme."
 body = "## Starting
 Pick a moonshot on the Paradigm tab and press Start. It spends its breakthroughs up front.
 ## Slots
-One project runs at a time. A second slot is a reward.
+One regular project runs at a time. A second regular slot is a reward. Research Programme runs alongside them.
 ## Running
 The bar shows progress and the time left. Projects keep running through every reset and while the game is closed.
+## Research Programme
+Available after your first Paradigm Shift. It costs 0.35 breakthroughs at level 1, then 1.4 times more per level. It takes 4 to 8 hours and permanently compounds compute by 3% per level, up to level 25.
 ## Rewards
-Each finished moonshot pays once, for good. Some rewards need another moonshot first. The last two wait for the Singularity."
+Each regular moonshot pays once, for good. Some rewards need another moonshot first. The last two wait for the Singularity."

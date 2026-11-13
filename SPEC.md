@@ -18,15 +18,25 @@ Output is Compute (FLOPs); Cash comes from production and is spent on producers,
 Training has Fine-tune (cash burst), Standard and Frontier runs; runs spend compute, need data and
 energy after a Paradigm Shift, take time, can fail, and successful runs improve the generation's
 compute bonus. The best score also gives a reduced bonus across resets.
+Run roles: Fine-tune is short, safe and pays the best cash burst. Frontier spends all compute on one
+risky run for the highest score and no burst. Standard spends 60% of compute, a moderate score and a
+moderate burst. Each run type has a chase_margin: how far its predicted score must land above the
+generation best for the auto-pick to chase it (Frontier 3%, Standard 0%, Fine-tune not chased).
+Auto-pick (Sim.pick_training): chase the highest-predicted run that beats the best by its chase_margin
+and fails at most 20%. If Frontier is blocked by that fail cap and Standard predicts within 45% below the best,
+Standard is picked instead (a player who cannot safely run Frontier takes Standard for cash plus a shot at the
+record). Otherwise fine-tune for cash. The best score also gives a reduced bonus across resets.
 
 RESET LAYERS (each: new currency, longer horizon, new mechanic; resets never delete all benefit)
 1. Funding Round (~30 min) → Equity. Unlocks Hiring: researchers, engineers, ops, distinct bonuses.
 2. Model Generation → Insights. Unlocks the research tree, mutually exclusive model branches,
    the alignment slider and a desk that offers papers with selectable effects.
 3. Paradigm Shift → Breakthroughs. Adds Data and capped Energy for training, automation, and
-  long-running moonshots whose rewards survive resets. Launch actions give timed boosts and
+  long-running moonshots whose rewards survive resets. The repeatable Research Programme costs 0.35
+  Breakthroughs at level 1, grows 1.4x per level, takes 4–8h and grants +3% permanent compounding
+  compute per level, up to level 25. Launch actions give timed boosts and
    cooldowns; the Launch Pad moonshot shortens them.
-4. Singularity → Legacy. Unlocks rival labs, three challenge tiers and five sequential AGI stages.
+4. Singularity → Legacy (1.34e12 lifetime cash threshold). Unlocks rival labs, three challenge tiers and five sequential AGI stages.
    Keeps unspent Breakthroughs and in-progress moonshots; Data and Energy reset. Paradigm upgrades
    still reset. The final AGI stage starts no earlier than day 9 after Ship, day 9.5 after Red-team,
    or day 11 after Full eval.
@@ -47,7 +57,7 @@ SYSTEMS
 TECHNICAL
 - Big-number class (mantissa+exponent); suffix (K, M, B, T, Qa…) then scientific notation.
 - Content as Godot Resources (.tres) so adding content needs no code.
-- Version 9 JSON saves in `user://`, with rolling `.bak` files, recovery and sequential migrations.
+- Version 10 JSON saves in `user://`, with rolling `.bak` files, recovery and sequential migrations.
 - Headless tools: `simulate.gd` (scripted 14-day run), `reward_gaps.gd`, `ending_order.sh`,
   `training_balance.gd` and `check.sh`.
 - GUT tests for economy, prestige, reset purity and save/load, all passing.

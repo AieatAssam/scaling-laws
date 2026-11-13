@@ -6,7 +6,7 @@ extends SceneTree
 ## inject-overflow adds a 400 px control to the shell; the run must then exit 1 (self-test of the width check).
 ## "late" gives a mid-to-late tower (currencies, resets, producers). Never touches the real save. Windowed.
 
-const SIZES := [Vector2i(360, 640), Vector2i(390, 844), Vector2i(844, 390), Vector2i(1280, 720)]
+const SIZES := [Vector2i(360, 640), Vector2i(390, 844), Vector2i(412, 915), Vector2i(430, 932), Vector2i(844, 390), Vector2i(1280, 720)]
 const SCROLL_POS := [0.0, 0.5, 1.0]
 ## Overflow tolerance in logical px (text metrics are rounded).
 const EPS := 1.0
@@ -58,6 +58,7 @@ func _initialize() -> void:
 		await create_timer(1.0).timeout
 		var vp: Vector2 = root.get_visible_rect().size
 		print("== %s %dx%d (logical %dx%d)" % [mode, s.x, s.y, vp.x, vp.y])
+		_check_hud(main, "hud@%dx%d" % [s.x, s.y])  # the HUD is the same on every tab: check it once per size
 		for id in tabs.keys():
 			var b: Button = tabs[id]
 			if not b.is_visible_in_tree():
@@ -138,6 +139,7 @@ func _capture(main: Node, vp: Vector2, out: String, mode: String, size: Vector2i
 	await process_frame
 	_checked += 1
 	_check(main, vp, "%s@%dx%d" % [tag, size.x, size.y])
+	_check_hud(main, "%s@%dx%d" % [tag, size.x, size.y])
 	root.get_texture().get_image().save_png("%s/%s_%dx%d_%s.png" % [out, mode, size.x, size.y, tag])
 
 
@@ -223,6 +225,8 @@ func _save_montage(frames: Array[Image], path: String) -> void:
 ##   MINW    a control whose minimum width is larger than the space its container gives it
 ##   OFF     a control that sticks out of the logical viewport (top/bottom, outside scroll pages)
 ##   OFF-W   a control that sticks out past the left or right edge (checked inside scroll pages too)
+##   OVERLAP two HUD labels whose rects intersect (see _check_hud)
+##   CLIP-SLACK a clipped HUD label with less than font height + 2 px (see _check_hud)
 func _check(n: Node, vp: Vector2, tag: String) -> void:
 	if n is Control and (n as Control).is_visible_in_tree() and (n as Control).size.x > 0.0:
 		var c := n as Control
@@ -241,6 +245,34 @@ func _check(n: Node, vp: Vector2, tag: String) -> void:
 			_problem("MINW", c, tag, "min=%.0f have=%.0f" % [c.get_combined_minimum_size().x, c.size.x])
 	for child in n.get_children():
 		_check(child, vp, tag)
+
+
+## HUD labels must not overlap each other: two visible, non-empty labels in the top bar whose rects intersect by more
+## than EPS px in both directions are a problem (the phone rate line once sat under the headline row).
+##   OVERLAP  the label's rect intersects another HUD label's rect
+func _check_hud(main: Node, tag: String) -> void:
+	var labels: Array[Label] = []
+	_collect_labels((main.get("_column") as Control).get_child(0), labels)
+	for l in labels:
+		# A clipped HUD label needs its font height plus 2 px of slack: at fractional content scale (every phone but 360)
+		# the last glyph row otherwise falls outside the clip rect.
+		var fh := l.get_theme_font("font").get_height(l.get_theme_font_size("font_size"))
+		if l.clip_text and l.size.y < fh + 2.0 - EPS:
+			_problem("CLIP-SLACK", l, tag, "'%s' is %.0f tall, font %.0f: needs 2 px slack" % [l.text, l.size.y, fh])
+	for i in labels.size():
+		var a := labels[i].get_global_rect()
+		for j in range(i + 1, labels.size()):
+			var o := a.intersection(labels[j].get_global_rect())
+			if o.size.x > EPS and o.size.y > EPS:
+				_problem("OVERLAP", labels[i], tag, "'%s' overlaps '%s' by %.0fx%.0f" % [
+					labels[i].text, labels[j].text, o.size.x, o.size.y])
+
+
+func _collect_labels(n: Node, out: Array[Label]) -> void:
+	if n is Label and (n as Label).is_visible_in_tree() and (n as Label).text != "":
+		out.append(n)
+	for c in n.get_children():
+		_collect_labels(c, out)
 
 
 func _check_label(l: Label, tag: String) -> void:

@@ -11,8 +11,8 @@ const TRAIN_DATA := 2.0
 const REFUND_SHARE := 0.5        # a failed run returns this share of its spend to compute
 const SCORE_ROLL := 0.02         # run score is rolled up or down by this share
 const FAIL_FLOOR := 0.4          # staff can cut a run's fail chance to this share of its base at most
-const PICK_BEST_MARGIN := 0.1    # pick_training: a run must predict this share above the best score to chase it
 const PICK_MAX_FAIL := 0.2       # pick_training: a run chasing the best must fail at most this often (Ops cut it)
+const PICK_NEAR_BEST := 0.45   # pick_training: Standard stands in for a risk-blocked Frontier when it predicts within this share of the best
 const DATA_RATE := 0.1           # data/sec once Paradigm Shift is done
 const ENERGY_RATE := 1.0
 const ENERGY_CAP := 100.0
@@ -380,29 +380,41 @@ static func start_training(s: GameState, id: String) -> Dictionary:
 
 
 ## Run types that can chase the best score (see pick_training), best first. Pure: reads state only.
-## Picks the run with the highest predicted score when it beats the best by PICK_BEST_MARGIN and fails at most
-## PICK_MAX_FAIL of the time. Otherwise the startable run with the most cash per minute (fine-tune for cash), or "".
-## Used by auto_train and tools/simulate.gd, so the two agree.
+## Picks the run with the highest predicted score when that beats the generation best by the run's chase_margin
+## and it fails at most PICK_MAX_FAIL of the time. Otherwise the startable run with the most cash per second
+## (fine-tune for cash), or "". Used by auto_train and tools/simulate.gd, so the two agree.
+## Fallback exception: when Frontier is blocked by its fail chance (over PICK_MAX_FAIL) and Standard predicts within
+## PICK_NEAR_BEST of the generation best, Standard is picked instead of the cash run. Rationale: a player who cannot
+## safely run Frontier takes Standard for cash plus a shot at the record.
 static func pick_training(s: GameState) -> String:
-	var bar := float(s.run["layers"][2]["best"]) * (1.0 + PICK_BEST_MARGIN)
+	var best := float(s.run["layers"][2]["best"])
 	var best_id := ""
 	var best_pred := -INF
 	var cash_id := ""
 	var cash_val := 0.0
+	var frontier_risky := false
+	var standard_pred := -INF
 	for d in s.db.get_all("training_runs"):
 		var p := training_preview(s, d.id)
 		if not p["ok"]:
 			continue
 		var pred: float = p["predicted_score"]
+		var bar := best * (1.0 + float(d.chase_margin))
 		if pred > bar and p["fail_chance"] <= PICK_MAX_FAIL and pred > best_pred:
 			best_pred = pred
 			best_id = d.id
+		if d.id == "frontier" and p["fail_chance"] > PICK_MAX_FAIL:
+			frontier_risky = true
+		if d.id == "standard":
+			standard_pred = pred
 		var cash := (1.0 - float(p["fail_chance"])) * float(p["revenue_seconds"]) / float(p["seconds"])
 		if cash > cash_val:
 			cash_val = cash
 			cash_id = d.id
 	if best_id != "":
 		return best_id
+	if frontier_risky and standard_pred >= best * (1.0 - PICK_NEAR_BEST):
+		return "standard"
 	return cash_id
 
 

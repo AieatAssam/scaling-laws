@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "lunar_foundry_synergy"
+title = "Vacuum Casting"
+description = "No air means no excuses for casting defects."
+icon = "compute"
+order = 26
+cost = 2013265920.0
+kind = "synergy"
+target = "lunar_foundry"
+source = "orbital_cluster"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "lunar_foundry", "value": 10}])

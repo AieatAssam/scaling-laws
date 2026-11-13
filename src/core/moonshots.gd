@@ -15,6 +15,10 @@ const FAST_HIRE := 0.8      # talent_pipeline
 const FAST_FAIL := 0.8      # efficient_training
 const CHEAP_PRODUCER := 0.9 # bulk_pricing
 const NEWS_LONGER := 1.5    # news_desk
+const PROGRAMME_MAX := 25
+const PROGRAMME_BASE_COST := 0.35
+const PROGRAMME_COST_GROWTH := 1.4
+const PROGRAMME_BONUS := 1.03
 
 
 static func all(s: GameState) -> Array:
@@ -42,6 +46,43 @@ static func is_running(s: GameState, id: String) -> bool:
 
 static func slots(s: GameState) -> int:
 	return BAY_SLOTS if done(s, "second_bay") else 1
+
+
+static func programme_level(s: GameState) -> int:
+	return int(_data(s)["programme"]["level"])
+
+
+static func programme_cost(s: GameState) -> float:
+	return PROGRAMME_BASE_COST * pow(PROGRAMME_COST_GROWTH, programme_level(s))
+
+
+static func programme_hours(s: GameState) -> int:
+	return mini(4 + floori(programme_level(s) / 6.0), 8)
+
+
+static func programme_left(s: GameState) -> float:
+	return float(_data(s)["programme"]["left"])
+
+
+static func programme_blocker(s: GameState) -> String:
+	if s.resets(3) == 0:
+		return "locked"
+	if programme_level(s) >= PROGRAMME_MAX:
+		return "max level"
+	if programme_left(s) > 0.0:
+		return "in progress"
+	if s.cur("breakthroughs").compare(BigNum.from_float(programme_cost(s))) < 0:
+		return "not enough breakthroughs"
+	return ""
+
+
+static func start_programme(s: GameState) -> Dictionary:
+	var reason := programme_blocker(s)
+	if reason != "":
+		return {"ok": false, "reason": reason}
+	s.set_cur("breakthroughs", s.cur("breakthroughs").subtract(BigNum.from_float(programme_cost(s))))
+	_data(s)["programme"]["left"] = programme_hours(s) * 3600.0
+	return {"ok": true, "level": programme_level(s) + 1}
 
 
 ## Why `start` would fail, or "" when it would succeed.
@@ -80,6 +121,13 @@ static func start(s: GameState, id: String) -> Dictionary:
 
 ## Advances running projects by dt seconds; a finished one applies its effects and emits moonshot_done.
 static func tick(s: GameState, dt: float, evs: Array) -> void:
+	var programme: Dictionary = _data(s)["programme"]
+	if float(programme["left"]) > 0.0:
+		programme["left"] = maxf(0.0, float(programme["left"]) - dt)
+		if float(programme["left"]) == 0.0:
+			programme["level"] += 1
+			s.persist["perm_mult"]["compute"] = float(s.persist["perm_mult"].get("compute", 1.0)) * PROGRAMME_BONUS
+			evs.append({"kind": "moonshot_done", "id": "research_programme"})
 	var r := running(s)
 	for i in range(r.size() - 1, -1, -1):
 		r[i]["left"] = float(r[i]["left"]) - dt

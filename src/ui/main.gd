@@ -27,6 +27,9 @@ const TAB_TIPS := {
 const TAB_LABEL_MIN_WIDTH := 96.0   # tabs narrower than this (phones) show only the icon
 ## Currencies beyond compute/cash, shown in the HUD once their layer has been reset (or they are held).
 const HUD_EXTRA := ["equity", "insights", "breakthroughs", "data", "energy", "legacy"]
+## Extra height under HUD text clipped to its label. At fractional content scale (every phone but 360 px wide) a label
+## whose rect is exactly its font height loses its last glyph row to the clip. See tools/dev_tab_walk.gd CLIP-SLACK.
+const HUD_SLACK := 2.0
 const LAB_SCENE := "res://src/lab/lab_view.tscn"
 ## Ending screen: instanced per ending, frees itself when the player continues.
 const ENDING_SCENE := "res://src/ui/ending_screen.tscn"
@@ -269,12 +272,14 @@ func _chip(icon_name: String, with_rate: bool, compact := false) -> Dictionary:
 	value.theme_type_variation = &"MicroValue" if compact else &"Value"
 	value.clip_text = true  # a chip may shrink below its text: the currency grid must fit 360 px
 	value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	value.custom_minimum_size.y = (8.0 if compact else 16.0) + HUD_SLACK
 	head.add_child(value)
 	var rate: Label = null
 	if with_rate:
 		rate = Label.new()
 		rate.theme_type_variation = &"MicroDim"
 		rate.clip_text = true
+		rate.custom_minimum_size.y = 8.0 + HUD_SLACK
 		box.add_child(rate)
 	return {"box": box, "value": value, "rate": rate}
 

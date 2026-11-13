@@ -9,4 +9,4 @@ title = "Auto-generate"
 description = "Ships the next Model Generation when it is highlighted."
 icon = "automation"
 order = 4
-cost = 12.0
+cost = 7.0

@@ -12,5 +12,6 @@ order = 3
 spend_share = 1.0
 seconds = 60.0
 fail_chance = 0.3
-score_mult = 1.25
+score_mult = 1.45
 revenue_seconds = 0.0
+chase_margin = 0.03

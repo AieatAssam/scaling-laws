@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "dyson_swarm_synergy"
+title = "Swarm Choreography"
+description = "The orbital dance has a surprisingly large HR budget."
+icon = "compute"
+order = 29
+cost = 16106127360.0
+kind = "synergy"
+target = "dyson_swarm"
+source = "lunar_foundry"
+value = 0.01
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "dyson_swarm", "value": 10}])

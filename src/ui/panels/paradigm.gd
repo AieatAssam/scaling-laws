@@ -8,6 +8,7 @@ var _rates: Label
 var _autos: Dictionary = {}   # id -> {buy: Button, status: Label, cost: float}
 var _slots: Array = []        # running project slots: {label: Label, bar: ProgressBar}
 var _moons: Dictionary = {}   # moonshot id -> {card: Control, meta: Label, btn: Button}
+var _programme: Dictionary
 var _done: Label
 
 
@@ -44,7 +45,7 @@ func _build() -> void:
 		Tip.attach(c, Callable(self, "_auto_tip").bind(id))
 
 	var mb := PanelKit.section(page, "Moonshots", "breakthroughs")
-	mb.add_child(PanelKit.caption("Long projects, one at a time. A project runs in real time, even offline, and its reward lasts through every reset."))
+	mb.add_child(PanelKit.caption("Regular projects use one slot (two with Second Bay). Research Programme runs alongside them. Projects run offline and rewards last through resets."))
 	for i in 2:
 		var sl := PanelKit.label("", PanelKit.TEXT)
 		var sb := PanelKit.bar(PanelKit.TEAL)
@@ -54,6 +55,23 @@ func _build() -> void:
 	_done = PanelKit.caption()
 	mb.add_child(_done)
 	Tip.attach(_done, Callable(self, "_done_tip"))
+	var pc := PanelKit.card()
+	mb.add_child(pc)
+	var prow := HBoxContainer.new()
+	prow.add_theme_constant_override("separation", 8)
+	pc.add_child(prow)
+	var ptext := VBoxContainer.new()
+	ptext.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	prow.add_child(ptext)
+	ptext.add_child(PanelKit.label("Research Programme", PanelKit.BRIGHT))
+	var pmeta := PanelKit.caption()
+	ptext.add_child(pmeta)
+	var pbtn := action_button("Start", false, Callable(self, "_start_programme"), "Research Programme started.")
+	pbtn.size_flags_horizontal = Control.SIZE_SHRINK_END
+	pbtn.custom_minimum_size.x = 56.0
+	pbtn.theme_type_variation = &"MicroButton"
+	prow.add_child(pbtn)
+	_programme = {"card": pc, "meta": pmeta, "btn": pbtn}
 	for d in Content.get_all("moonshots"):
 		var id: String = d.id
 		var c := PanelKit.card()
@@ -124,12 +142,17 @@ func _moon_tip(id: String) -> String:
 
 ## Completed moonshots, listed.
 func _done_tip() -> String:
-	var lines: Array[String] = ["Completed moonshots"]
+	var lines: Array[String] = ["Completed moonshots", "Research Programme level %d of %d." % [
+		Moonshots.programme_level(Game.state), Moonshots.PROGRAMME_MAX]]
 	for id in Game.state.persist["moonshots"]["done"]:
 		lines.append(PanelText.title_of("moonshots", id))
 	if lines.size() == 1:
 		lines.append("None yet.")
 	return "\n".join(lines)
+
+
+func _start_programme() -> Dictionary:
+	return Game.start_research_programme()
 
 
 func is_unlocked() -> bool:
@@ -146,6 +169,8 @@ func wants_attention() -> bool:
 	for id in _moons:
 		if Moonshots.blocker(s, id) == "":
 			return true
+	if Moonshots.programme_blocker(s) == "":
+		return true
 	return false
 
 
@@ -169,6 +194,15 @@ func _refresh_moonshots(s: GameState) -> void:
 			sl.label.text = "Project slot free"
 	var n_done: int = s.persist["moonshots"]["done"].size()
 	_done.text = "Completed: %d of %d" % [n_done, Moonshots.all(s).size()]
+	_programme.card.visible = s.resets(3) > 0
+	var plevel := Moonshots.programme_level(s)
+	var pleft := Moonshots.programme_left(s)
+	var pblock := Moonshots.programme_blocker(s)
+	_programme.meta.text = "Level %d/%d | %d%% compute per level | %s BT | %dh%s" % [
+		plevel, Moonshots.PROGRAMME_MAX, 3, PanelText.num(Moonshots.programme_cost(s)), Moonshots.programme_hours(s),
+		(" | " + PanelKit.hms(pleft) + " left") if pleft > 0.0 else (" | " + pblock if pblock != "" else "")]
+	_programme.btn.text = "Running" if pleft > 0.0 else ("Max" if plevel >= Moonshots.PROGRAMME_MAX else "Start")
+	_programme.btn.disabled = pblock != ""
 	for id in _moons:
 		var o: Dictionary = _moons[id]
 		var d = s.db.get_def("moonshots", id)

@@ -30,7 +30,7 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 				"upgrades": 0, "evals_passed": 0, "evals_failed": 0, "ships": 0, "solo_full": 0, "solo_redteam": 0, "solo_ship": 0, "tier_1": 0, "tier_2": 0, "tier_3": 0},
 			"redteam_uses": 0,       # community red-team runs so far: each adds RED_SPEED to rival speed (see Endgame)
 			"challenge_mult": 1.0,   # product of permanent challenge rewards, capped at Endgame.CHALLENGE_CAP
-		"moonshots": {"running": [], "done": []},  # see Moonshots: survives every reset
+		"moonshots": {"running": [], "done": [], "programme": {"level": 0, "left": 0.0}},  # survives every reset
 		"lifetime_resets": [0, 0, 0, 0],
 		"settings": {"reduce_motion": false, "notation": "suffix"},
 		"intro_seen": false,
@@ -127,10 +127,13 @@ static func from_dict(content_db, d: Dictionary) -> GameState:
 	_fill(data, t)
 	_fill(data["run"], t["run"])
 	var persist: Dictionary = data["persist"]
-	for k in ["stats", "settings"]:  # structs: a partial one is completed key by key, never replaced wholesale
+	for k in ["stats", "settings", "moonshots"]:  # structs: a partial one is completed key by key, never replaced wholesale
 		if not (persist.get(k) is Dictionary):
 			persist[k] = t["persist"][k].duplicate(true)
 		_fill(persist[k], t["persist"][k])
+	if not (persist["moonshots"].get("programme") is Dictionary):
+		persist["moonshots"]["programme"] = t["persist"]["moonshots"]["programme"].duplicate(true)
+	_fill(persist["moonshots"]["programme"], t["persist"]["moonshots"]["programme"])
 	_fill(persist, t["persist"])
 	s.persist = persist
 	s.run = data["run"]
@@ -180,6 +183,7 @@ static func _fill(saved: Dictionary, tmpl: Dictionary) -> void:
 ## JSON gives every number back as float; restore the fields that are integers.
 func _normalize_ints() -> void:
 	persist["eval_seed"] = int(persist.get("eval_seed", 1))
+	persist["moonshots"]["programme"]["level"] = int(persist["moonshots"]["programme"].get("level", 0))
 	run["stage"] = int(run["stage"])
 	for i in run["resets_done"].size():
 		run["resets_done"][i] = int(run["resets_done"][i])

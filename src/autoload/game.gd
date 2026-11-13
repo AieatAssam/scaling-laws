@@ -295,6 +295,13 @@ func start_moonshot(id: String) -> Dictionary:
 	return r
 
 
+func start_research_programme() -> Dictionary:
+	var r := Moonshots.start_programme(state)
+	if r["ok"]:
+		moonshot_started.emit("research_programme")
+	return r
+
+
 func catch_news() -> Dictionary:
 	var r := News.catch(state)
 	if r["ok"]:

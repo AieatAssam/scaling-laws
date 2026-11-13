@@ -46,6 +46,7 @@ const STALL_LIMIT := 7200.0
 const STALL_FACTOR := 4.0      # gain stalled when it has not risen for this many times the time it took to reach it
 const CYCLE_SPEEDUP := 0.9    # epoch 0: cycles 2.. must be at most this fraction of cycle 1
 const LATER_EPOCH_MIN_RATE := 0.7 # epochs > 0: cycles 2.. must earn at least this fraction of the first cycle's gain per hour
+const MIN_CYCLE_GAIN_SAMPLE := 20.0 # integer sqrt reset gains are too coarse for rate comparisons below this sample size
 const ENDING_EARLIEST := 216.0 * HOUR   # 9 d: the AGI ending must not come sooner
 const ENDING_LATEST := 336.0 * HOUR     # 14 d
 const SLIDER_EARLY := 0.5   # every ending: alignment before the Singularity
@@ -247,6 +248,7 @@ func _policy() -> void:
 	_research()
 	_automation()
 	_moonshots()
+	_research_programme()
 	_training()
 	_slider()
 	_legacy()
@@ -345,6 +347,12 @@ func _moonshots() -> void:
 			return
 		moon_log.append([now(), "start " + best.id])
 		_log("moonshot start %s" % best.id)
+
+
+func _research_programme() -> void:
+	if Moonshots.start_programme(s).get("ok", false):
+		moon_log.append([now(), "start research_programme"])
+		_log("moonshot start Research Programme level %d" % (Moonshots.programme_level(s) + 1))
 
 
 ## Moonshot and automation timing: starts and completions, and the gaps between completions after the first Paradigm Shift.
@@ -825,14 +833,15 @@ func _report() -> int:
 					var gain_later := 0.0
 					for i in range(1, g.size()):
 						gain_later += float(g[i])
+					# Reset gains are floored integers from sqrt(lifetime); small samples make one point swing the rate gate.
 					var rate_first: float = float(g[0]) / float(d[0])
 					var rate_later: float = gain_later / (later * float(d.size() - 1))
-					if rate_later < LATER_EPOCH_MIN_RATE * rate_first:
+					if float(g[0]) >= MIN_CYCLE_GAIN_SAMPLE and gain_later >= MIN_CYCLE_GAIN_SAMPLE and rate_later < LATER_EPOCH_MIN_RATE * rate_first:
 						_problem("%s epoch %d: cycles 2.. earn %.2f/h, under %.2fx the first cycle's %.2f/h" % [
 							LAYER_NAMES[k], e, rate_later * HOUR, LATER_EPOCH_MIN_RATE, rate_first * HOUR])
 						var detail: Array = []
 						for i in d.size():
-							detail.append("%d@%.1fm" % [int(g[i]), float(d[i]) * 60.0])
+							detail.append("%d@%.1fm" % [int(g[i]), float(d[i]) / 60.0])
 						print("  pacing detail %s epoch %d gains@minutes: %s" % [LAYER_NAMES[k], e, ", ".join(detail)])
 		# A later epoch's first cycle must beat epoch 0's first cycle of the same layer (kept bonuses pay off).
 		if first_of.has(0):

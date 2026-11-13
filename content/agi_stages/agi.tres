@@ -9,4 +9,4 @@ title = "AGI"
 description = "One step on the road to AGI."
 icon = "agi"
 order = 5
-conditions = Array[Dictionary]([{"type": "compute_rate_gte", "value": 1e12}, {"type": "resets_gte", "layer": 4, "value": 1}, {"type": "time_played_gte", "value": 777600.0}])
+conditions = Array[Dictionary]([{"type": "compute_rate_gte", "value": 5e12}, {"type": "resets_gte", "layer": 4, "value": 1}, {"type": "time_played_gte", "value": 777600.0}])

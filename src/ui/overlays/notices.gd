@@ -145,6 +145,12 @@ func show_record(layer: int, secs: float) -> void:
 
 
 func show_moonshot(id: String) -> void:
+	if id == "research_programme":
+		_toast_icon.visible = false
+		_toast_title.text = "Research Programme: level %d of %d" % [Moonshots.programme_level(Game.state), Moonshots.PROGRAMME_MAX]
+		_toast.visible = true
+		_toast_t = 3.0
+		return
 	var d = Content.get_def("moonshots", id)
 	_toast_icon.visible = false
 	_toast_title.text = "Moonshot complete: %s" % (d.title if d else id)

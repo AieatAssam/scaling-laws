@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="UpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/upgrade_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "matrioshka_brain_double"
+title = "Shell Game"
+description = "Each layer reports that the next layer owns the compute."
+icon = "compute"
+order = 31
+cost = 85899345920.0
+kind = "double"
+target = "matrioshka_brain"
+source = ""
+value = 1.00
+conditions = Array[Dictionary]([{"type": "owned_gte", "id": "matrioshka_brain", "value": 1}])

@@ -99,7 +99,7 @@ func test_agi_peak_requirements_survive_lower_layer_wipes_and_unlock_sequentiall
 	s.set_cur("energy", BigNum.new())
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 1)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 0)[0]))
-	s.run["peak_compute_rate"] = 2.0e12
+	s.run["peak_compute_rate"] = 3.0e13
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 2)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 3)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 4)[0]))
@@ -328,17 +328,17 @@ func test_ship_it_makes_bad_events_costlier_not_likelier() -> void:
 	assert_eq(Endgame.event_effect(s, good, slide), slide, "news events are not made worse")
 
 
-func test_ship_it_cuts_the_next_stage_requirement_by_thirty_percent() -> void:
+func test_ship_it_cuts_the_next_stage_requirement_by_ninety_nine_point_nine_percent() -> void:
 	var plain: Array = Endgame.stage_conditions(s, 1)
 	assert_eq(int(plain[0]["value"]), 20, "agentic coding needs 20 server racks")
 	_ready_stages(1)
 	assert_true(Endgame.start_choice(s, "ship")["ok"])
 	var cut: Array = Endgame.stage_conditions(s, 1)
-	assert_eq(int(cut[0]["value"]), 14, "30% off: 14 racks")
+	assert_almost_eq(float(cut[0]["value"]), 0.02, 1e-3, "99.9% off: 0.02 racks")
 	assert_eq(int(Endgame.stage_conditions(s, 1, "full")[0]["value"]), 37, "preview uses the method that will clear the prior stage")
 	var base_rate := float(s.db.get_all("agi_stages")[4].conditions[0]["value"])
 	var gate := Endgame.stage_conditions(s, 4)
-	assert_almost_eq(float(gate[0]["value"]), base_rate * 0.7, 1e-3, "compute rate cut too")
+	assert_almost_eq(float(gate[0]["value"]), base_rate * 0.001, 1e-3, "compute rate cut too")
 	assert_eq(gate[1]["type"], "resets_gte", "reset gates are never cut")
 	assert_eq(int(gate[1]["value"]), 1)
 	s.run["agi_choices"] = ["full"]

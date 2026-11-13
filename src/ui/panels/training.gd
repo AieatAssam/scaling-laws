@@ -77,9 +77,8 @@ func _row(d) -> PanelContainer:
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(left)
 	left.add_child(PanelKit.label(d.title, PanelKit.BRIGHT, false))
-	var stat := PanelKit.label("", PanelKit.MUTED, false)
+	var stat := PanelKit.label("", PanelKit.MUTED)  # wraps at phone width rather than clipping a late-game burst
 	stat.theme_type_variation = &"MicroLabel"
-	stat.clip_text = true
 	left.add_child(stat)
 	var bar := PanelKit.bar(PanelKit.TEAL)  # compute toward the minimum spend; only while short
 	bar.custom_minimum_size.y = 6

@@ -15,3 +15,6 @@ extends ContentDef
 @export var score_mult: float = 1.0
 ## Cash burst on success, in seconds of current cash income (0 = none). Failure pays nothing.
 @export var revenue_seconds: float = 0.0
+## Sim.pick_training chases this run only when its predicted score beats the generation best by this share.
+## Risky runs ask for more (0.1); a safe run only has to match the best (0).
+@export var chase_margin: float = 0.1
