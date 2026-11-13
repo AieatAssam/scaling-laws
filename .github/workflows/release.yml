@@ -234,8 +234,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p android/build
-          unzip -p "$HOME/.local/share/godot/export_templates/4.7.2.stable/android_source.zip" > "$RUNNER_TEMP/android_source.zip"
-          unzip -q "$RUNNER_TEMP/android_source.zip" -d android/build
+          unzip -q "$HOME/.local/share/godot/export_templates/4.7.2.stable/android_source.zip" -d android/build
+          touch android/build/.gdignore
           printf '%s\n' '4.7.2.stable' > android/.build_version
 
       - name: Configure signing
