@@ -7,9 +7,9 @@ A pixel-art idle game about growing an AI lab, one purchase and grant applicatio
 ## Play
 
 - [Play in your browser](https://aieatassam.github.io/scaling-laws/)
-- Downloads from the [latest release](https://github.com/AieatAssam/scaling-laws/releases/latest): [macOS ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Windows ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Linux ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [web build ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Android APK](https://github.com/AieatAssam/scaling-laws/releases/latest)
+- Downloads from the [latest release](https://github.com/AieatAssam/scaling-laws/releases/latest): [macOS ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Windows ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Linux ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [web build ZIP](https://github.com/AieatAssam/scaling-laws/releases/latest), [Android APK](https://github.com/AieatAssam/scaling-laws/releases/latest), [Android AAB for Google Play](https://github.com/AieatAssam/scaling-laws/releases/latest)
 
-Desktop builds are unsigned or ad-hoc signed. The macOS build is not notarized: right-click and choose Open, or run `xattr -dr com.apple.quarantine "Scaling Laws.app"`. On Windows, keep the `.exe` and `.pck` together. On Linux, run `chmod +x ScalingLaws.x86_64` and keep the `.pck` beside it. The Android download is a debug-signed arm64 APK; enable "install unknown apps" to sideload it.
+Desktop builds are unsigned or ad-hoc signed. The macOS build is not notarized: right-click and choose Open, or run `xattr -dr com.apple.quarantine "Scaling Laws.app"`. On Windows, keep the `.exe` and `.pck` together. On Linux, run `chmod +x ScalingLaws.x86_64` and keep the `.pck` beside it. The Android APK is signed for release and can be sideloaded after enabling "install unknown apps".
 
 ## What kind of game is it?
 
@@ -60,6 +60,8 @@ $GODOT --path .
 Run the project checks with `tools/check.sh`. The project layout and design live in [SPEC.md](SPEC.md); code-facing APIs are documented in [docs/API.md](docs/API.md).
 
 CI runs checks on pushes to `main` and on pull requests.
-Pushing a `vX.Y.Z` tag builds the desktop and web downloads, attempts the Android APK build, publishes a GitHub Release and deploys the web build to Pages; update the version in `project.godot` and `export_presets.cfg` first.
+Pushing a `vX.Y.Z` tag builds the desktop, web, signed Android APK and signed Android AAB, publishes a GitHub Release and deploys the web build to Pages. Update the version in `project.godot` and `export_presets.cfg` first; Android version codes are derived from `MAJOR.MINOR.PATCH` as `MAJOR*1,000,000 + MINOR*1,000 + PATCH` (each part must be at most 999). Use the Release workflow's `build_android` input to test Android artifacts without creating a GitHub release.
+
+Android signing, local builds and Google Play upload steps are in [docs/android-release.md](docs/android-release.md).
 
 Code is MIT licensed; see [LICENSE](LICENSE). The bundled Press Start 2P font is under the SIL Open Font License. Sprites were generated with the Codex CLI image tool and processed into the shared palette; the recipe is in [art/README.md](art/README.md).

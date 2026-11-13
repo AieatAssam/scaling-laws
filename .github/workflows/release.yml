@@ -4,6 +4,12 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      build_android:
+        description: Build Android APK and AAB artifacts
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: read
@@ -23,7 +29,7 @@ env:
   BASE_URL: https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable
 
 jobs:
-  # Tests, then exports the four desktop/web presets and zips them. Dry run: workflow_dispatch on any branch.
+  # Tests, then exports the four desktop/web presets and zips them.
   build:
     name: Test and export (macOS, Windows, Linux, Web)
     runs-on: ubuntu-latest
@@ -81,10 +87,18 @@ jobs:
               && grep -q "file_version=\"$VER.0\"" export_presets.cfg \
               || { echo "export_presets.cfg versions must be $VER"; exit 1; }
           else
+            VER=$(sed -n 's/^config\/version="\([^"]*\)"/\1/p' project.godot)
             TAG="v0.0.0-dev.${GITHUB_SHA::7}"
           fi
+          [[ "$VER" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "Version must be numeric MAJOR.MINOR.PATCH"; exit 1; }
+          MAJOR=${BASH_REMATCH[1]}; MINOR=${BASH_REMATCH[2]}; PATCH=${BASH_REMATCH[3]}
+          (( MAJOR <= 999 && MINOR <= 999 && PATCH <= 999 )) || { echo "Version components must be <= 999 for Android version codes"; exit 1; }
+          CODE=$((10#$MAJOR * 1000000 + 10#$MINOR * 1000 + 10#$PATCH))
+          (( CODE > 0 )) || { echo "Android version code must be positive"; exit 1; }
+          sed -i "s/^version\/code=.*/version\/code=$CODE/" export_presets.cfg
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Build tag: $TAG"
+          echo "Android version code: $CODE"
 
       - name: Import assets (pass 1)
         run: godot --headless --path . --import
@@ -151,6 +165,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Add privacy policy to the web site
+        run: cp docs/privacy.html build/web/privacy.html
+
       - name: Upload web site for Pages
         uses: actions/upload-artifact@v4
         with:
@@ -159,12 +176,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Debug-signed APK. Best effort: never blocks desktop/web release.
+  # Release-signed APK and AAB when signing secrets are available; forks get a debug APK.
   android:
-    name: Android APK (best effort)
+    name: Android APK and AAB
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_android) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -199,50 +216,125 @@ jobs:
           unzip -q -j "$RUNNER_TEMP/tpl/$TEMPLATES_TPZ" 'templates/*' -d "$HOME/.local/share/godot/export_templates/4.7.2.stable"
           rm -f "$RUNNER_TEMP/tpl/$TEMPLATES_TPZ"
 
-      - name: Debug keystore and SDK paths
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Godot Android SDK packages
+        run: sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.1.0" "ndk;29.0.14206865" "cmake;3.22.1"
+
+      - name: Install Gradle Android build template
         run: |
           set -euo pipefail
-          KS="$RUNNER_TEMP/debug.keystore"
-          keytool -genkeypair -v -keystore "$KS" -storepass android -keypass android \
-            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
-          {
-            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$KS"
-            echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey"
-            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android"
-          } >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=${ANDROID_HOME:-}  JAVA_HOME=${JAVA_HOME:-}"
-          ls "${ANDROID_HOME:-/nonexistent}/build-tools" || true
+          mkdir -p android/build
+          unzip -p "$HOME/.local/share/godot/export_templates/4.7.2.stable/android_source.zip" > "$RUNNER_TEMP/android_source.zip"
+          unzip -q "$RUNNER_TEMP/android_source.zip" -d android/build
+          printf '%s\n' '4.7.2.stable' > android/.build_version
+
+      - name: Configure signing
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_ALIAS" ]]; then
+            KS="$RUNNER_TEMP/scaling-laws-upload.p12"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KS"
+            chmod 600 "$KS"
+            {
+              echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$KS"
+              echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$ANDROID_KEY_ALIAS"
+              echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+            echo "Release signing secrets found; building release APK and AAB."
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+            echo "Release signing secrets unavailable; building a debug APK only and skipping the AAB."
+          fi
 
       - name: Put Godot on PATH
         run: echo "$HOME/godot-bin" >> "$GITHUB_PATH"
+
+      - name: Resolve Android version code
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VER="${TAG#v}"; else VER=$(sed -n 's/^config\/version="\([^"]*\)"/\1/p' project.godot); fi
+          [[ "$VER" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "Version must be numeric MAJOR.MINOR.PATCH"; exit 1; }
+          MAJOR=${BASH_REMATCH[1]}; MINOR=${BASH_REMATCH[2]}; PATCH=${BASH_REMATCH[3]}
+          (( MAJOR <= 999 && MINOR <= 999 && PATCH <= 999 )) || { echo "Version components must be <= 999"; exit 1; }
+          CODE=$((10#$MAJOR * 1000000 + 10#$MINOR * 1000 + 10#$PATCH))
+          sed -i "s/^version\/code=.*/version\/code=$CODE/" export_presets.cfg
 
       - name: Import assets
         run: |
           godot --headless --path . --import
           godot --headless --path . --import
 
-      - name: Export debug APK
+      - name: Export release APK and AAB
+        if: steps.signing.outputs.has_signing == 'true'
         run: |
           set -euo pipefail
           mkdir -p build/android
+          godot --headless --path . --export-release "Android" build/android/ScalingLaws.apk
+          godot --headless --path . --export-release "Android AAB" build/android/ScalingLaws.aab
+          test -s build/android/ScalingLaws.apk && test -s build/android/ScalingLaws.aab
+          "$ANDROID_HOME/build-tools/36.1.0/apksigner" verify --verbose --print-certs build/android/ScalingLaws.apk | tee build/android/apk-signature.txt
+          grep -q 'Signer #1 certificate DN:' build/android/apk-signature.txt
+          if grep -Fq 'CN=Android Debug' build/android/apk-signature.txt; then echo "APK is debug-signed"; exit 1; fi
+          jarsigner -verify -verbose -certs build/android/ScalingLaws.aab | tee build/android/aab-signature.txt
+          grep -q 'jar verified' build/android/aab-signature.txt
+          rm build/android/apk-signature.txt build/android/aab-signature.txt
+
+      - name: Export debug APK fallback
+        if: steps.signing.outputs.has_signing != 'true'
+        run: |
+          set -euo pipefail
+          KS="$RUNNER_TEMP/debug.keystore"
+          keytool -genkeypair -keystore "$KS" -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$KS"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
+          mkdir -p build/android
           godot --headless --path . --export-debug "Android" build/android/ScalingLaws.apk
           test -s build/android/ScalingLaws.apk
-          ls -la build/android
 
-      - name: Upload APK
+      - name: Upload release APK and AAB
+        if: steps.signing.outputs.has_signing == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: android-artifacts
+          path: |
+            build/android/ScalingLaws.apk
+            build/android/ScalingLaws.aab
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload debug APK fallback
+        if: steps.signing.outputs.has_signing != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-artifacts
           path: build/android/ScalingLaws.apk
           if-no-files-found: error
           retention-days: 14
 
-  # Creates or updates the GitHub Release. Runs only for v* tags, and only if the desktop/web build succeeded.
+  # Creates or updates the GitHub Release only for v* tags after all builds succeed.
   publish:
     name: Publish GitHub Release
     needs: [build, android]
-    if: ${{ always() && needs.build.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ needs.build.result == 'success' && needs.android.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -256,12 +348,10 @@ jobs:
           name: release-archives
           path: release
 
-      - name: Download Android APK (if built)
-        id: apk
-        continue-on-error: true
+      - name: Download Android artifacts
         uses: actions/download-artifact@v4
         with:
-          name: android-apk
+          name: android-artifacts
           path: release
 
       - name: Create or update release
