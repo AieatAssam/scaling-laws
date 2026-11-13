@@ -6,7 +6,7 @@
 script = ExtResource("1_s")
 id = "price_cut"
 title = "Price cut"
-description = "Compute x1.3 for 10 min. Costs 10% of cash. Cooldown 15 min."
+description = "Compute x1.3 for 10 min. Costs 10% of cash."
 icon = "breakthroughs"
 order = 2
 cost_currency = "cash"

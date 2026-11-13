@@ -59,6 +59,7 @@ static func buy(s: GameState, id: String) -> Dictionary:
 	var cost := BigNum.from_float(float(s.db.get_def("upgrades", id).cost))
 	s.set_cur("cash", s.cur("cash").subtract(cost))
 	owned_ids(s).append(id)
+	s.persist["stats"]["upgrades"] = int(s.persist["stats"].get("upgrades", 0)) + 1
 	return {"ok": true, "id": id, "cost": cost}
 
 

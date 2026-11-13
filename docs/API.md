@@ -14,8 +14,12 @@ Generated from the code in `src/` (signatures as written). Core files are pure: 
 | `src/autoload/content.gd` | `Content`: loads every `.tres` under `res://content/`. |
 | `src/autoload/save_system.gd` | `SaveSystem`: versioned JSON save file. |
 | `src/autoload/game.gd` | `Game`: owns the state, ticks it, autosaves, emits signals. |
+| `src/ui/main.gd`, `src/ui/panels/` | HUD, goal rail, tabs, Stats overlay and game panels. |
 | `content/<type>/*.tres` | All balance data. The folder name is the content type. |
 | `tools/smoke.gd` | Headless smoke test (see bottom). |
+| `tools/simulate.gd`, `reward_gaps.gd`, `training_balance.gd` | Headless progression and balance reports. |
+| `tools/ending_order.sh` | Checks ending order in content. |
+| `tools/check.sh` | Import, GUT, smoke, and (unless `--fast`) simulator and training-balance checks. |
 
 ## BigNum
 
@@ -29,7 +33,7 @@ Instance: `copy()`, `is_zero()`, `to_float()`, `log10()`, `add(o)`, `subtract(o)
 - `get_all(type: String) -> Array`: sorted by `(order, id)`.
 - `types() -> Array`: the content types found.
 
-Types loaded: `producers`, `layers`, `staff`, `research`, `automation`, `rivals`, `challenges`, `agi_stages`, `endings`, `events`, `benchmarks`, `training_runs`, `help`.
+Types loaded: `producers`, `layers`, `staff`, `research`, `automation`, `rivals`, `challenges`, `agi_stages`, `endings`, `events`, `benchmarks`, `training_runs`, `help`, `papers`, `upgrades`, `launches`, `news`, `moonshots`.
 
 `help` (`HelpTopicDef`, `content/help/*.tres`): `order`, `conditions` (same shape as other unlocks; locked topics show `???` and `hint`), `hint`, `body`. `body` is a light markup: `## ` headings, `- ` bullets, blank-line paragraphs, `[icon:x]` / `[badge:x]` inline images, `{CONST}` / `{CONST:pct|h|min}` / `{threshold:k}` / `{layer:k}` tokens resolved against live state (unknown tokens render as `<UNKNOWN:x>`, which the test catches), and the `[training]` and `[layers]` directives. Resolved by `HelpText.to_bbcode` (`src/ui/panels/parts/help_text.gd`). Tested in `tests/test_help.gd`.
 
@@ -46,7 +50,7 @@ Constant: `CURRENCY_LAYER`, which maps each currency to its reset layer (`cash`,
 - `resets(k) -> int`: resets of layer k (1..4) done this run.
 - `to_dict() -> Dictionary`, `static from_dict(content_db, d) -> GameState`
 
-`persist` keys: `perm_mult` (dict key → float), `legacy_perks` (dict), `automation` (array of ids), `benchmarks` (array of ids), `best_all` (float), `stats` (`runs`, `resets`, `time`, `trainings`, `failed`, `events`), `lifetime_resets` (4 ints, index = layer 1..4 minus one: every reset of that layer ever, across runs; `perform_reset` increments it; the lab shows one legacy prop per non-zero entry; saves without it backfill from `run.resets_done`), `settings` (dict), `intro_seen` (bool; new games start `false`, saves without the field backfill to `true`, every reset keeps it), `saved_at` (unix seconds).
+`persist` keys: `perm_mult` (dict key → float), `legacy_perks` (dict), `automation` (array of ids), `benchmarks` (array of ids), `best_all` (float), `stats` (runs, resets, time, trainings, failed trainings, events, papers, landmarks, upgrades, launches, news, moonshots, evals passed/failed, ships and challenge-tier counts), `moonshots` (running and completed projects), `records`, `seen_reveals`, `reveals_seeded`, `lifetime_resets` (4 ints, index = layer 1..4 minus one: every reset of that layer ever, across runs; `perform_reset` increments it), `settings`, `intro_seen`, `saved_at` (unix seconds), and AGI eval seed data. Missing fields in older saves are filled from the current state template.
 
 `run` keys: `layers` (5 dicts, index = layer), `resets_done` ([4] ints), `stage` (AGI stage index), `slider` (0..1, starts 0.5), `peak_compute_rate` and `agi_peaks` (best AGI requirement values since the last Singularity reset), `flags` (dict), `rivals` (id → progress), `challenges_done` (array), `challenge_passed` (id → bool, set when a challenge finishes; read with `.get`, since older saves may lack it), `run_over` (ending id or "").
 
@@ -233,6 +237,11 @@ Per-type keys:
 | `endings` | `EndingDef` | `order`, `conditions` |
 | `events` | `EventDef` | `category`, `weight`, `cooldown`, `conditions`, `choices` |
 | `benchmarks` | `BenchmarkDef` | `badge`, `conditions`, `effects` |
+| `papers` | `PaperDef` | `blurb`, `weight`, `conditions`, `choices` |
+| `upgrades` | `UpgradeDef` | `cost`, `kind`, `target`, `source`, `value`, `conditions` |
+| `launches` | `LaunchDef` | `cost_currency`, `cost_share`, `cooldown`, `conditions`, `effects` |
+| `news` | `NewsDef` | `weight`, `reward` |
+| `moonshots` | `MoonshotDef` | `hours`, `breakthroughs`, `cash`, `prereqs`, `conditions`, `effects` |
 
 ### Event `.tres` (`content/events/`)
 
@@ -305,7 +314,7 @@ It prints `OK` and exits 0, or prints `FAIL` lines and exits 1.
 `Records` (`src/core/records.gd`, pure) keeps `persist.records`, which survives resets: `fastest` (layer key "1".."4" → seconds of the quickest cycle), `cycle_start` (per layer 0..4, game time the layer was last cleared), `run_start`, the achieved sets `producers`, `research`, `challenges`, `endings`, `outpaced` (rivals not launched when an ending is reached), and `agi_best`.
 - `note_reset(persist, k) -> {layer, secs, first, record}`: `secs` is the time since layer k's clock. The first reset of a layer sets its baseline (no record). Later ones are records when faster; a reset of k clears clocks 0..k. `Game` calls it from `layer_reset`.
 - `note(persist, group, id)`, `note_agi(persist, index)` (keeps the max), `note_ending(s, id)`, `new_run(persist)`, `absorb(s)`.
-- `completion(s) -> {percent: float 0..100, parts: [{id, label, done, total}]}`: nine parts, equal weight each: producers, benchmarks, research, automation, resets (layers ever reset / 4), challenges, rivals outpaced / 5, AGI stages (`agi_best` / 5), endings / 3.
+- `completion(s) -> {percent: float 0..100, parts: [{id, label, done, total}]}`: ten equally weighted parts: producer tiers, benchmarks, research, automation, reset layers, challenges, rivals outpaced, AGI stages, endings and completed moonshots.
 - `run_seconds(persist)`, `format_duration(secs)` ("45s", "12m 04s", "1h 03m"), `layer_title(s, k)`.
 
 `Reveals` (`src/core/reveals.gd`, pure) holds the one-time "New: <System>" cards. Each entry has `id`, `title`, `topic` (the Help topic it links to), `body` and `conditions` (mirrors the topic). `next_due(s)` returns the first reveal whose conditions hold and that is not in `persist.seen_reveals`; `mark_seen`, `is_seen`, `find`. `seed(s)` runs once (`persist.reveals_seeded`). "Constraints" covers the regulation challenges; "Training" uses `time_played_gte` 600 because training has no content gate. The card itself is `RevealCard` (see UI widgets).

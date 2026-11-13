@@ -122,6 +122,7 @@ func test_full_suite_failure_sets_the_cooldown() -> void:
 			failed = failed or e["kind"] == "agi_failed"
 		if failed:
 			assert_almost_eq(float(st.run["eval_cooldown"]), 3600.0, 1e-9)
+			assert_eq(int(st.persist["stats"]["evals_failed"]), 1)
 			assert_eq(Endgame.choice_blocker(st, "full"), "full suite cooling down")
 			assert_eq(Endgame.choice_blocker(st, "redteam"), "", "other methods stay open")
 			assert_eq(st.run["agi_choices"], [], "a failed stage is not cleared")

@@ -7,7 +7,7 @@ extends Control
 
 const AMOUNTS := [1, 10, -1]   # -1 = max affordable
 const ART := Vector2i(192, 128)          # room art on disk
-const THUMB_SMALL := Vector2(48, 32)     # phone: room art at 1/4, every texel stays whole
+const THUMB_SMALL := Vector2(36, 24)     # phone: compact room art, every texel stays whole
 const THUMB_WIDE := Vector2(96, 64)      # desktop: 1/2
 const WIDE_PANEL := 440.0                # panel width from which the wide thumbnails are used
 const BUY_W := 128.0                    # fixed buy button width: "x10 12.3M" with the cash icon
@@ -321,7 +321,7 @@ func _launch_tip(id: String) -> String:
 			lines.append("Effect: %s x%.2f for %s." % [_key_label(str(e["key"])), float(e["value"]), PanelKit.hms(float(e["seconds"]))])
 	lines.append("Cost: %s %s (%.0f%% of %s)." % [Launches.cost(s, id).format(), d.cost_currency,
 		float(d.cost_share) * 100.0, d.cost_currency])
-	lines.append("Cooldown: %s." % PanelKit.hms(float(d.cooldown)))
+	lines.append("Cooldown: %s." % PanelKit.hms(float(d.cooldown) * Moonshots.cooldown_mult(s)))
 	var left := Launches.cooldown_left(s, id)
 	if left > 0.0:
 		lines.append("Ready in %s." % PanelKit.hms(left))

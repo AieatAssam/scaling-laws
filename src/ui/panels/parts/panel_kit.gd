@@ -37,7 +37,8 @@ static func col(i: int) -> Color:
 
 
 static func reduce_motion() -> bool:
-	return bool(Game.state.persist["settings"].get("reduce_motion", false))
+	var tree := Engine.get_main_loop() as SceneTree
+	return bool(tree.root.get_node("Game").state.persist["settings"].get("reduce_motion", false))
 
 
 ## Scrollable page with a 12px gutter. Returns the VBox to add content to.

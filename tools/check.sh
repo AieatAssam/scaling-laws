@@ -16,7 +16,7 @@ run_check() {
   name=$1
   shift
   log=$(mktemp "${TMPDIR:-/tmp}/scaling-laws-check.XXXXXX") || exit 1
-  if "$@" >"$log" 2>&1; then
+  if "$@" >"$log" 2>&1 && ! grep -Eiq 'SCRIPT ERROR|Parse Error|Compile Error|Failed to load script' "$log"; then
     printf 'PASS %s\n' "$name"
     passed=$((passed + 1))
     rm -f "$log"
@@ -33,7 +33,7 @@ run_check import "$GODOT" --headless --path . --import
 run_check GUT "$GODOT" --headless --path . -s addons/gut/gut_cmdln.gd -gconfig=res://.gutconfig.json -gexit
 
 log=$(mktemp "${TMPDIR:-/tmp}/scaling-laws-check.XXXXXX") || exit 1
-if "$GODOT" --headless --path . -s tools/smoke.gd >"$log" 2>&1 && grep -qx 'OK' "$log"; then
+if "$GODOT" --headless --path . -s tools/smoke.gd >"$log" 2>&1 && grep -qx 'OK' "$log" && ! grep -Eiq 'SCRIPT ERROR|Parse Error|Compile Error|Failed to load script' "$log"; then
   printf 'PASS smoke\n'
   passed=$((passed + 1))
   rm -f "$log"

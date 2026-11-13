@@ -92,6 +92,12 @@ func _build() -> void:
 	_row(all, "time", "Time played")
 	_row(all, "events", "Events resolved")
 	_row(all, "papers", "Papers read")
+	_row(all, "moonshots", "Moonshots completed")
+	_row(all, "upgrades", "Lab upgrades bought")
+	_row(all, "launches", "Launches fired")
+	_row(all, "news", "News caught")
+	_row(all, "evals_passed", "Evals passed")
+	_row(all, "evals_failed", "Evals failed")
 	_row(all, "landmarks", "Landmarks")
 	_row(all, "top_tier", "Highest producer")
 
@@ -222,6 +228,8 @@ func _refresh() -> void:
 	_v["time"].text = Records.format_duration(float(stats["time"]))
 	_v["events"].text = str(int(stats.get("events", 0)))
 	_v["papers"].text = str(int(stats.get("papers", 0)))
+	for key in ["moonshots", "upgrades", "launches", "news", "evals_passed", "evals_failed"]:
+		_v[key].text = str(int(stats.get(key, 0)))
 	_v["landmarks"].text = str(int(stats.get("landmarks", 0)))
 	_v["top_tier"].text = _top_tier(s)
 

@@ -18,9 +18,9 @@ func _at(t: float) -> void:
 	s.persist["stats"]["time"] = t
 
 
-func test_fresh_completion_is_zero_with_nine_parts() -> void:
+func test_fresh_completion_is_zero_with_ten_parts() -> void:
 	var c := Records.completion(s)
-	assert_eq(c["parts"].size(), 9)
+	assert_eq(c["parts"].size(), 10)
 	assert_eq(float(c["percent"]), 0.0)
 
 
@@ -45,6 +45,10 @@ func test_reset_layers_and_agi_count_in_completion() -> void:
 	Records.note_agi(s.persist, 2)  # the best is kept, not the latest
 	var agi := _part(Records.completion(s), "agi")
 	assert_eq(int(agi["done"]), 3)
+	s.persist["moonshots"]["done"].append("launch_pad")
+	var moons := _part(Records.completion(s), "moonshots")
+	assert_eq(int(moons["done"]), 1)
+	assert_eq(int(moons["total"]), s.db.get_all("moonshots").size())
 
 
 func test_percent_is_the_mean_of_the_part_fractions() -> void:
@@ -53,7 +57,7 @@ func test_percent_is_the_mean_of_the_part_fractions() -> void:
 	var c := Records.completion(s)
 	for part in c["parts"]:
 		total += float(part["done"]) / maxf(float(part["total"]), 1.0)
-	assert_almost_eq(float(c["percent"]), 100.0 * total / 9.0, 0.0001)
+	assert_almost_eq(float(c["percent"]), 100.0 * total / 10.0, 0.0001)
 
 
 func test_first_reset_sets_baseline_not_record() -> void:

@@ -2,7 +2,8 @@ extends SceneTree
 ## Dev: walks every visible tab at four phone/desktop sizes. For each tab it shoots the top, middle and bottom of the
 ## panel's scroll page and joins the three into one montage PNG. Runs a clipping check on every frame and exits 1 when
 ## anything clips, overflows its container or breaks mid-word:
-##   $GODOT --path . -s tools/dev_tab_walk.gd -- <out_dir> fresh|late
+##   $GODOT --path . -s tools/dev_tab_walk.gd -- <out_dir> fresh|late [inject-overflow]
+## inject-overflow adds a 400 px control to the shell; the run must then exit 1 (self-test of the width check).
 ## "late" gives a mid-to-late tower (currencies, resets, producers). Never touches the real save. Windowed.
 
 const SIZES := [Vector2i(360, 640), Vector2i(390, 844), Vector2i(844, 390), Vector2i(1280, 720)]
@@ -18,6 +19,7 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out: String = args[0] if args.size() > 0 else "/tmp"
 	var mode: String = args[1] if args.size() > 1 else "fresh"
+	var inject := args.size() > 2 and args[2] == "inject-overflow"  # self-test: a 400 px control must fail the run
 	DirAccess.make_dir_recursive_absolute(out)
 	await process_frame
 	var g = root.get_node("/root/Game")
@@ -44,6 +46,10 @@ func _initialize() -> void:
 		for id in ["intern_laptop", "cloud_gpus", "server_rack", "data_centre", "custom_silicon"]:
 			Sim.buy_producer(st, id, -1)
 	g.running = false
+	if inject:
+		var wide := Control.new()
+		wide.custom_minimum_size = Vector2(400, 4)
+		main.get("_column").add_child(wide)
 	await create_timer(0.5).timeout
 	var tabs: Dictionary = main.get("_tabs")
 	var panels: Dictionary = main.get("_panels")
@@ -156,13 +162,17 @@ func _save_montage(frames: Array[Image], path: String) -> void:
 ##   CLIP-V  a wrapped label whose text is taller than its box
 ##   BREAK   a word wider than its label (it would split mid-word)
 ##   MINW    a control whose minimum width is larger than the space its container gives it
-##   OFF     a control that sticks out of the logical viewport
+##   OFF     a control that sticks out of the logical viewport (top/bottom, outside scroll pages)
+##   OFF-W   a control that sticks out past the left or right edge (checked inside scroll pages too)
 func _check(n: Node, vp: Vector2, tag: String) -> void:
 	if n is Control and (n as Control).is_visible_in_tree() and (n as Control).size.x > 0.0:
 		var c := n as Control
 		var r := c.get_global_rect()
 		# Vertical overflow inside a scroll page is expected (that is what scrolling is for); sideways never is.
-		if r.end.x > vp.x + EPS or r.position.x < -EPS or (not _in_scroll(c) and (r.end.y > vp.y + EPS or r.position.y < -EPS)):
+		# Width is checked everywhere, scroll pages included: nothing may stick out past the viewport's left or right edge.
+		if r.end.x > vp.x + EPS or r.position.x < -EPS:
+			_problem("OFF-W", c, tag, "rect=%s vp=%.0f" % [str(r), vp.x])
+		if not _in_scroll(c) and (r.end.y > vp.y + EPS or r.position.y < -EPS):
 			_problem("OFF", c, tag, "rect=%s" % str(r))
 		if c is Label:
 			_check_label(c as Label, tag)

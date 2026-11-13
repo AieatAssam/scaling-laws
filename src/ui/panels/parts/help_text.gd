@@ -115,6 +115,6 @@ static func _training(content, state: GameState) -> Array[String]:
 static func _layers(content) -> Array[String]:
 	var out: Array[String] = []
 	for ld in content.get_all("layers"):
-		out.append("- %s: gain 1 at %s cash earned, about %s h per cycle, grants %s" % [
+		out.append("- %s: gain 1 at %s cash earned, about %sh per cycle, grants %s" % [
 			ld.title, BigNum.from_float(ld.threshold).format(), _num(ld.target_hours), ld.currency])
 	return out

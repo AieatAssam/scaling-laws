@@ -26,7 +26,7 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 		"perm_mult": {}, "legacy_perks": {}, "automation": [], "benchmarks": [],
 		"best_all": 0.0,
 		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0, "launches": 0, "news": 0, "moonshots": 0,
-				"evals_passed": 0, "ships": 0, "solo_full": 0, "solo_redteam": 0, "solo_ship": 0, "tier_1": 0, "tier_2": 0, "tier_3": 0},
+				"upgrades": 0, "evals_passed": 0, "evals_failed": 0, "ships": 0, "solo_full": 0, "solo_redteam": 0, "solo_ship": 0, "tier_1": 0, "tier_2": 0, "tier_3": 0},
 			"redteam_uses": 0,       # community red-team runs so far: each adds RED_SPEED to rival speed (see Endgame)
 			"challenge_mult": 1.0,   # product of permanent challenge rewards, capped at Endgame.CHALLENGE_CAP
 		"moonshots": {"running": [], "done": []},  # see Moonshots: survives every reset

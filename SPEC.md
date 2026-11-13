@@ -1,6 +1,7 @@
 # Scaling Laws — build spec (contract for all agents)
 
-Pixel-art incremental game: run an AI lab from a garage to AGI. Godot 4.7 (GDScript only).
+Pixel-art incremental game: run an AI lab from a garage to AGI. Godot 4.7 (GDScript only), 360x640
+base viewport, Press Start 2P font, ASCII UI text and palette-only colours.
 Godot binary: `/Applications/Godot.app/Contents/MacOS/Godot` (referred to as `$GODOT`).
 macOS desktop first; Android later → pointer-first input (mouse == touch, no hover-only or
 keyboard-only features), responsive layout, no fixed resolution.
@@ -10,43 +11,48 @@ Keep code small and boring; no speculative abstractions.
 
 ## Game design (authoritative)
 
-PRODUCERS — 12 tiers; cost = base * 1.15^owned; milestone multipliers at 25/50/100/200 owned.
+PRODUCERS — 12 tiers; cost grows with ownership; milestone multipliers at 25/50/100/200 owned.
 ids: intern_laptop, cloud_gpus, server_rack, data_centre, custom_silicon, hyperscale_campus,
 fusion_plant, orbital_cluster, lunar_foundry, dyson_swarm, matrioshka_brain, universe_simulator.
-Output is Compute (FLOPs); Cash is a secondary currency (producers are bought with cash; compute
-earns cash through a passive "inference revenue" conversion; compute itself is spent on training).
-Training Runs: spend compute to train a model, scored by data quality and architecture; a higher
-score gives a permanent (for the current layer-2 generation; best score carries a reduced bonus
-across resets) multiplier. Runs take time and can fail (failure chance shown up front).
+Output is Compute (FLOPs); Cash comes from production and is spent on producers, staff and upgrades.
+Training has Fine-tune (cash burst), Standard and Frontier runs; runs spend compute, need data and
+energy after a Paradigm Shift, take time, can fail, and successful runs improve the generation's
+compute bonus. The best score also gives a reduced bonus across resets.
 
 RESET LAYERS (each: new currency, longer horizon, new mechanic; resets never delete all benefit)
 1. Funding Round (~30 min) → Equity. Unlocks Hiring: researchers, engineers, ops, distinct bonuses.
-2. Model Generation (~4 h) → Insights. Unlocks a Research Tree with mutually exclusive
-   architecture branches, and an Alignment-vs-Capability slider.
-3. Paradigm Shift (~1–2 days) → Breakthroughs. Unlocks Data, Energy and Alignment resources that
-   constrain compute, plus automation of earlier layers (auto-buy, auto-train, auto-fund, auto-gen).
-4. Singularity (multi-day) → Legacy. Unlocks rival labs, regulation challenges, and the final AGI
-   sequence with three endings (aligned / rushed / open-sourced).
+2. Model Generation → Insights. Unlocks the research tree, mutually exclusive model branches,
+   the alignment slider and a desk that offers papers with selectable effects.
+3. Paradigm Shift → Breakthroughs. Adds Data and capped Energy for training, automation, and
+   long-running moonshots whose rewards survive resets. Launch actions give timed boosts and
+   cooldowns; the Launch Pad moonshot shortens them.
+4. Singularity → Legacy. Unlocks rival labs, three challenge tiers and five sequential AGI stages.
+   Each stage can be cleared by an instant Ship it, a 6h community red-team or a 12h full safety
+   evaluation. The majority choice determines the ending; ties go to the last choice.
 Gain = floor(sqrt(lifetime/threshold)); UI highlights the reset when gain >= 2x current holding.
 
 SYSTEMS
 - Benchmarks: auto-unlocking achievements with permanent bonuses.
-- Events: rival launches, regulation, talent poaching; short choices with trade-offs; neglected
-  alignment worsens later events.
+- Events and breaking news: short event choices have trade-offs; timed news chips can be caught for
+  cash, compute or temporary boosts.
 - Offline progress: 24h cap, 50% efficiency, "while you were away" summary.
+- Rival race actions can delay or slow rivals; outpacing a rival records the achievement.
+- The HUD shows the Scale headline, current goal rail and Stats screen. Reveal cards appear once as
+  systems become available. Touch and mouse can drag-scroll panels; desktop hotkeys select tabs,
+  cycle producer quantity and confirm dialogs.
 
 TECHNICAL
 - Big-number class (mantissa+exponent); suffix (K, M, B, T, Qa…) then scientific notation.
 - Content as Godot Resources (.tres) so adding content needs no code.
-- Versioned JSON save in user://. Strict persistent/run state split.
-- Headless simulator that plays hours with a scripted strategy and checks pacing
-  (no unlock deserts, sensible time to each reset).
+- Version 8 JSON saves in `user://`, with rolling `.bak` files, recovery and sequential migrations.
+- Headless tools: `simulate.gd` (scripted 14-day run), `reward_gaps.gd`, `ending_order.sh`,
+  `training_balance.gd` and `check.sh`.
 - GUT tests for economy, prestige, reset purity and save/load, all passing.
 
 VISUALS
 - Pixel art, one shared palette (`art/palette.hex`, one RRGGBB per line). UI colours come ONLY
   from this palette.
-- project.godot: stretch mode canvas_items, aspect expand, base viewport 640x360, default texture
+- project.godot: stretch mode canvas_items, aspect expand, base viewport 360x640, default texture
   filter nearest, window resizable. UI built from anchored Control nodes in containers.
 - Side-view lab cutaway that grows with each tier; late tiers zoom out to orbit, a swarm and a
   simulated universe. A reset collapses the scene and keeps one legacy prop per layer.

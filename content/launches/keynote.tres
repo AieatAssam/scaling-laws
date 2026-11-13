@@ -6,7 +6,7 @@
 script = ExtResource("1_s")
 id = "keynote"
 title = "Keynote"
-description = "All production x2 for 2 min. Costs 5% of cash. Cooldown 30 min."
+description = "All production x2 for 2 min. Costs 5% of cash."
 icon = "breakthroughs"
 order = 4
 cost_currency = "cash"

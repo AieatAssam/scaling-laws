@@ -103,6 +103,7 @@ static func completion(s: GameState) -> Dictionary:
 		_part("rivals", "Rivals outpaced", s.db.get_all("rivals"), p["records"]["outpaced"]),
 		_part("agi", "AGI stages", null, {}, s.db.get_all("agi_stages").size(), int(p["records"]["agi_best"])),
 		_part("endings", "Endings", s.db.get_all("endings"), p["records"]["endings"]),
+		_part("moonshots", "Moonshots", null, {}, s.db.get_all("moonshots").size(), (p["moonshots"]["done"] as Array).size()),
 	]
 	var sum := 0.0
 	for part in parts:

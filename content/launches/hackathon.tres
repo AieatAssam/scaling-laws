@@ -6,7 +6,7 @@
 script = ExtResource("1_s")
 id = "hackathon"
 title = "Hackathon"
-description = "Training runs 2x faster for 5 min. Costs 5% of compute. Cooldown 20 min."
+description = "Training runs 2x faster for 5 min. Costs 5% of compute."
 icon = "breakthroughs"
 order = 3
 cost_currency = "compute"

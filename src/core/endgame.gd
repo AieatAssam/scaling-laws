@@ -230,6 +230,7 @@ static func _finish_eval(s: GameState, evs: Array) -> void:
 	if passed:
 		_clear(s, idx, m, evs)
 	else:
+		s.persist["stats"]["evals_failed"] = int(s.persist["stats"].get("evals_failed", 0)) + 1
 		if m == "full":
 			s.run["eval_cooldown"] = FULL_COOLDOWN
 		evs.append({"kind": "agi_failed", "index": idx, "method": m})

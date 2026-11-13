@@ -50,6 +50,11 @@ var rg_dry_state := {"p": {}, "d": {}}
 var rg_evs := {}                    # event kind -> count seen by _handle
 var rg_end := 0.0
 var rg_news_seen := false
+var rg_novel_seen := {}
+var rg_completion_timeline: Array = []
+var rg_prev_landmarks := 0
+var rg_prev_news := 0
+var rg_first_paradigm := -1.0
 
 
 # ---------------------------------------------------------------- hooks (every one calls super)
@@ -77,7 +82,8 @@ func _observe() -> void:
 			_reward("tier", "first %s" % d.title, true)
 		for m in RG_MILESTONES:
 			if n >= m and old < m:
-				_reward("milestone", "%s: %d owned" % [d.title, m], false)
+				if _novel("milestone:%s:%d" % [d.id, m]):
+					_reward("milestone", "%s: %d owned" % [d.title, m], true)
 		rg_prev_owned[d.id] = n
 	for role in STAFF_ROLES:
 		var n: int = _staff_count(role)
@@ -86,13 +92,15 @@ func _observe() -> void:
 		rg_prev_staff[role] = n
 	var res: Array = s.run["layers"][2]["research"]
 	for id in res:
-		if not (id in rg_prev_research):
-			_reward("research", "research %s" % id, false)
+		if not (id in rg_prev_research) and _novel("research:" + id):
+			_reward("research", "research %s" % id, true)
 	rg_prev_research = res.duplicate()
 	var auto: Array = s.persist["automation"]
 	for id in auto:
 		if not (id in rg_prev_auto):
-			_reward("automation", "automation %s" % id, true)
+			if _novel("automation:" + id):
+				_reward("automation", "automation %s" % id, true)
+				rg_completion_timeline.append([now(), "automation " + id])
 	rg_prev_auto = auto.duplicate()
 	var perks: Dictionary = s.persist["legacy_perks"]
 	for key in perks:
@@ -101,8 +109,8 @@ func _observe() -> void:
 	rg_prev_legacy = perks.duplicate()
 	var ups: Array = Upgrades.owned_ids(s)
 	for id in ups:
-		if not (id in rg_prev_upgrades):
-			_reward("upgrade", "upgrade %s" % id, false)
+		if not (id in rg_prev_upgrades) and _novel("upgrade:" + id):
+			_reward("upgrade", "upgrade %s" % id, true)
 	rg_prev_upgrades = ups.duplicate()
 	var launched := int(s.persist["stats"]["launches"])
 	for i in range(rg_prev_launches, launched):
@@ -120,6 +128,12 @@ func _observe() -> void:
 	_unlock_once("L", s.resets(4) > 0, "system: legacy")
 	_unlock_once("C", s.resets(4) > 0, "system: regulation challenges")
 	_unlock_once("V", s.resets(4) > 0, "system: rival labs")
+	for d in Launches.all(s):
+		_unlock_once("launch:" + d.id, Rules.check_all(s, d.conditions), "launch unlocked: %s" % d.title)
+	var landmarks := int(s.persist["stats"].get("landmarks", 0))
+	if landmarks > rg_prev_landmarks:
+		_reward("paper", "landmark paper (%d)" % landmarks, _novel("landmark:%d" % landmarks))
+	rg_prev_landmarks = landmarks
 
 
 func _handle(evs: Array) -> void:
@@ -134,37 +148,58 @@ func _handle(evs: Array) -> void:
 			"event":
 				_unlock_once("E", true, "first event offered (%s)" % e["id"])
 			"benchmark":
-				_reward("benchmark", "benchmark %s (%s)" % [e["id"], e["badge"]], false)
+				if _novel("benchmark:" + e["id"]):
+					_reward("benchmark", "benchmark %s (%s)" % [e["id"], e["badge"]], true)
 			"challenge_done":
-				_reward("challenge", "regulation %s %s" % [e["id"], "passed" if e["success"] else "failed"], false)
+				var challenge = content.get_def("challenges", e["id"])
+				if e["success"] and _novel("challenge:%d" % int(challenge.tier)):
+					_reward("challenge", "challenge tier %d completed (%s)" % [int(challenge.tier), e["id"]], true)
 			"rival_launched":
 				_reward("rival", "rival launched: %s" % e["id"], false)
 			"agi_advanced":
 				var stage = content.get_all("agi_stages")[int(e["index"]) - 1]
-				_reward("agi", "AGI stage %d: %s" % [int(e["index"]), stage.id], true)
+				_reward("agi", "AGI stage %d unlocked: %s" % [int(e["index"]), stage.id], false)
+			"agi_cleared":
+				if _novel("agi_clear:%d" % int(e["index"])):
+					_reward("agi", "AGI stage %d cleared" % [int(e["index"]) + 1], true)
 			"ending":
 				_reward("ending", "ENDING %s" % e["id"], true)
 			"moonshot_done":
-				_reward("moonshot", "moonshot %s" % e["id"], true)
-			"news":
-				if not rg_news_seen:
-					rg_news_seen = true
-					_reward("news", "first news caught (%s)" % e["id"], true)
-				_reward("news", "news caught (%s)" % e["id"], false)
+				if _novel("moonshot:" + e["id"]):
+					_reward("moonshot", "moonshot %s" % e["id"], true)
+					rg_completion_timeline.append([now(), "moonshot " + e["id"]])
+			"paper_offered":
+				if _novel("paper:" + e["id"]):
+					_reward("paper", "first paper offered: %s" % e["id"], true)
 			"agi_cleared", "agi_failed":
 				_reward("eval", "%s %s stage %d" % [e["method"] if e.has("method") else e["kind"], e["kind"], int(e["index"])], false)
 			"rival_outpaced":
-				_reward("outpaced", "rival outpaced: %s" % e["id"], false)
+				if _novel("outpaced:" + e["id"]):
+					_reward("outpaced", "rival outpaced: %s" % e["id"], true)
 			"paper_resolved":
-				_reward("paper", "paper %s (choice %d)" % [e["id"], int(e["choice"])], false)
+				pass
 	super._handle(evs)
+	var caught_news := int(s.persist["stats"].get("news", 0))
+	if caught_news > rg_prev_news and not rg_news_seen:
+		rg_news_seen = true
+		_reward("news", "first news caught", true)
+	rg_prev_news = caught_news
 
 
 func _on_reset(k: int, gain: int, why: String) -> void:
+	if k == 3 and rg_first_paradigm < 0.0:
+		rg_first_paradigm = now()
 	var first: bool = not rg_first_reset[k]
 	rg_first_reset[k] = true
 	_reward("reset", "%s reset, gain %d (%s)" % [LAYER_NAMES[k], gain, why], first)
 	super._on_reset(k, gain, why)
+
+
+func _novel(key: String) -> bool:
+	if rg_novel_seen.has(key):
+		return false
+	rg_novel_seen[key] = true
+	return true
 
 
 func _report() -> int:
@@ -183,6 +218,8 @@ func _report() -> int:
 	_rg_gap_section("longest gaps between any two reward moments:", "all")
 	_rg_gap_section("longest gaps between BIG reward moments:", "big")
 	_rg_gap_section("longest gaps between novel (first-of-kind) moments:", "novel")
+	_rg_novel_per_day()
+	_rg_completion_timeline()
 	_rg_phase_table()
 	_rg_dry_section("p", "purchase-dry stretches (nothing affordable to buy), longest first:")
 	_rg_dry_section("d", "decision-dry stretches (nothing to buy or decide), longest first:")
@@ -386,6 +423,40 @@ func _rg_phase_table() -> void:
 					novel += 1
 		print("  %-8s %6.2f  %8.2f  %6.2f  %5d  %11.0f%%  %11.0f%%" % [RG_PHASE_NAMES[i], span, small / span,
 			big / span, novel, 100.0 * _rg_dry_in("p", a, b) / (span * HOUR), 100.0 * _rg_dry_in("d", a, b) / (span * HOUR)])
+
+
+func _rg_novel_per_day() -> void:
+	print("")
+	print("novel moments per game day:")
+	for day in range(int(ceil(rg_end / 86400.0))):
+		var count := 0
+		for r in rg_rewards:
+			if r["novel"] and float(r["t"]) >= day * 86400.0 and float(r["t"]) < (day + 1) * 86400.0:
+				count += 1
+		print("  day %2d: %d" % [day + 1, count])
+
+
+func _rg_completion_timeline() -> void:
+	print("")
+	print("moonshot/automation completion timeline and gaps:")
+	var previous := maxf(0.0, rg_first_paradigm)
+	var first_moonshot := -1.0
+	var longest := 0.0
+	for row in rg_completion_timeline:
+		if float(row[0]) < previous:
+			continue
+		var gap := float(row[0]) - previous
+		longest = maxf(longest, gap)
+		print("  %s  %s  (gap %s)" % [_rg_t(float(row[0])), row[1], _rg_len(gap)])
+		if first_moonshot < 0.0 and String(row[1]).begins_with("moonshot "):
+			first_moonshot = float(row[0])
+		previous = float(row[0])
+	var count := 0
+	for row in rg_completion_timeline:
+		if float(row[0]) >= maxf(0.0, rg_first_paradigm):
+			count += 1
+	var first_delay := "none" if first_moonshot < 0.0 else _rg_len(first_moonshot - maxf(0.0, rg_first_paradigm))
+	print("  post-Paradigm completions: %d; longest consecutive gap %.2f h; first moonshot delay %s" % [count, longest / HOUR, first_delay])
 
 
 func _rg_dry_in(key: String, a: float, b: float) -> float:

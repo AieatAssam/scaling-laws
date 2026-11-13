@@ -22,8 +22,13 @@ var _dialog: ConfirmationDialog
 
 ## A layer k is shown as reachable once the layer below has been reset, or once this layer's gain is non-zero.
 static func is_layer_unlocked(k: int) -> bool:
-	var s: GameState = Game.state
+	var s: GameState = _game().state
 	return s.resets(k - 1) > 0 or s.resets(k) > 0 or int(Sim.reset_preview(s, k)["gain"]) >= 1
+
+
+static func _game() -> Node:
+	var loop := Engine.get_main_loop()
+	return loop.root.get_node_or_null("Game") if loop is SceneTree else null
 
 
 ## Builds the card for layer k. `on_result` receives (sim_result, ok_text) after the reset runs.
@@ -64,12 +69,12 @@ func setup(k: int, on_result: Callable) -> PanelResetCard:
 
 
 func refresh() -> void:
-	var p: Dictionary = Sim.reset_preview(Game.state, layer)
+	var p: Dictionary = Sim.reset_preview(_game().state, layer)
 	var cur: String = PanelText.cur_name(str(p["currency"]))
 	var gain := int(p["gain"])
 	_gain.text = "Gain on reset: +%d %s" % [gain, cur]
 	_holding.text = "You hold: %s %s" % [(p["holding"] as BigNum).format(), cur]
-	_eta.text = _eta_text(Rules.reset_eta(Game.state, layer))
+	_eta.text = _eta_text(Rules.reset_eta(_game().state, layer))
 	var allowed: bool = p["allowed"]
 	if not allowed:
 		_why.text = str(p["reason"])
@@ -85,7 +90,7 @@ func refresh() -> void:
 
 ## Full explanation of this reset: gain, holding, what it wipes, and why it is or isn't allowed now.
 func _tip() -> String:
-	var p: Dictionary = Sim.reset_preview(Game.state, layer)
+	var p: Dictionary = Sim.reset_preview(_game().state, layer)
 	var cur: String = PanelText.cur_name(str(p["currency"]))
 	var lines: Array[String] = [
 		"Run %s" % PanelText.layer_title(layer),
@@ -128,5 +133,5 @@ static func _span(sec: float) -> String:
 
 
 func _do_reset() -> void:
-	var r: Dictionary = Game.reset_layer(layer)
+	var r: Dictionary = _game().reset_layer(layer)
 	_on_result.call(r, "%s done." % PanelText.layer_title(layer))

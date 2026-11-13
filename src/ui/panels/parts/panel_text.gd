@@ -3,7 +3,8 @@ class_name PanelText
 
 
 static func title_of(type: String, id: String) -> String:
-	var d = Content.get_def(type, id)
+	var root := (Engine.get_main_loop() as SceneTree).root
+	var d = root.get_node("Content").get_def(type, id)
 	return d.title if d != null else id
 
 
@@ -12,7 +13,8 @@ static func cur_name(id: String) -> String:
 
 
 static func layer_title(k: int) -> String:
-	var d = Sim.layer_def(Game.state, k)
+	var root := (Engine.get_main_loop() as SceneTree).root
+	var d = Sim.layer_def(root.get_node("Game").state, k)
 	return d.title if d != null else "Layer %d" % k
 
 

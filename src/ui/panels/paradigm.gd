@@ -111,7 +111,7 @@ func _moon_tip(id: String) -> String:
 	var s: GameState = Game.state
 	var d = Content.get_def("moonshots", id)
 	var lines: Array[String] = [d.title, d.description,
-		"Runs %s h of game time. Costs %s breakthroughs." % [PanelText.num(d.hours), PanelText.num(d.breakthroughs)]]
+		"Runs %sh of game time. Costs %s BT." % [PanelText.num(d.hours), PanelText.num(d.breakthroughs)]]
 	if d.prereqs.size() > 0:
 		var names: Array[String] = []
 		for p in d.prereqs:
@@ -177,7 +177,7 @@ func _refresh_moonshots(s: GameState) -> void:
 		if not shown:
 			continue
 		var reason := Moonshots.blocker(s, id)
-		o.meta.text = "%s h, %s breakthroughs%s" % [PanelText.num(d.hours), PanelText.num(d.breakthroughs),
+		o.meta.text = "%sh, %s BT%s" % [PanelText.num(d.hours), PanelText.num(d.breakthroughs),
 			"" if reason == "" else " | " + reason]
 		o.btn.disabled = reason != ""
 
