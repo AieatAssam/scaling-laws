@@ -99,7 +99,7 @@ func test_agi_peak_requirements_survive_lower_layer_wipes_and_unlock_sequentiall
 	s.set_cur("energy", BigNum.new())
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 1)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 0)[0]))
-	s.run["peak_compute_rate"] = 1.1e11
+	s.run["peak_compute_rate"] = 2.0e12
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 2)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 3)[0]))
 	assert_true(Rules.check(s, Endgame.stage_conditions(s, 4)[0]))
@@ -335,17 +335,20 @@ func test_ship_it_cuts_the_next_stage_requirement_by_thirty_percent() -> void:
 	assert_true(Endgame.start_choice(s, "ship")["ok"])
 	var cut: Array = Endgame.stage_conditions(s, 1)
 	assert_eq(int(cut[0]["value"]), 14, "30% off: 14 racks")
-	assert_eq(int(Endgame.stage_conditions(s, 1, "full")[0]["value"]), 34, "preview uses the method that will clear the prior stage")
+	assert_eq(int(Endgame.stage_conditions(s, 1, "full")[0]["value"]), 37, "preview uses the method that will clear the prior stage")
+	var base_rate := float(s.db.get_all("agi_stages")[4].conditions[0]["value"])
 	var gate := Endgame.stage_conditions(s, 4)
-	assert_almost_eq(float(gate[0]["value"]), 1e11 * 0.7, 1e-3, "compute rate cut too")
+	assert_almost_eq(float(gate[0]["value"]), base_rate * 0.7, 1e-3, "compute rate cut too")
 	assert_eq(gate[1]["type"], "resets_gte", "reset gates are never cut")
 	assert_eq(int(gate[1]["value"]), 1)
 	s.run["agi_choices"] = ["full"]
-	assert_eq(int(Endgame.stage_conditions(s, 1)[0]["value"]), 34, "full suite raises the next numeric requirement by 70%")
+	assert_eq(int(Endgame.stage_conditions(s, 1)[0]["value"]), 37, "full suite raises the next numeric requirement by 85%")
 	assert_almost_eq(float(Endgame.stage_conditions(s, 3)[0]["value"]), Sim.ENERGY_CAP, 1e-3, "scaled energy cannot exceed its 100-unit cap")
-	assert_almost_eq(float(Endgame.stage_conditions(s, 4)[0]["value"]), 1e11 * 1.7, 1e-3, "full suite raises the final rate gate too")
+	assert_almost_eq(float(Endgame.stage_conditions(s, 4)[0]["value"]), base_rate * 1.85, 1e-3, "full suite raises the final rate gate too")
+	assert_almost_eq(float(Endgame.stage_conditions(s, 4)[2]["value"]), 11.0 * 86400.0, 1e-3, "full eval sets the final stage's eleven-day floor")
 	s.run["agi_choices"] = ["redteam"]
 	assert_eq(int(Endgame.stage_conditions(s, 1)[0]["value"]), 20, "red-team leaves the next requirement at baseline")
+	assert_almost_eq(float(Endgame.stage_conditions(s, 4)[2]["value"]), 9.5 * 86400.0, 1e-3, "red-team sets the final stage's 9.5-day floor")
 
 
 func test_ending_pays_its_legacy() -> void:

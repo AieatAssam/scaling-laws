@@ -390,6 +390,7 @@ func _dispatch(evs: Array) -> void:
 	for e in evs:
 		match e["kind"]:
 			"training_done":
+				Records.note_deployment_burst(state.persist, e.get("revenue", BigNum.new()))
 				training_finished.emit(e)
 			"auto_train":
 				training_started.emit(e["id"])

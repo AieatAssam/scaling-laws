@@ -4,7 +4,7 @@ extends Node
 ## a file from a newer version is set aside as <path>.newer-<ms> and never overwritten. `last_notice` says
 ## what load_data had to do (empty when nothing happened); Game shows it to the player.
 
-const VERSION := 8
+const VERSION := 9
 const DEFAULT_PATH := "user://save.json"
 
 var last_notice := ""
@@ -82,6 +82,19 @@ func migrate(wrapper: Dictionary) -> Dictionary:
 		state = _v6_to_v7(state)
 	if v < 8:
 		state = _v7_to_v8(state)
+	if v < 9:
+		state = _v8_to_v9(state)
+	return state
+
+
+static func _v8_to_v9(state: Dictionary) -> Dictionary:
+	var persist: Dictionary = state.get("persist", {})
+	var records: Dictionary = persist.get("records", {})
+	records["offline_seconds"] = float(records.get("offline_seconds", 0.0))
+	if not records.has("deployment_burst_cash"):
+		records["deployment_burst_cash"] = BigNum.new().to_json()
+	persist["records"] = records
+	state["persist"] = persist
 	return state
 
 

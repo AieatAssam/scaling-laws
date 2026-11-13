@@ -160,9 +160,12 @@ static func parts(s: GameState, key: String) -> Array:
 
 # ---------------------------------------------------------------- Funding Round (layer 1) carry, around the wipe
 
-## Captures what survives a Funding Round (k == 1) before layer 0 is wiped. Read back by after_wipe.
+## Captures reset carry before lower layers are wiped: Singularity keeps Breakthroughs; moonshots are persistent;
+## Funding Round carry is gated by its moonshots.
 static func before_wipe(s: GameState, k: int) -> Dictionary:
 	var keep := {}
+	if k == 4:
+		keep["breakthroughs"] = s.cur("breakthroughs")
 	if k != 1:
 		return keep
 	var L0: Dictionary = s.run["layers"][0]
@@ -178,9 +181,11 @@ static func before_wipe(s: GameState, k: int) -> Dictionary:
 	return keep
 
 
-## Puts back what before_wipe kept and grants the seed capital, after the wipe and before the reset gain.
+## Puts back what before_wipe kept and grants seed capital, after the wipe and before the reset gain.
 static func after_wipe(s: GameState, k: int, keep: Dictionary) -> void:
 	var L0: Dictionary = s.run["layers"][0]
+	if keep.has("breakthroughs"):
+		s.set_cur("breakthroughs", keep["breakthroughs"])
 	if keep.has("training"):
 		L0["training"] = keep["training"]
 	if keep.has("upgrades"):

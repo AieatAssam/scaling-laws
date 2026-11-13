@@ -24,9 +24,12 @@ RESET LAYERS (each: new currency, longer horizon, new mechanic; resets never del
 2. Model Generation → Insights. Unlocks the research tree, mutually exclusive model branches,
    the alignment slider and a desk that offers papers with selectable effects.
 3. Paradigm Shift → Breakthroughs. Adds Data and capped Energy for training, automation, and
-   long-running moonshots whose rewards survive resets. Launch actions give timed boosts and
+  long-running moonshots whose rewards survive resets. Launch actions give timed boosts and
    cooldowns; the Launch Pad moonshot shortens them.
 4. Singularity → Legacy. Unlocks rival labs, three challenge tiers and five sequential AGI stages.
+   Keeps unspent Breakthroughs and in-progress moonshots; Data and Energy reset. Paradigm upgrades
+   still reset. The final AGI stage starts no earlier than day 9 after Ship, day 9.5 after Red-team,
+   or day 11 after Full eval.
    Each stage can be cleared by an instant Ship it, a 6h community red-team or a 12h full safety
    evaluation. The majority choice determines the ending; ties go to the last choice.
 Gain = floor(sqrt(lifetime/threshold)); UI highlights the reset when gain >= 2x current holding.
@@ -44,7 +47,7 @@ SYSTEMS
 TECHNICAL
 - Big-number class (mantissa+exponent); suffix (K, M, B, T, Qa…) then scientific notation.
 - Content as Godot Resources (.tres) so adding content needs no code.
-- Version 8 JSON saves in `user://`, with rolling `.bak` files, recovery and sequential migrations.
+- Version 9 JSON saves in `user://`, with rolling `.bak` files, recovery and sequential migrations.
 - Headless tools: `simulate.gd` (scripted 14-day run), `reward_gaps.gd`, `ending_order.sh`,
   `training_balance.gd` and `check.sh`.
 - GUT tests for economy, prestige, reset purity and save/load, all passing.

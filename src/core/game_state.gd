@@ -2,7 +2,8 @@ class_name GameState
 extends RefCounted
 ## All game state. `persist` survives every reset and new run; `run` is what resets wipe.
 ## run.layers[0] = base run (cash, compute, producers). run.layers[1..4] = funding, generation,
-## paradigm, singularity. Reset k keeps currency k, wipes layers 0..k-1, and zeroes layer k's life/clock.
+## paradigm, singularity. Reset k keeps currency k, wipes layers 0..k-1, and zeroes layer k's life/clock;
+## Singularity also keeps unspent breakthroughs while Paradigm upgrades, Data and Energy reset.
 
 const CURRENCY_LAYER := {
 	"cash": 0, "compute": 0, "equity": 1, "insights": 2,
@@ -195,4 +196,6 @@ func _normalize_ints() -> void:
 	for i in persist["lifetime_resets"].size():
 		persist["lifetime_resets"][i] = int(persist["lifetime_resets"][i])
 	persist["records"]["agi_best"] = int(persist["records"]["agi_best"])
+	persist["records"]["offline_seconds"] = float(persist["records"].get("offline_seconds", 0.0))
+	persist["records"]["deployment_burst_cash"] = BigNum.from_json(persist["records"].get("deployment_burst_cash", {})).to_json()
 	persist["redteam_uses"] = int(persist["redteam_uses"])

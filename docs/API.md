@@ -56,7 +56,7 @@ Constant: `CURRENCY_LAYER`, which maps each currency to its reset layer (`cash`,
 
 Each layer dict: `cur` (currency → BigNum), `life` (BigNum, cash earned since last reset), `clock` (seconds), `owned` (layer 0 only), `staff` (layer 1 only), `research` (layer 2 only, array of ids), `best` (layer 2 only, training score), `debt` (layer 0 only), `run_mult`, `timed` (layer 0 only), `training` (layer 0 only), `cooldowns` and `pending` (layer 0 only, event state), `event_timer`, `challenge` (layer 4 only).
 
-Reset k keeps currency k, wipes layers 0..k-1 completely, and zeroes layer k's `life` and `clock`. It also adds 1 to `persist.lifetime_resets[k-1]` and to `persist.stats.resets`.
+Reset k keeps currency k, wipes layers 0..k-1, and zeroes layer k's `life` and `clock`. Singularity (k = 4) also preserves unspent Breakthroughs while resetting Data, Energy, and Paradigm-layer upgrades; persistent moonshots keep running through every reset. It also adds 1 to `persist.lifetime_resets[k-1]` and to `persist.stats.resets`.
 
 ## Sim (static, pure)
 
@@ -143,7 +143,7 @@ Event dicts returned by `tick`, each with a `kind` key:
 
 ## SaveSystem (autoload `SaveSystem`)
 
-- `VERSION = 8`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. v3 → v4 (`_v3_to_v4`): adds `persist.records`. v7 → v8 adds Singularity-scoped AGI peak state. A save with no version field counts as v0.
+- `VERSION = 9`, `DEFAULT_PATH = "user://save.json"`. v2: a training run stores its `type`; a v1 run in flight (a bare compute share) is refunded its spend into compute and cleared. v3 → v4 (`_v3_to_v4`): adds `persist.records`. v7 → v8 adds Singularity-scoped AGI peak state. v8 → v9 adds lifetime offline-credit and training-burst cash totals. A save with no version field counts as v0.
 - `save(state: Dictionary, path=DEFAULT_PATH) -> bool`: writes `{"version", "state"}` as JSON. Before overwriting, copies the current file to `<path>.bak`, but only if it is a valid save, so a damaged file never replaces the backup. Refuses (`false`, `push_error`) to overwrite a file written by a newer version.
 - `load_data(path=DEFAULT_PATH) -> Dictionary`: returns the migrated state dict, or `{}` for a new game. Sets `last_notice: String` (empty when nothing needed reporting):
   - missing file: `{}`, no notice.
@@ -311,7 +311,7 @@ It prints `OK` and exits 0, or prints `FAIL` lines and exits 1.
 
 ## Records, completion and reveals
 
-`Records` (`src/core/records.gd`, pure) keeps `persist.records`, which survives resets: `fastest` (layer key "1".."4" → seconds of the quickest cycle), `cycle_start` (per layer 0..4, game time the layer was last cleared), `run_start`, the achieved sets `producers`, `research`, `challenges`, `endings`, `outpaced` (rivals not launched when an ending is reached), and `agi_best`.
+`Records` (`src/core/records.gd`, pure) keeps `persist.records`, which survives resets: `fastest` (layer key "1".."4" → seconds of the quickest cycle), `cycle_start` (per layer 0..4, game time the layer was last cleared), `run_start`, the achieved sets `producers`, `research`, `challenges`, `endings`, `outpaced` (rivals not launched when an ending is reached), `agi_best`, `offline_seconds` (credited offline elapsed seconds), and `deployment_burst_cash` (serialized BigNum lifetime cash from successful training bursts). `note_offline` and `note_deployment_burst` accumulate the two lifetime totals.
 - `note_reset(persist, k) -> {layer, secs, first, record}`: `secs` is the time since layer k's clock. The first reset of a layer sets its baseline (no record). Later ones are records when faster; a reset of k clears clocks 0..k. `Game` calls it from `layer_reset`.
 - `note(persist, group, id)`, `note_agi(persist, index)` (keeps the max), `note_ending(s, id)`, `new_run(persist)`, `absorb(s)`.
 - `completion(s) -> {percent: float 0..100, parts: [{id, label, done, total}]}`: ten equally weighted parts: producer tiers, benchmarks, research, automation, reset layers, challenges, rivals outpaced, AGI stages, endings and completed moonshots.
@@ -362,7 +362,7 @@ Long real-time projects on the Paradigm panel. Defs: `content/moonshots/*.tres` 
 - `Moonshots.blocker(s, id)` -> `""` or `"unknown moonshot"`, `"done"`, `"running"`, `"locked"`, `"needs <Title>"`, `"no free project slot"`, `"not enough breakthroughs"`, `"not enough cash"`
 - `Moonshots.start(s, id)` -> `{ok, ...}`; spends breakthroughs and cash; `Game.start_moonshot` wraps it
 - `Moonshots.tick(s, dt, evs)`: counts down; a finished one applies its effects, adds to `persist.stats.moonshots`, and emits `moonshot_done` (`Game.moonshot_finished`)
-- Hooks read by other systems: `producer_cost_mult`, `cooldown_mult`, `staff_cost_mult`, `fail_mult`, `chip_mult`, `desk_slots`, `threshold_for` (Funding and Generation gain), `bonus_gain` (Paradigm, Singularity), `parts` (AGI road compute)
+- Hooks read by other systems: `producer_cost_mult`, `cooldown_mult`, `staff_cost_mult`, `fail_mult`, `chip_mult`, `desk_slots`, `threshold_for` (Funding and Generation gain bonuses), `bonus_gain` (Paradigm, Singularity), `parts` (AGI road compute)
 - `Moonshots.before_wipe(s, k)` / `after_wipe(s, k, keep)`: called by `Sim.perform_reset`. On a Funding Round (k = 1) they keep the training run when `second_cluster` is done, and the early lab upgrades (order ≤ `LAB_KEEP_ORDER`) when `institutional_memory` is done
 
 State: `persist.moonshots` = `{running: [{id, left}], done: [id]}`. `SaveSystem._v5_to_v6` adds it when missing.
@@ -371,7 +371,7 @@ State: `persist.moonshots` = `{running: [{id, left}], done: [id]}`. `SaveSystem.
 
 The AGI road, the ending choice, the rival race and the regulation challenge tiers. `sim.gd` calls `Endgame.tick` once per tick and `Endgame.launch_seconds` for rival clocks; nothing else in the core holds this logic.
 
-- Methods: `ship` (instant, Ship it), `redteam` (6 h community red-team), `full` (12 h full eval suite, then a 1 h cooldown after a failure). The previous stage's method scales the next stage's numeric requirements: ship ×0.7, red-team ×1.0, full ×1.7 (capped at a resource maximum); `resets_gte` is unchanged. `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
+- Methods: `ship` (instant, Ship it), `redteam` (6 h community red-team), `full` (12 h full eval suite, then a 1 h cooldown after a failure). The previous stage's method scales the next stage's resource requirements: ship ×0.7, red-team ×1.0, full ×1.85 (capped at a resource maximum); reset gates are unchanged. The final stage starts no earlier than day 9 after Ship, day 9.5 after Red-team, or day 11 after Full eval. `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
 - `stage_conditions(s, index, previous_method="")` returns a stage's live gates; `previous_method` previews the numeric scaling before that method is cleared.
 - Evaluations: `run.eval = {method, index, left}`. Pass chance: red-team `RED_PASS` (0.7); full suite `FULL_BASE` + `FULL_SLIDER` × alignment slider + `FULL_OPS` per ops staff, capped at `FULL_CAP` (0.97). A pass clears the stage; a fail reopens it (the full suite then cools down).
 - Ending: `majority(choices)` picks the most-used method, ties going to the most recent choice. `ending_for(choices)` maps it to `aligned` (full), `open_sourced` (redteam) or `rushed` (ship). Run ends after the fifth stage clears.
@@ -381,9 +381,9 @@ The AGI road, the ending choice, the rival race and the regulation challenge tie
 
 `Game` wraps the actions (`agi_choose`, `outship`, `acqui_hire`) and emits `agi_cleared`, `agi_failed`, `rival_outpaced` and `race_action`.
 
-## Save version 8
+## Save version 9
 
-`SaveSystem.VERSION = 8`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). `_v7_to_v8` adds `run.peak_compute_rate` and `run.agi_peaks`. A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached.
+`SaveSystem.VERSION = 9`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). `_v7_to_v8` adds `run.peak_compute_rate` and `run.agi_peaks`. `_v8_to_v9` adds lifetime offline-credit and training-burst cash totals to `persist.records`. A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached.
 
 ## Save version 5
 

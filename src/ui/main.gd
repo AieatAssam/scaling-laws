@@ -73,6 +73,7 @@ var _stats: StatsPanel            # Settings > Statistics overlay, built on firs
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	get_viewport().gui_embed_subwindows = true
 	add_to_group("shell")
 	resized.connect(_on_resized)
 	get_window().size_changed.connect(_fit_base)

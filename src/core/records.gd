@@ -19,8 +19,19 @@ static func default(now: float) -> Dictionary:
 	return {
 		"fastest": {}, "cycle_start": [now, now, now, now, now], "run_start": now,
 		"producers": {}, "research": {}, "challenges": {}, "endings": {}, "outpaced": {},
-		"agi_best": 0, "best_gain": {},
+		"agi_best": 0, "best_gain": {}, "offline_seconds": 0.0,
+		"deployment_burst_cash": BigNum.new().to_json(),
 	}
+
+
+static func note_offline(persist: Dictionary, seconds: float) -> void:
+	var r: Dictionary = persist["records"]
+	r["offline_seconds"] = float(r.get("offline_seconds", 0.0)) + maxf(seconds, 0.0)
+
+
+static func note_deployment_burst(persist: Dictionary, cash: BigNum) -> void:
+	var r: Dictionary = persist["records"]
+	r["deployment_burst_cash"] = BigNum.from_json(r.get("deployment_burst_cash", {})).add(cash).to_json()
 
 
 ## Largest gain of one reset of layer k so far.

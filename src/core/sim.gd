@@ -723,6 +723,7 @@ static func tick(s: GameState, dt: float, offline: bool = false, modal: bool = f
 ## Simulates `seconds` away from the game in 60 s steps, capped at 24 h.
 static func offline(s: GameState, seconds: float) -> Dictionary:
 	var secs := minf(seconds, OFFLINE_CAP)
+	Records.note_offline(s.persist, secs)
 	var c0 := s.cur("cash")
 	var k0 := s.cur("compute")
 	var events: Array = []

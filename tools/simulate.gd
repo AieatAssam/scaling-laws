@@ -332,8 +332,6 @@ func _automation() -> void:
 				moon_log.append([now(), "auto " + d.id])
 				more = true
 				break
-
-
 ## Keeps every project slot full: the cheapest startable moonshot first (breakthroughs, then hours).
 func _moonshots() -> void:
 	while Moonshots.running(s).size() < Moonshots.slots(s):

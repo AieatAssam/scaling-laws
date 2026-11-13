@@ -120,6 +120,26 @@ func test_v3_save_is_migrated_with_records() -> void:
 	assert_eq(float(r["run_start"]), 500.0)
 
 
+func test_v8_save_migrates_lifetime_totals_and_records_accumulate() -> void:
+	var state := s.to_dict()
+	state["persist"]["records"].erase("offline_seconds")
+	state["persist"]["records"].erase("deployment_burst_cash")
+	var saver: Node = autofree(SaveScript.new())
+	var migrated: Dictionary = saver.migrate({"version": 8, "state": state})
+	var r: Dictionary = migrated["persist"]["records"]
+	assert_eq(float(r["offline_seconds"]), 0.0)
+	assert_true(BigNum.from_json(r["deployment_burst_cash"]).is_zero())
+	Records.note_offline(s.persist, 120.0)
+	Records.note_offline(s.persist, 60.0)
+	Records.note_deployment_burst(s.persist, BigNum.from_float(1e30))
+	Records.note_deployment_burst(s.persist, BigNum.from_float(2e30))
+	assert_eq(float(s.persist["records"]["offline_seconds"]), 180.0)
+	assert_eq(BigNum.from_json(s.persist["records"]["deployment_burst_cash"]).format(), BigNum.from_float(3e30).format())
+	var json := JSON.parse_string(JSON.stringify(s.to_dict())) as Dictionary
+	var restored := GameState.from_dict(content, json)
+	assert_eq(JSON.stringify(restored.to_dict()), JSON.stringify(s.to_dict()), "lifetime totals survive JSON save/load")
+
+
 func test_absorb_counts_what_a_loaded_save_holds() -> void:
 	var p := s.persist
 	p["records"] = Records.default(0.0)

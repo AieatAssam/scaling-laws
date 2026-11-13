@@ -48,6 +48,7 @@ func _rich_state(resets_before: int) -> GameState:
 	s.persist["perm_mult"] = {"compute": 1.3}
 	s.persist["legacy_perks"] = {"cash": 2}
 	s.persist["automation"] = ["auto_buy"]
+	s.persist["moonshots"]["running"] = [{"id": "open_weights", "left": 1800.0}]
 	var benches: Array = content.get_all("benchmarks")
 	if not benches.is_empty():
 		s.persist["benchmarks"] = [benches[0].id]
@@ -75,6 +76,8 @@ func test_each_reset_wipes_exactly_the_layers_below_it() -> void:
 			var expect: Dictionary = Support.plain(GameState.fresh_layer())
 			if j == 0:
 				expect["cur"] = {"cash": Support.plain(BigNum.from_float(GameState.START_CASH))}
+			elif k == 4 and j == 3:
+				expect["cur"] = {"breakthroughs": Support.plain(before["run"]["layers"][3]["cur"].get("breakthroughs", BigNum.new()))}
 			assert_eq(after["run"]["layers"][j], expect, "reset %d wipes layer %d" % [k, j])
 
 		var expect_k: Dictionary = before["run"]["layers"][k].duplicate(true)

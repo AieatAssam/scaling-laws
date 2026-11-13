@@ -6,7 +6,7 @@ const WIPES := {
 	1: "Wipes cash, compute, producers and any training run. Keeps equity and everything in later layers.",
 	2: "Also wipes equity and staff. Keeps insights, research and the best training score.",
 	3: "Also wipes insights, research and the best training score. Keeps breakthroughs, data, energy and automation.",
-	4: "Also wipes breakthroughs, data and energy. Keeps legacy and its perks, the AGI stage, rival progress and challenges.",
+	4: "Wipes data and energy. Keeps breakthroughs, running moonshots, legacy and its perks, the AGI stage, rival progress and challenges. Paradigm upgrades reset.",
 }
 const LAYER_ART := ["", "funding", "generation", "paradigm", "singularity"]
 
@@ -58,11 +58,15 @@ func setup(k: int, on_result: Callable) -> PanelResetCard:
 	v.add_child(_why)
 	_button = PanelKit.button("", Callable(), false)
 	_button.theme_type_variation = &"MicroButton"   # 8 px: "Run +N Breakthroughs" fits the card width
-	_button.pressed.connect(func() -> void: _dialog.popup_centered())
+	_button.pressed.connect(_confirm_dialog)
 	v.add_child(_button)
 	_dialog = ConfirmationDialog.new()
 	_dialog.exclusive = false   # several panels live in one window in the dev harness; only one dialog opens at a time anyway
 	_dialog.confirmed.connect(_do_reset)
+	_dialog.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_dialog.get_label().custom_minimum_size.y = 72
+	_dialog.get_ok_button().custom_minimum_size.y = 40
+	_dialog.get_cancel_button().custom_minimum_size.y = 40
 	add_child(_dialog)
 	refresh()
 	return self
@@ -135,3 +139,8 @@ static func _span(sec: float) -> String:
 func _do_reset() -> void:
 	var r: Dictionary = _game().reset_layer(layer)
 	_on_result.call(r, "%s done." % PanelText.layer_title(layer))
+
+
+func _confirm_dialog() -> void:
+	var vp := get_viewport_rect().size
+	_dialog.popup_centered(Vector2i(roundi(minf(480.0, vp.x - 16.0)), roundi(minf(240.0, vp.y - 16.0))))

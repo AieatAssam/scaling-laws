@@ -77,9 +77,68 @@ func _initialize() -> void:
 				await process_frame  # frame_post_draw never fired while the window was occluded: the run hung
 				frames.append(root.get_texture().get_image())
 			_save_montage(frames, "%s/%s_%dx%d_%s.png" % [out, mode, s.x, s.y, id])
+		await _overlay_walk(main, vp, out, mode, s)
 		print("tabs shown: %s" % ", ".join(tabs.keys().filter(func(k): return (tabs[k] as Button).is_visible_in_tree())))
 	print("CHECK items=%d problems=%d" % [_checked, _problems])
 	quit(1 if _problems > 0 else 0)
+
+
+func _overlay_walk(main: Node, vp: Vector2, out: String, mode: String, size: Vector2i) -> void:
+	var g = root.get_node("/root/Game")
+	g.state.persist["records"]["offline_seconds"] = 90500.0
+	g.state.persist["records"]["deployment_burst_cash"] = BigNum.from_float(1e12).to_json()
+	main.open_stats()
+	await _capture(main, vp, out, mode, size, "overlay_stats")
+	var stats_scroll := _find_scroll(main.get("_stats"))
+	stats_scroll.scroll_vertical = int(stats_scroll.get_v_scroll_bar().max_value)
+	await process_frame
+	await _capture(main, vp, out, mode, size, "overlay_stats_bottom")
+	stats_scroll.scroll_vertical = 0
+	main.get("_stats").hide()
+
+	var reveal = main.get("_reveal_card")
+	g.state.persist["stats"]["time"] = 1300.0
+	g.state.persist["seen_reveals"].erase("training")
+	reveal.call("_open", "training")
+	await _capture(main, vp, out, mode, size, "overlay_reveal")
+	reveal.call("_close")
+
+	var notices = main.get("_notices")
+	notices.show_offline({"away": 90000.0, "capped": true, "cash": BigNum.from_float(1234),
+		"compute": BigNum.from_float(5678), "events": [{"kind": "training_done"}, {"kind": "reset"}]})
+	await _capture(main, vp, out, mode, size, "overlay_offline")
+	notices.dismiss()
+
+	main.call("play_intro")
+	await create_timer(0.7).timeout
+	main.get("_intro").call("_end_typing")
+	await _capture(main, vp, out, mode, size, "overlay_intro")
+	main.get("_intro").call("_finish")
+	await create_timer(0.8).timeout
+	await process_frame
+
+	for key in ["funding", "singularity"]:
+		var card = main.get("_panels")[key].get("_card")
+		card.call("_confirm_dialog")
+		await process_frame
+		await _capture(main, vp, out, mode, size, "overlay_reset_%s" % key)
+		card.get("_dialog").hide()
+
+	for ending in ["aligned", "rushed", "open_sourced"]:
+		var scene: Node = load("res://src/ui/ending_screen.tscn").instantiate()
+		main.add_child(scene)
+		scene.call("show_ending", ending)
+		await process_frame
+		await _capture(main, vp, out, mode, size, "overlay_ending_%s" % ending)
+		scene.queue_free()
+		await process_frame
+
+
+func _capture(main: Node, vp: Vector2, out: String, mode: String, size: Vector2i, tag: String) -> void:
+	await process_frame
+	_checked += 1
+	_check(main, vp, "%s@%dx%d" % [tag, size.x, size.y])
+	root.get_texture().get_image().save_png("%s/%s_%dx%d_%s.png" % [out, mode, size.x, size.y, tag])
 
 
 ## "full": everything unlocked and running, so every tab, row and overlay has content. CHEATS (dev only, never saved):

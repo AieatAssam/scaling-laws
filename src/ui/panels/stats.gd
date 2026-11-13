@@ -90,6 +90,8 @@ func _build() -> void:
 	_row(all, "runs", "Runs started")
 	_row(all, "resets", "Resets")
 	_row(all, "time", "Time played")
+	_row(all, "offline", "Offline time credited")
+	_row(all, "bursts", "Deployment burst cash")
 	_row(all, "events", "Events resolved")
 	_row(all, "papers", "Papers read")
 	_row(all, "moonshots", "Moonshots completed")
@@ -226,6 +228,8 @@ func _refresh() -> void:
 	_v["runs"].text = str(int(stats["runs"]))
 	_v["resets"].text = str(int(stats["resets"]))
 	_v["time"].text = Records.format_duration(float(stats["time"]))
+	_v["offline"].text = Records.format_duration(float(p["records"].get("offline_seconds", 0.0)))
+	_v["bursts"].text = BigNum.from_json(p["records"].get("deployment_burst_cash", {})).format()
 	_v["events"].text = str(int(stats.get("events", 0)))
 	_v["papers"].text = str(int(stats.get("papers", 0)))
 	for key in ["moonshots", "upgrades", "launches", "news", "evals_passed", "evals_failed"]:

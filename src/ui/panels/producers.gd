@@ -48,6 +48,9 @@ func _ready() -> void:
 	_picker = AmountPicker.new().setup("Buy", AMOUNTS, "Buy")
 	_picker.changed.connect(func(_a: int) -> void: _refresh())
 	page.add_child(_picker)
+	var scroll_hint := PanelKit.label("Drag list to scroll", PanelKit.MUTED, false)
+	scroll_hint.theme_type_variation = &"MicroDim"
+	page.add_child(scroll_hint)
 
 	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -122,7 +125,7 @@ func _row(d) -> PanelContainer:
 	buy.expand_icon = true
 	buy.add_theme_constant_override("icon_max_width", 16)
 	buy.clip_text = true
-	buy.custom_minimum_size = Vector2(BUY_W, 20)
+	buy.custom_minimum_size = Vector2(BUY_W, 40)
 	buy.size_flags_horizontal = Control.SIZE_SHRINK_END
 	buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	buy.pressed.connect(_buy.bind(id, buy))

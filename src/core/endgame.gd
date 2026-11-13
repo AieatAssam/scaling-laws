@@ -21,7 +21,7 @@ const RED_SECONDS := 21600.0
 const RED_PASS := 0.7
 const RED_SPEED := 0.05          # rival speed per community red-team run, persistent (persist.redteam_uses)
 const SHIP_CUT := 0.7            # the stage after a Ship it choice needs 30% less of each numeric requirement
-const FULL_SCALE := 1.7          # a full suite raises the next stage's numeric requirements by 70%
+const FULL_SCALE := 1.85         # a full suite raises the next stage's numeric requirements by 85%
 const RECK_RIVAL := 0.1          # rival speed per Ship it choice in this run (rivals hear about the release)
 const RECK_SEVERITY := 0.25      # negative alignment event loss per Ship it choice in this run
 const BAD_CATEGORIES := ["incident", "outage"]
@@ -85,7 +85,7 @@ static func pending_index(s: GameState) -> int:
 
 
 ## Conditions of the stage at `index` (0-based) as they now stand. The last choice scales the next stage's numeric
-## requirements by SHIP_CUT / 1.0 / FULL_SCALE for ship / red-team / full; resource caps and resets_gte are unchanged.
+## resource requirements by SHIP_CUT / 1.0 / FULL_SCALE; the final stage also has a method-specific time floor.
 static func stage_conditions(s: GameState, index: int, previous_method: String = "") -> Array:
 	var stages: Array = s.db.get_all("agi_stages")
 	var conds: Array = stages[index].conditions
@@ -97,9 +97,13 @@ static func stage_conditions(s: GameState, index: int, previous_method: String =
 	var out: Array = []
 	for c in conds:
 		var d: Dictionary = c.duplicate()
-		if ["compute_rate_gte", "owned_gte", "currency_gte", "training_best_gte"].has(d["type"]):
+		if d["type"] == "time_played_gte" and index == stages.size() - 1:
+			var final_days := {"ship": 9.0, "redteam": 9.5, "full": 11.0}
+			if final_days.has(method):
+				d["value"] = float(final_days[method]) * 86400.0
+		var scaled := ["compute_rate_gte", "owned_gte", "currency_gte", "training_best_gte"].has(d["type"])
+		if scaled:
 			d["_agi_peak"] = true
-		if d["type"] != "resets_gte" and d.has("value"):
 			d["value"] = float(d["value"]) * requirement_scale
 			if d["type"] == "currency_gte" and d["id"] == "energy":
 				d["value"] = minf(float(d["value"]), Sim.ENERGY_CAP)
