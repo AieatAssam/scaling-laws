@@ -9,3 +9,4 @@ title = "Kestrel"
 description = "A rival lab racing for AGI."
 icon = "rivals"
 launch_hours = 16.0
+outpace_stage = 4

@@ -175,3 +175,32 @@ func _state() -> GameState:
 
 func _assert_asset(path: String) -> void:
 	assert_true(FileAccess.file_exists(path), "asset exists: " + path)
+
+
+func test_challenge_tiers_chain_to_the_tier_below() -> void:
+	var by_id := {}
+	for c in content.get_all("challenges"):
+		by_id[c.id] = c
+	for c in content.get_all("challenges"):
+		var where := "challenge %s" % c.id
+		assert_true(int(c.tier) in [1, 2, 3], where + " tier is I, II or III")
+		if c.requires == "":
+			assert_eq(int(c.tier), 1, where + " without a requirement is tier I")
+		elif by_id.has(c.requires):
+			assert_eq(int(by_id[c.requires].tier), int(c.tier) - 1, where + " requires the tier below")
+		else:
+			fail_test(where + " requires an unknown challenge %s" % c.requires)
+
+
+func test_rivals_and_endings_point_at_real_stages_and_methods() -> void:
+	var stages: int = content.get_all("agi_stages").size()
+	for r in content.get_all("rivals"):
+		assert_between(int(r.outpace_stage), 1, stages, "rival %s outpace stage" % r.id)
+	for e in content.get_all("endings"):
+		assert_true(e.method in ["full", "redteam", "ship"], "ending %s method" % e.id)
+
+
+func test_help_topics_have_a_title_and_text() -> void:
+	for h in content.get_all("help"):
+		assert_false(String(h.title).is_empty(), "help %s has a title" % h.id)
+		assert_false(String(h.body).is_empty(), "help %s has a body" % h.id)

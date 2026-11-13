@@ -94,7 +94,7 @@ static func cost_mult(s: GameState, id: String) -> float:
 	for u in owned_defs(s):
 		if u.kind == "cost" and u.target == id:
 			m *= 1.0 - u.value
-	return m
+	return m * Moonshots.producer_cost_mult(s)
 
 
 ## Factors this module adds to multiplier `key`, for Rules.mult_parts: revenue (cash) and train_speed.

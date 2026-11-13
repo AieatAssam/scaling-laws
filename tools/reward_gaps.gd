@@ -5,11 +5,12 @@ extends "res://tools/simulate.gd"
 ##   $GODOT --headless --path . -s tools/reward_gaps.gd -- --hours=336 --seed=1 --ending=aligned
 ##
 ## Reward kinds and class:
-##   BIG:   tier (first purchase of a tier, ever), automation, reset (any layer), agi, ending,
+##   BIG:   tier (first purchase of a tier, ever), automation, moonshot (completed), reset (any layer), agi, ending,
 ##          unlock (a tab, system, constraint, the first event, the first training run)
 ##   small: milestone (25/50/100/200 owned, each run), hire, research, legacy, training (new best score),
-##          benchmark, challenge (regulation completed, pass or fail), rival (launch; the code has no "overtake")
-##   novel: first-of-kind only: first tier, first reset of each layer, unlock, automation, agi, ending.
+##          benchmark, challenge (regulation completed, pass or fail), rival (launch; the code has no "overtake"),
+##          upgrade (bought, manual or automatic), launch (fired), paper (desk choice resolved)
+##   novel: first-of-kind only: first tier, first reset of each layer, unlock, automation, moonshot, agi, ending.
 ## Gaps run between reward moments: rewards in one sim step form one moment. Steps are 30–120 s apart, so gap
 ## lengths are good to about ±2 min.
 ## Dry stretches are steps at which nothing is affordable:
@@ -17,9 +18,9 @@ extends "res://tools/simulate.gd"
 ##   decision-dry: also no pending event, highlighted reset, startable challenge or startable training run.
 ## Repeat purchases are not rewards by definition, so a long gap marks where the player sees nothing new.
 
-const RG_BIG := ["tier", "automation", "reset", "agi", "ending", "unlock"]
+const RG_BIG := ["tier", "automation", "moonshot", "reset", "agi", "ending", "unlock"]
 const RG_KINDS := ["tier", "milestone", "hire", "research", "automation", "legacy", "training", "benchmark",
-	"challenge", "rival", "reset", "agi", "ending", "unlock"]
+	"challenge", "rival", "upgrade", "launch", "paper", "moonshot", "reset", "agi", "ending", "unlock"]
 const RG_PHASES := [[0.0, 1.0], [1.0, 4.0], [4.0, 12.0], [12.0, 24.0], [24.0, 48.0], [48.0, 72.0], [72.0, 1e9]]
 const RG_PHASE_NAMES := ["0-1 h", "1-4 h", "4-12 h", "12-24 h", "day 2", "day 3", "day 4+"]
 const RG_TABS := ["", "Funding", "Generation", "Paradigm", "Singularity"]
@@ -40,6 +41,8 @@ var rg_prev_staff := {}
 var rg_prev_research: Array = []
 var rg_prev_auto: Array = []
 var rg_prev_legacy := {}
+var rg_prev_upgrades: Array = []
+var rg_prev_launches := 0
 var rg_dry := {"p": [], "d": []}    # key -> [start, end, what ended it, state at start]
 var rg_dry_start := {"p": -1.0, "d": -1.0}
 var rg_dry_state := {"p": {}, "d": {}}
@@ -94,6 +97,15 @@ func _observe() -> void:
 		for i in range(int(rg_prev_legacy.get(key, 0)), int(perks[key])):
 			_reward("legacy", "legacy perk %s (%d)" % [key, i + 1], false)
 	rg_prev_legacy = perks.duplicate()
+	var ups: Array = Upgrades.owned_ids(s)
+	for id in ups:
+		if not (id in rg_prev_upgrades):
+			_reward("upgrade", "upgrade %s" % id, false)
+	rg_prev_upgrades = ups.duplicate()
+	var launched := int(s.persist["stats"]["launches"])
+	for i in range(rg_prev_launches, launched):
+		_reward("launch", "launch fired (%d)" % (i + 1), false)
+	rg_prev_launches = launched
 	for k in range(1, 5):
 		# Mirrors the panels' is_unlocked(): layer k shows after a reset of k-1 or k, or once its gain reaches 1.
 		var shown: bool = s.resets(k) > 0 or (k > 1 and s.resets(k - 1) > 0) or int(Sim.reset_preview(s, k)["gain"]) >= 1
@@ -130,6 +142,10 @@ func _handle(evs: Array) -> void:
 				_reward("agi", "AGI stage %d: %s" % [int(e["index"]), stage.id], true)
 			"ending":
 				_reward("ending", "ENDING %s" % e["id"], true)
+			"moonshot_done":
+				_reward("moonshot", "moonshot %s" % e["id"], true)
+			"paper_resolved":
+				_reward("paper", "paper %s (choice %d)" % [e["id"], int(e["choice"])], false)
 	super._handle(evs)
 
 
@@ -407,7 +423,7 @@ func _rg_checks() -> void:
 	for r in rg_rewards:
 		fired[r["kind"]] = true
 	print("")
-	for kind in ["tier", "milestone", "hire", "research", "automation", "training", "benchmark", "reset", "agi", "unlock"]:
+	for kind in ["tier", "milestone", "hire", "research", "automation", "moonshot", "upgrade", "launch", "paper", "training", "benchmark", "reset", "agi", "unlock"]:
 		if not fired.has(kind):
 			print("WARN: no %s reward fired" % kind)
 	if ending_id == "":

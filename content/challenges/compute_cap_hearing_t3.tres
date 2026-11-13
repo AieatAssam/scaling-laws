@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ChallengeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/challenge_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "compute_cap_hearing_t3"
+title = "Compute Cap Hearing III"
+description = "They are not satisfied."
+icon = "regulation"
+duration = 10800.0
+goal = Array[Dictionary]([{"type": "currency_gte", "id": "energy", "value": 100.0}, {"type": "currency_gte", "id": "data", "value": 40.0}])
+reward = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.12}])
+penalty = Array[Dictionary]([{"type": "add_debt", "value": 40.0}])
+tier = 3
+requires = "compute_cap_hearing_t2"

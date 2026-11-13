@@ -110,6 +110,7 @@ static func mult_parts(s: GameState, key: String) -> Array:
 		out.append({"id": "desk", "name": "Research desk", "value": 1.0 + float(s.run["layers"][2]["desk"]["bonus"])})
 	out.append({"id": "run", "name": "Run upgrades", "value": float(L0["run_mult"].get(key, 1.0))})
 	out.append_array(Upgrades.parts(s, key))
+	out.append_array(Moonshots.parts(s, key))
 	for t in L0["timed"]:
 		if t["key"] == key:
 			out.append({"id": "timed", "name": "Timed boost", "value": float(t["value"])})
@@ -238,7 +239,7 @@ static func reset_worth_life(s: GameState, k: int) -> BigNum:
 	var g := _ceil_big(s.cur(ld.currency).mul_f(2.0))
 	if g.compare(BigNum.from_float(2.0)) < 0:
 		g = BigNum.from_float(2.0)
-	return BigNum.from_float(float(ld.threshold)).multiply(g.multiply(g))
+	return BigNum.from_float(Moonshots.threshold_for(s, k, float(ld.threshold))).multiply(g.multiply(g))
 
 
 ## Seconds to cover `remaining` of lifetime at `rate` per second (0 when already covered).
@@ -267,7 +268,8 @@ static func reset_eta(s: GameState, k: int) -> Dictionary:
 	if not p["highlight"]:
 		out["worth_in"] = _secs(reset_worth_life(s, k).subtract(life), rate)
 	var g := int(p["gain"])
-	out["next_in"] = _secs(BigNum.from_float(float(ld.threshold) * float(g + 1) * float(g + 1)).subtract(life), rate)
+	var thr := Moonshots.threshold_for(s, k, float(ld.threshold))
+	out["next_in"] = _secs(BigNum.from_float(thr * float(g + 1) * float(g + 1)).subtract(life), rate)
 	return out
 
 

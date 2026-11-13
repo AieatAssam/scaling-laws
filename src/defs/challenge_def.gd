@@ -6,3 +6,5 @@ extends ContentDef
 @export var goal: Array[Dictionary] = []
 @export var reward: Array[Dictionary] = []
 @export var penalty: Array[Dictionary] = []
+@export var tier: int = 1
+@export var requires: String = ""  # id of the tier below, passed at least once (ever) before this one is open

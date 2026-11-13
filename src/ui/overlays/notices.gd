@@ -77,6 +77,7 @@ func _ready() -> void:
 	Game.save_notice.connect(func(text: String) -> void: _request(show_save_notice.bind(text)))
 	Game.benchmark_unlocked.connect(show_benchmark)
 	Game.record_set.connect(show_record)
+	Game.moonshot_finished.connect(show_moonshot)
 
 
 func _request(open: Callable) -> void:
@@ -139,6 +140,14 @@ func show_benchmark(id: String, badge: String) -> void:
 func show_record(layer: int, secs: float) -> void:
 	_toast_icon.visible = false
 	_toast_title.text = "New record: fastest %s %s" % [Records.layer_title(Game.state, layer), Records.format_duration(secs)]
+	_toast.visible = true
+	_toast_t = 3.0
+
+
+func show_moonshot(id: String) -> void:
+	var d = Content.get_def("moonshots", id)
+	_toast_icon.visible = false
+	_toast_title.text = "Moonshot complete: %s" % (d.title if d else id)
 	_toast.visible = true
 	_toast_t = 3.0
 

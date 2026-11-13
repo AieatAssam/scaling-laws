@@ -54,7 +54,7 @@ static func fire(s: GameState, id: String) -> Dictionary:
 	s.set_cur(d.cost_currency, s.cur(d.cost_currency).subtract(paid))
 	for e in d.effects:
 		Rules.apply(s, e)
-	s.run["launches"][id] = float(d.cooldown)
+	s.run["launches"][id] = float(d.cooldown) * Moonshots.cooldown_mult(s)
 	s.persist["stats"]["launches"] = int(s.persist["stats"].get("launches", 0)) + 1
 	return {"ok": true, "id": id, "cost": paid}
 

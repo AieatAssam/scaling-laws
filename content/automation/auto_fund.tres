@@ -9,4 +9,4 @@ title = "Auto-fund"
 description = "Takes the Funding Round when it is highlighted."
 icon = "automation"
 order = 3
-cost = 5.0
+cost = 6.0

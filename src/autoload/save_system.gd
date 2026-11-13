@@ -4,7 +4,7 @@ extends Node
 ## a file from a newer version is set aside as <path>.newer-<ms> and never overwritten. `last_notice` says
 ## what load_data had to do (empty when nothing happened); Game shows it to the player.
 
-const VERSION := 5
+const VERSION := 7
 const DEFAULT_PATH := "user://save.json"
 
 var last_notice := ""
@@ -76,6 +76,29 @@ func migrate(wrapper: Dictionary) -> Dictionary:
 		state = _v3_to_v4(state)
 	if v < 5:
 		state = _v4_to_v5(state)
+	if v < 6:
+		state = _v5_to_v6(state)
+	if v < 7:
+		state = _v6_to_v7(state)
+	return state
+
+
+## Adds the AGI choices of the run (run.agi_choices). Stages already cleared before evals existed were passed by
+## shipping: a run that has ended maps its ending to the method that wins it (aligned full, open_sourced red-team,
+## rushed ship). New run and persist keys are filled from defaults by GameState.from_dict; no counters are added.
+static func _v6_to_v7(state: Dictionary) -> Dictionary:
+	var run: Dictionary = state.get("run", {})
+	if not run.has("agi_choices"):
+		var over := String(run.get("run_over", ""))
+		var method: String = {"aligned": "full", "open_sourced": "redteam"}.get(over, "ship")
+		var n := int(run.get("stage", 0))
+		if over != "":
+			n = 5
+		var choices: Array = []
+		for i in n:
+			choices.append(method if over != "" else "ship")
+		run["agi_choices"] = choices
+	state["run"] = run
 	return state
 
 
@@ -108,6 +131,19 @@ static func _v4_to_v5(state: Dictionary) -> Dictionary:
 			stats[k] = 0
 	persist["stats"] = stats
 	state["run"] = run
+	state["persist"] = persist
+	return state
+
+
+## Adds Moonshots state (persist.moonshots: running projects and completed ids) and its stats counter.
+static func _v5_to_v6(state: Dictionary) -> Dictionary:
+	var persist: Dictionary = state.get("persist", {})
+	if not persist.has("moonshots"):
+		persist["moonshots"] = {"running": [], "done": []}
+	var stats: Dictionary = persist.get("stats", {})
+	if not stats.has("moonshots"):
+		stats["moonshots"] = 0
+	persist["stats"] = stats
 	state["persist"] = persist
 	return state
 

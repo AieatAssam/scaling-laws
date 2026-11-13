@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ChallengeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/challenge_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "safety_board_review_t3"
+title = "Safety Board Review III"
+description = "They are not satisfied."
+icon = "regulation"
+duration = 10800.0
+goal = Array[Dictionary]([{"type": "flag_set", "id": "rival_monolith_launched"}])
+reward = Array[Dictionary]([{"type": "add_slider", "value": 0.25}])
+penalty = Array[Dictionary]([{"type": "add_debt", "value": 60.0}])
+tier = 3
+requires = "safety_board_review_t2"

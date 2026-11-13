@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MoonshotDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/moonshot_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "legacy_tithe"
+title = "Legacy Tithe"
+description = "Each Singularity pays one extra legacy."
+icon = "legacy"
+hours = 14.0
+breakthroughs = 9.5
+cash = 0.0
+prereqs = Array[String](["paradigm_dividend"])
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_singularity_1"}])
+effects = Array[Dictionary]([])

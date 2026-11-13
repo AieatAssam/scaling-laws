@@ -9,4 +9,4 @@ title = "Auto-review"
 description = "Automatically chooses the best cash option for new papers."
 icon = "automation"
 order = 5
-cost = 3.0
+cost = 3.5

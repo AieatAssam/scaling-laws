@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MoonshotDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/moonshot_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "news_desk"
+title = "News Desk"
+description = "Breaking news chips stay up 50% longer."
+icon = "events"
+hours = 2.0
+breakthroughs = 2.0
+cash = 0.0
+prereqs = Array[String]([])
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_paradigm_1"}])
+effects = Array[Dictionary]([])

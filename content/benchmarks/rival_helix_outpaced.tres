@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rival_helix_outpaced"
+title = "Outpaced: Helix"
+description = "Clear the AGI stage Helix AI was racing toward before it launched."
+icon = "benchmarks"
+badge = "silver"
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "outpaced_helix"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "cash", "value": 1.01}])

@@ -9,3 +9,4 @@ title = "Helix AI"
 description = "A rival lab racing for AGI."
 icon = "rivals"
 launch_hours = 10.0
+outpace_stage = 3

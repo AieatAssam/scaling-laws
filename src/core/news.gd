@@ -38,7 +38,7 @@ static func tick(s: GameState, dt: float, evs: Array, hold: bool) -> void:
 	if Sim.compute_per_second(s).is_zero():  # rewards are priced in income: none before the first producer
 		return
 	var id := _pick(s)
-	n["chip"] = {"id": id, "left": CHIP_SECONDS}
+	n["chip"] = {"id": id, "left": CHIP_SECONDS * Moonshots.chip_mult(s)}
 	n["timer"] = MIN_GAP - MEAN_EXTRA * log(1.0 - s.rng.randf())
 	evs.append({"kind": "news", "id": id})
 

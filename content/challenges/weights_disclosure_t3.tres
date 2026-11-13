@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ChallengeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/challenge_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "weights_disclosure_t3"
+title = "Weights Disclosure III"
+description = "They are not satisfied."
+icon = "regulation"
+duration = 14400.0
+goal = Array[Dictionary]([{"type": "training_best_gte", "value": 8.0}])
+reward = Array[Dictionary]([{"type": "perm_mult", "key": "training", "value": 1.16}])
+penalty = Array[Dictionary]([{"type": "add_currency", "id": "cash", "value": -100000.0}])
+tier = 3
+requires = "weights_disclosure_t2"

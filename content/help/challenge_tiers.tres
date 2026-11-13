@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "challenge_tiers"
+title = "Challenge tiers"
+icon = "regulation"
+order = 73
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_paradigm_1"}])
+hint = "Each regulation challenge has three tiers."
+body = "## Tiers\nEach challenge has three tiers. Tier II and III open once the tier below has been passed at least once, in any run.\n- Each tier roughly doubles the goal and asks more of the run.\n- Rewards step up: a permanent bonus of x1.05, then x1.08, then x1.12 (weights disclosure x1.10, x1.13, x1.16).\n## The cap\nPermanent challenge bonuses multiply up to a total of x1.4. Past that, rewards add nothing permanent.\n## Benchmarks\nPass five challenges in one tier to unlock that tier's benchmark."

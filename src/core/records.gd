@@ -64,12 +64,9 @@ static func note_agi(persist: Dictionary, index: int) -> void:
 	persist["records"]["agi_best"] = maxi(int(persist["records"]["agi_best"]), index)
 
 
-## An ending ends the run: every rival that has not launched yet was outpaced.
+## An ending ends the run. (Rivals are outpaced when their milestone is cleared, see Endgame; not here.)
 static func note_ending(s: GameState, id: String) -> void:
 	note(s.persist, "endings", id)
-	for r in s.db.get_all("rivals"):
-		if not bool(s.run["flags"].get("rival_%s_launched" % r.id, false)):
-			note(s.persist, "outpaced", r.id)
 
 
 ## Adds whatever the current state already shows (called when a save is loaded, so older saves count what they have).
@@ -85,6 +82,9 @@ static func absorb(s: GameState) -> void:
 	for id in passed:
 		if bool(passed[id]):
 			note(p, "challenges", id)
+	for r in s.db.get_all("rivals"):
+		if bool(s.run["flags"].get("outpaced_%s" % r.id, false)):
+			note(p, "outpaced", r.id)
 	if String(s.run["run_over"]) != "":
 		note(p, "endings", String(s.run["run_over"]))
 	note_agi(p, int(s.run["stage"]))

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "rival_race"
+title = "Rival race"
+icon = "rivals"
+order = 72
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_paradigm_1"}])
+hint = "Rivals race you to each AGI stage."
+body = "## The race\nEach rival races toward one AGI stage from the moment that stage is reached. Its bar and time left are on its row.\n- Outpaced: you clear that stage before the rival launches.\n- A launched rival is lost for this run.\n## Your moves\n- Outship: spends compute to delay a rival, with less gain each time, up to double its schedule. Cooldown applies.\n- Acqui-hire: pays cash for the rival's lead researcher, slows the rival and adds one researcher. Once per rival per run. The researcher leaves with the next Singularity reset.\n## Red-teams\nEvery community red-team speeds all rivals up by 5%, for good."

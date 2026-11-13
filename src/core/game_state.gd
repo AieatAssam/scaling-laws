@@ -24,7 +24,11 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 	persist = {
 		"perm_mult": {}, "legacy_perks": {}, "automation": [], "benchmarks": [],
 		"best_all": 0.0,
-		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0, "launches": 0, "news": 0},
+		"stats": {"runs": 1, "resets": 0, "time": 0.0, "trainings": 0, "failed": 0, "events": 0, "launches": 0, "news": 0, "moonshots": 0,
+				"evals_passed": 0, "ships": 0, "solo_full": 0, "solo_redteam": 0, "solo_ship": 0, "tier_1": 0, "tier_2": 0, "tier_3": 0},
+			"redteam_uses": 0,       # community red-team runs so far: each adds RED_SPEED to rival speed (see Endgame)
+			"challenge_mult": 1.0,   # product of permanent challenge rewards, capped at Endgame.CHALLENGE_CAP
+		"moonshots": {"running": [], "done": []},  # see Moonshots: survives every reset
 		"lifetime_resets": [0, 0, 0, 0],
 		"settings": {"reduce_motion": false, "notation": "suffix"},
 		"intro_seen": false,
@@ -45,6 +49,10 @@ static func fresh_run() -> Dictionary:
 		"layers": layers, "resets_done": [0, 0, 0, 0], "stage": 0, "slider": 0.5,
 		"flags": {}, "rivals": {}, "challenges_done": [], "challenge_passed": {}, "run_over": "",
 		"launches": {}, "news": {"timer": News.FIRST_SECONDS, "chip": {}},
+		"agi_choices": [],     # one method per cleared AGI stage (see Endgame)
+		"eval": {},            # running evaluation: {method, index, left}
+		"eval_cooldown": 0.0,  # seconds until the full eval suite can run again
+		"race": {"work": {}, "delay": {}, "outships": {}, "cool": {}, "acqui": []},  # rival race (see Endgame)
 	}
 
 
@@ -182,3 +190,4 @@ func _normalize_ints() -> void:
 	for i in persist["lifetime_resets"].size():
 		persist["lifetime_resets"][i] = int(persist["lifetime_resets"][i])
 	persist["records"]["agi_best"] = int(persist["records"]["agi_best"])
+	persist["redteam_uses"] = int(persist["redteam_uses"])

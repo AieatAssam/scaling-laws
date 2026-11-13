@@ -142,3 +142,18 @@ func test_new_run_keeps_persistent_state_and_legacy_currency() -> void:
 func test_new_run_refused_while_the_run_is_live() -> void:
 	var s := _rich_state(0)
 	assert_false(Sim.new_run(s)["ok"])
+
+
+func test_new_run_starts_the_endgame_fresh() -> void:
+	var s := _rich_state(4)
+	s.run["run_over"] = "rushed"
+	s.run["agi_choices"] = ["ship", "ship"]
+	s.run["eval"] = {"method": "full", "index": 2, "left": 100.0}
+	s.run["eval_cooldown"] = 50.0
+	s.run["race"]["work"] = {"aurora": 0.5}
+	assert_true(Sim.new_run(s)["ok"])
+	assert_eq(s.run["agi_choices"], [], "AGI choices wiped by a new run")
+	assert_true((s.run["eval"] as Dictionary).is_empty(), "evaluation wiped by a new run")
+	assert_eq(float(s.run["eval_cooldown"]), 0.0, "full-suite cooldown wiped by a new run")
+	assert_eq(s.run["race"]["work"], {}, "rival race wiped by a new run")
+	assert_eq(int(s.run["stage"]), 0, "AGI stage wiped by a new run")

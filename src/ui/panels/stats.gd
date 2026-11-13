@@ -4,13 +4,14 @@ extends PanelBase
 ## Settings > Statistics (the shell's open_stats); Close or Back hides it. Reads only: Records, the persist counters and
 ## the live state. Every section is aligned rows (label left, value right) under an accent header and a thin rule.
 
-const TABLE_HEAD := ["Layer", "Resets", "Fastest", "Last", "Best gain", "Holding"]
+const TABLE_HEAD := ["", "Resets", "Fastest", "Last", "Best", "Holding"]
+const LAYER_ART := ["", "funding", "generation", "paradigm", "singularity"]
 
 var _percent: Label
 var _overall: ProgressBar
 var _parts := {}   # part id -> {count: Label, bar: ProgressBar}
 var _v := {}       # row key -> value Label
-var _cells := {}   # layer k -> {layer, resets, fastest, last, gain: Label, icon: TextureRect, holding: Label}
+var _cells := {}   # layer k -> {resets, fastest, last, gain: Label, icon: TextureRect, holding: Label}
 
 
 func _build() -> void:
@@ -83,14 +84,17 @@ func _section(title: String) -> VBoxContainer:
 	return box
 
 
-## Label left, value right, on one line. Returns {box, value}.
+## Label left (wraps before it widens the page), value right. Returns {box, value}.
 func _line(text: String) -> Dictionary:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
-	h.add_child(PanelKit.label(text, PanelKit.TEXT, false))
+	var name_l := PanelKit.label(text, PanelKit.TEXT, true)
+	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_l.size_flags_stretch_ratio = 2.0
+	h.add_child(name_l)
 	var v := PanelKit.label("", PanelKit.BRIGHT, false)
 	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	v.size_flags_horizontal = Control.SIZE_SHRINK_END
+	v.size_flags_horizontal = Control.SIZE_SHRINK_END  # values keep their natural width; the label gives way
 	h.add_child(v)
 	return {"box": h, "value": v}
 
@@ -101,23 +105,27 @@ func _row(box: Control, key: String, text: String) -> void:
 	_v[key] = line["value"]
 
 
-## Per-layer table: layer, lifetime resets, fastest cycle, time since last reset, best gain, what it holds.
+## Per-layer table: layer icon, lifetime resets, fastest cycle, time since last reset, best gain, what it holds.
 func _build_layers(box: VBoxContainer) -> void:
 	var grid := GridContainer.new()
 	grid.columns = TABLE_HEAD.size()
-	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 4)
 	box.add_child(grid)
 	for i in TABLE_HEAD.size():
-		grid.add_child(_cell(TABLE_HEAD[i], true, i == 0))
+		grid.add_child(_cell(TABLE_HEAD[i], true))
 	for k in range(1, Records.LAYERS + 1):
+		var art := TextureRect.new()
+		art.texture = Fx.tex_fit("res://assets/legacy/%s.png" % LAYER_ART[k], Vector2i(16, 16))
+		art.custom_minimum_size = Vector2(16, 16)
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		Tip.attach(art, Records.layer_title(Game.state, k))
 		var cell := {
-			"layer": _cell("", false, true), "resets": _cell("", false, false),
-			"fastest": _cell("", false, false), "last": _cell("", false, false), "gain": _cell("", false, false),
-			"icon": PanelKit.icon("cash", 1.0), "holding": _cell("", false, false),
+			"resets": _cell("", false), "fastest": _cell("", false), "last": _cell("", false),
+			"gain": _cell("", false), "icon": PanelKit.icon("cash", 1.0), "holding": _cell("", false),
 		}
 		_cells[k] = cell
-		grid.add_child(cell["layer"])
+		grid.add_child(art)
 		grid.add_child(cell["resets"])
 		grid.add_child(cell["fastest"])
 		grid.add_child(cell["last"])
@@ -130,13 +138,12 @@ func _build_layers(box: VBoxContainer) -> void:
 		grid.add_child(hold)
 
 
-## A table cell in the micro font. Headers take the accent colour; left-aligned for the layer name.
-func _cell(text: String, accent: bool, left: bool) -> Label:
+## A right-aligned table cell in the micro font. Headers take the accent colour.
+func _cell(text: String, accent: bool) -> Label:
 	var l := Label.new()
 	l.theme_type_variation = &"MicroLabel"
 	l.text = text
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if left else HORIZONTAL_ALIGNMENT_RIGHT
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	l.add_theme_color_override("font_color", Fx.col(Fx.ACCENT) if accent else PanelKit.col(PanelKit.TEXT))
 	return l
 
@@ -195,10 +202,9 @@ func _refresh_layers(s: GameState) -> void:
 		var cell: Dictionary = _cells[k]
 		var prev := Sim.reset_preview(s, k)
 		var n := int(life[k - 1])
-		(cell["layer"] as Label).text = Records.layer_title(s, k).split(" ")[0]
 		(cell["resets"] as Label).text = str(n)
 		(cell["fastest"] as Label).text = Records.format_duration(float(fastest[str(k)])) if fastest.has(str(k)) else "-"
-		(cell["last"] as Label).text = "never" if n == 0 else "%s ago" % _ago(now - float(p["records"]["cycle_start"][k]))
+		(cell["last"] as Label).text = "-" if n == 0 else _ago(now - float(p["records"]["cycle_start"][k]))
 		(cell["gain"] as Label).text = (BigNum.from_float(float(gains[str(k)])).format()) if gains.has(str(k)) else "-"
 		var cur := str(prev["currency"])
 		if cell.get("cur", "") != cur:  # the layer's currency only changes when a save is loaded

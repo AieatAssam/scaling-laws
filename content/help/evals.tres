@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "evals"
+title = "AGI safety evals"
+icon = "regulation"
+order = 71
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_paradigm_1"}])
+hint = "Clear each AGI stage: full suite, red-team or ship it."
+body = "## The three choices\nEach AGI stage waits for you once its threshold is met. Clear it with one of three choices.\n- Full eval suite: 4 hours, pass chance 50% plus 40% of your alignment slider plus 2% per Ops staff, capped at 97%. A failed suite cools down for 1 hour.\n- Community red-team: 2 hours, 70% pass. Each run also speeds rivals up for good.\n- Ship it: instant and certain. It brings more and worse bad events for the rest of the run.\n## The ending\nEach cleared stage adds one counter: Assurance (full suite), Openness (red-team) or Recklessness (ship it). The most common method wins: aligned, open-sourced or rushed. A tie goes to the method you chose last.\n## Offline\nEvaluations keep running while you are away, at full speed."

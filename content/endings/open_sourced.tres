@@ -9,4 +9,5 @@ title = "Open-sourced"
 description = "The weights are public. Everyone gets a turn."
 icon = "open_sourced"
 order = 2
-conditions = Array[Dictionary]([{"type": "flag_set", "id": "open_sourced"}])
+method = "redteam"
+conditions = Array[Dictionary]([])

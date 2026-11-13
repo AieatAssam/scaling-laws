@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "solo_redteam"
+title = "Solo Openness"
+description = "Clear all five AGI stages with community red-teams."
+icon = "benchmarks"
+badge = "silver"
+conditions = Array[Dictionary]([{"type": "stat_gte", "id": "solo_redteam", "value": 1}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.01}])

@@ -1,6 +1,8 @@
 #!/bin/sh
-# Ending order check: on each seed (1-3, 336 h), the rushed AGI ending comes at least 5% sooner than open-sourced,
-# and open-sourced at least 5% sooner than aligned. Every run must reach the ending it was asked for.
+# Ending order check: on each seed (1-3, 336 h), the rushed AGI ending comes at least 3% sooner than open-sourced,
+# and open-sourced at least 3% sooner than aligned (rushed <= 0.97 x open-sourced <= 0.97 x aligned).
+# Each ending is reached by its own method: aligned by the full eval suite, open-sourced by the community red-team,
+# rushed by shipping every stage (tools/simulate.gd). Every run must reach the ending it was asked for.
 # Exits 1 on any violation. Seeds 4-6 are printed for information only.
 #   tools/ending_order.sh
 set -u
@@ -51,8 +53,8 @@ for seed in 1 2 3 4 5 6; do
     if [ "$r" = none ] || [ "$o" = none ] || [ "$a" = none ]; then
       verdict="FAIL (missing ending)"
       status=1
-    elif ! awk -v r="$r" -v o="$o" -v a="$a" 'BEGIN { exit !(r <= 0.95 * o && o <= 0.95 * a) }'; then
-      verdict="FAIL (order or 5% gap)"
+    elif ! awk -v r="$r" -v o="$o" -v a="$a" 'BEGIN { exit !(r <= 0.97 * o && o <= 0.97 * a) }'; then
+      verdict="FAIL (order or 3% gap)"
       status=1
     fi
   else

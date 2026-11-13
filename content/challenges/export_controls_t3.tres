@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ChallengeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/challenge_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "export_controls_t3"
+title = "Export Controls III"
+description = "They are not satisfied."
+icon = "regulation"
+duration = 7200.0
+goal = Array[Dictionary]([{"type": "owned_gte", "id": "cloud_gpus", "value": 50}, {"type": "owned_gte", "id": "custom_silicon", "value": 25}])
+reward = Array[Dictionary]([{"type": "add_slider", "value": 0.2}])
+penalty = Array[Dictionary]([{"type": "add_currency", "id": "compute", "value": -100000000.0}])
+tier = 3
+requires = "export_controls_t2"

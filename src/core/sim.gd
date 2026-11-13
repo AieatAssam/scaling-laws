@@ -158,7 +158,7 @@ static func buy_producer(s: GameState, id: String, count: int = 1) -> Dictionary
 ## Cost of hiring `count` more of `role` at the current headcount.
 static func staff_cost(s: GameState, role: String, count: int = 1) -> BigNum:
 	var d = s.db.get_def("staff", role)
-	return _series(_big(d.base_cost), d.cost_growth, int(s.run["layers"][1]["staff"].get(role, 0)), count)
+	return _series(_big(d.base_cost), d.cost_growth, int(s.run["layers"][1]["staff"].get(role, 0)), count).mul_f(Moonshots.staff_cost_mult(s))
 
 
 ## Why `hire` would fail, or "" when it would succeed.
@@ -321,7 +321,7 @@ static func training_fail_factor(s: GameState) -> float:
 	var cut := 0.0
 	for st in s.db.get_all("staff"):
 		cut += float(st.fail_per_hire) * int(s.run["layers"][1]["staff"].get(st.id, 0))
-	return maxf(FAIL_FLOOR, 1.0 - cut)
+	return maxf(FAIL_FLOOR, (1.0 - cut) * Moonshots.fail_mult(s))
 
 
 ## What run type `id` would do now. Keys: ok, reason, id, title, spend, seconds, score_mult, base_fail, fail_factor,
@@ -458,7 +458,7 @@ static func reset_preview(s: GameState, k: int) -> Dictionary:
 		return {"layer": k, "currency": "", "gain": 0, "holding": BigNum.new(), "highlight": false, "allowed": false, "reason": "no such layer"}
 	var L: Dictionary = s.run["layers"][k]
 	# Plain floats: BigNum divide leaves 3.9999... for exact ratios, which would floor one short.
-	var q: float = (L["life"] as BigNum).to_float() / float(ld.threshold)
+	var q: float = (L["life"] as BigNum).to_float() / Moonshots.threshold_for(s, k, float(ld.threshold))
 	var gain := int(minf(floor(sqrt(q) + 1e-9), 1e15))
 	var holding: BigNum = s.cur(ld.currency)
 	var reason := ""
@@ -478,14 +478,16 @@ static func perform_reset(s: GameState, k: int) -> Dictionary:
 	var p := reset_preview(s, k)
 	if not p["allowed"]:
 		return _fail(p["reason"])
+	var keep := Moonshots.before_wipe(s, k)
 	for j in k:
 		s.run["layers"][j] = GameState.fresh_layer()
 	s.set_cur("cash", BigNum.from_float(GameState.START_CASH))  # layer 0 was wiped; bootstrap income
+	Moonshots.after_wipe(s, k, keep)
 	var L: Dictionary = s.run["layers"][k]
 	if k == 2: L["desk"] = GameState.fresh_layer()["desk"]
 	L["life"] = BigNum.new()
 	L["clock"] = 0.0
-	s.add_cur(p["currency"], _big(float(p["gain"])))
+	s.add_cur(p["currency"], _big(float(p["gain"]) + Moonshots.bonus_gain(s, k)))
 	s.run["resets_done"][k - 1] = int(s.run["resets_done"][k - 1]) + 1
 	s.persist["stats"]["resets"] = int(s.persist["stats"]["resets"]) + 1
 	s.persist["lifetime_resets"][k - 1] = int(s.persist["lifetime_resets"][k - 1]) + 1
@@ -502,7 +504,7 @@ static func resolve_event(s: GameState, choice: int) -> Dictionary:
 	if choice < 0 or choice >= d.choices.size():
 		return _fail("no such choice")
 	for e in d.choices[choice]["effects"]:
-		Rules.apply(s, e)
+		Rules.apply(s, Endgame.event_effect(s, d, e))
 	L0["cooldowns"][d.id] = float(d.cooldown)
 	L0["pending"] = ""
 	s.persist["stats"]["events"] = int(s.persist["stats"]["events"]) + 1
@@ -550,13 +552,13 @@ static func _events_tick(s: GameState, dt: float, evs: Array) -> void:
 		if L0["cooldowns"].has(d.id) or not Rules.check_all(s, d.conditions) or not event_eligible(s, d):
 			continue
 		pool.append(d)
-		total += float(d.weight)
+		total += Endgame.event_weight(s, d)
 	if pool.is_empty():
 		return
 	var r := s.rng.randf() * total
 	var pick = pool.back()
 	for d in pool:
-		r -= float(d.weight)
+		r -= Endgame.event_weight(s, d)
 		if r < 0.0:
 			pick = d
 			break
@@ -576,6 +578,8 @@ static func challenge_blocker(s: GameState, id: String) -> String:
 		return "a challenge is already running"
 	if id in s.run["challenges_done"]:
 		return "already completed"
+	if Endgame.tier_blocker(s, id) != "":
+		return Endgame.tier_blocker(s, id)
 	return ""
 
 
@@ -598,7 +602,9 @@ static func _challenge_tick(s: GameState, dt: float, evs: Array) -> void:
 	var d = s.db.get_def("challenges", c["id"])
 	var success := Rules.check_all(s, d.goal)
 	for e in (d.reward if success else d.penalty):
-		Rules.apply(s, e)
+		Rules.apply(s, Endgame.challenge_effect(s, e) if success else e)
+	if success:
+		Endgame.challenge_won(s, d)
 	s.run["challenges_done"].append(c["id"])
 	var passed: Dictionary = s.run.get("challenge_passed", {})
 	passed[c["id"]] = success
@@ -657,38 +663,9 @@ static func _benchmarks(s: GameState, evs: Array) -> void:
 		evs.append({"kind": "benchmark", "id": b.id, "badge": b.badge})
 
 
-static func _agi(s: GameState, evs: Array) -> void:
-	var stages: Array = s.db.get_all("agi_stages")
-	while s.run["stage"] < stages.size() and Rules.check_all(s, stages[s.run["stage"]].conditions):
-		s.run["stage"] = int(s.run["stage"]) + 1
-		evs.append({"kind": "agi_advanced", "index": s.run["stage"]})
-	if s.run["stage"] >= stages.size() and s.run["run_over"] == "":
-		for e in s.db.get_all("endings"):
-			if Rules.check_all(s, e.conditions):
-				s.run["run_over"] = e.id
-				evs.append({"kind": "ending", "id": e.id})
-				break
-
-
-## Singularity-layer clock (seconds) at which rival `id` launches. rival_progress > 0 speeds a rival up;
-## < 0 delays it (floored at 10% of its schedule).
+## Race seconds rival `id` needs from the start of its race (see Endgame.launch_seconds). Kept for callers that show it.
 static func rival_launch_time(s: GameState, id: String) -> float:
-	var r = s.db.get_def("rivals", id)
-	var progress := float(s.run["rivals"].get(id, 0.0))
-	return float(r.launch_hours) * 3600.0 * maxf(0.1, 1.0 - progress)
-
-
-static func _rivals(s: GameState, evs: Array) -> void:
-	if s.resets(4) == 0:
-		return
-	var clock := float(s.run["layers"][4]["clock"])
-	for r in s.db.get_all("rivals"):
-		var flag := "rival_%s_launched" % r.id
-		if bool(s.run["flags"].get(flag, false)):
-			continue
-		if clock >= rival_launch_time(s, r.id):
-			s.run["flags"][flag] = true
-			evs.append({"kind": "rival_launched", "id": r.id})
+	return Endgame.launch_seconds(s, id)
 
 
 # ---------------------------------------------------------------- tick
@@ -730,9 +707,9 @@ static func tick(s: GameState, dt: float, offline: bool = false, modal: bool = f
 	Desk.tick(s, dt, evs)
 	_automate(s, evs)
 	_benchmarks(s, evs)
-	_agi(s, evs)
-	_rivals(s, evs)
+	Endgame.tick(s, dt, evs)
 	_challenge_tick(s, dt, evs)
+	Moonshots.tick(s, dt, evs)
 	if not offline:
 		_events_tick(s, dt, evs)
 	News.tick(s, dt, evs, offline or modal)

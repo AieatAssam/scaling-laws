@@ -116,7 +116,7 @@ func _refresh_desk() -> void:
 	if not Desk.unlocked(s):
 		_desk_timer.text = "Unlocks after your first Model Generation."
 	else:
-		_desk_timer.text = "Desk full" if desk["slots"].size() >= Desk.CAP else "Next paper: %s" % PanelKit.hms(float(desk["timer"]))
+		_desk_timer.text = "Desk full" if desk["slots"].size() >= Desk.cap(s) else "Next paper: %s" % PanelKit.hms(float(desk["timer"]))
 	var signature := str(desk["slots"])
 	if signature == _desk_signature:
 		return

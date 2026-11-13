@@ -9,4 +9,5 @@ title = "Rushed"
 description = "It works. Nobody checked why."
 icon = "rushed"
 order = 3
+method = "ship"
 conditions = Array[Dictionary]([])

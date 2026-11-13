@@ -4,3 +4,4 @@ extends ContentDef
 
 @export var order: int = 0
 @export var conditions: Array[Dictionary] = []
+@export var method: String = ""  # the AGI method that wins this ending: full, redteam or ship

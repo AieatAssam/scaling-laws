@@ -10,8 +10,8 @@ func before_each() -> void:
 	content = autofree(Support.make_content())
 
 
-func test_version_is_five() -> void:
-	assert_eq(SaveScript.VERSION, 5)
+func test_version_is_seven() -> void:
+	assert_eq(SaveScript.VERSION, 7)
 
 
 func test_a_v4_save_gains_the_new_state() -> void:

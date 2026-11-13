@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ChallengeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/challenge_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "safety_board_review_t2"
+title = "Safety Board Review II"
+description = "A regulator wants answers, again."
+icon = "regulation"
+duration = 7200.0
+goal = Array[Dictionary]([{"type": "flag_set", "id": "rival_helix_launched"}])
+reward = Array[Dictionary]([{"type": "add_slider", "value": 0.2}])
+penalty = Array[Dictionary]([{"type": "add_debt", "value": 30.0}])
+tier = 2
+requires = "safety_board_review"

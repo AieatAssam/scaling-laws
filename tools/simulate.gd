@@ -21,6 +21,8 @@ extends SceneTree
 ##     cycle must beat epoch 0's first cycle of the same layer (kept bonuses pay off).
 ##   Generation policy: once the research tree is bought, Model Generation resets are skipped (insights have no use).
 ##   Aligned policy: the slider stays at 0.5 until the Singularity, then goes to 0.9 (the aligned ending needs 0.9).
+##   AGI policy: each stage is cleared by its target ending's method (aligned full suite, open_sourced red-team,
+##     rushed ship it), so the majority of five choices gives that ending.
 ##   --probe: prints Generation and Paradigm reset decisions and compute/s crossings (diagnostics only, no gate).
 ##   Unlock gaps: an unlock is a first producer tier, staff role, research node, automation, benchmark, constraint,
 ##     rival, challenge, AGI stage, ending, first training, or first reset of a layer. Events are not unlocks.
@@ -91,6 +93,7 @@ var snaps: Array = []                                  # phase snapshot lines (s
 var snap_15 := false
 var picks: Array = []                                  # [seconds, run id, log10 stock, training mult, generation best, ops] per pick
 var upgrades_bought := 0                              # lab upgrades bought over the whole run (end state is wiped by Singularity)
+var moon_log: Array = []                              # [time, label] moonshot starts and completions, and automation buys (cadence line)
 var news_spawned := 0                                  # breaking-news headlines shown; the scripted player catches every other one
 
 
@@ -235,10 +238,12 @@ func _policy() -> void:
 	_launches()
 	_research()
 	_automation()
+	_moonshots()
 	_training()
 	_slider()
 	_legacy()
 	_challenge()
+	_agi()
 	_resets()
 
 
@@ -316,8 +321,58 @@ func _automation() -> void:
 		for d in content.get_all("automation"):
 			if Sim.buy_automation(s, d.id)["ok"]:
 				_log("automation %s" % d.id)
+				moon_log.append([now(), "auto " + d.id])
 				more = true
 				break
+
+
+## Keeps every project slot full: the cheapest startable moonshot first (breakthroughs, then hours).
+func _moonshots() -> void:
+	while Moonshots.running(s).size() < Moonshots.slots(s):
+		var best = null
+		for d in content.get_all("moonshots"):
+			if Moonshots.blocker(s, d.id) != "":
+				continue
+			if best == null or d.breakthroughs < best.breakthroughs or (d.breakthroughs == best.breakthroughs and d.hours < best.hours):
+				best = d
+		if best == null or not Moonshots.start(s, best.id)["ok"]:
+			return
+		moon_log.append([now(), "start " + best.id])
+		_log("moonshot start %s" % best.id)
+
+
+## Moonshot and automation timing: starts and completions, and the gaps between completions after the first Paradigm Shift.
+func _moon_report() -> void:
+	var started := 0
+	var finished: Array = []   # every completion, in order
+	var times: Array = []
+	for e in moon_log:
+		var label: String = e[1]
+		if label.begins_with("start "):
+			started += 1
+		if label.begins_with("done ") or label.begins_with("auto "):
+			times.append(float(e[0]))
+			finished.append("  %s at %s" % [label, _fmt(float(e[0]))])
+	var start_t := float(first_reset[3])
+	var end_t := ending_t if ending_t >= 0.0 else now()
+	var gaps: Array = []
+	var prev := start_t
+	for t in times:
+		if t < start_t or t > end_t:
+			continue
+		gaps.append(t - prev)
+		prev = t
+	var mean := 0.0
+	var longest := 0.0
+	for g in gaps:
+		mean += float(g)
+		longest = maxf(longest, float(g))
+	if gaps.size() > 0:
+		mean /= gaps.size()
+	print("moonshots: %d started; completions (moonshots + automation) %d; cadence after first Paradigm: %d, mean gap %.1f h, longest %.1f h" % [
+		started, times.size(), gaps.size(), mean / HOUR, longest / HOUR])
+	for line in finished:
+		_say(line)
 
 
 ## Starts the run type Sim.pick_training chooses (the same rule auto_train uses).
@@ -361,6 +416,17 @@ func _challenge() -> void:
 		if Sim.start_challenge(s, d.id)["ok"]:
 			_unlock("challenge started: %s" % d.id, "challenge:" + d.id)
 		return
+
+
+## AGI choices: each stage is cleared by the target ending's own method (aligned full suite, open_sourced red-team,
+## rushed ship it). A full suite that fails waits out its cooldown and is tried again.
+func _agi() -> void:
+	var method: String = {"aligned": "full", "open_sourced": "redteam", "rushed": "ship"}[ending_target]
+	if Endgame.pending_index(s) < 0 or not (s.run["eval"] as Dictionary).is_empty():
+		return
+	var r := Endgame.start_choice(s, method)
+	if r["ok"]:
+		_handle(r["events"])
 
 
 ## Records when each layer's gain first reached 1 and 2, and when it last rose in the current cycle.
@@ -496,10 +562,21 @@ func _handle(evs: Array) -> void:
 				_log("auto-train %s" % e["id"])
 			"reset":
 				_on_reset(int(e["layer"]), int(e["gain"]), "auto")
+			"moonshot_done":
+				moon_log.append([now(), "done " + e["id"]])
+				_log("moonshot done %s" % e["id"])
 			"challenge_done":
 				_log("challenge %s %s" % [e["id"], "succeeded" if e["success"] else "failed"])
 			"rival_launched":
 				_unlock("rival launched: %s" % e["id"], "rival:" + e["id"])
+			"agi_cleared":
+				_log("AGI stage %d cleared: %s" % [int(e["index"]) + 1, e["method"]])
+			"agi_failed":
+				_log("AGI stage %d: %s failed" % [int(e["index"]) + 1, e["method"]])
+			"rival_outpaced":
+				_log("rival outpaced: %s" % e["id"])
+			"rival_launched":
+				_log("rival launched: %s" % e["id"])
 			"agi_advanced":
 				var stage = content.get_all("agi_stages")[int(e["index"]) - 1]
 				_unlock("AGI stage %d: %s" % [e["index"], stage.id], "agi:%d" % int(e["index"]))
@@ -593,6 +670,7 @@ func _signature() -> int:
 		n += _staff_count(role)
 	n += s.run["layers"][2]["research"].size() + s.persist["automation"].size()
 	n += s.persist["benchmarks"].size() + s.run["challenges_done"].size() + int(s.run["stage"])
+	n += s.persist["moonshots"]["done"].size() + Moonshots.running(s).size()
 	n += int(s.persist["stats"]["trainings"]) + int(s.persist["stats"]["events"]) + int(s.persist["stats"].get("papers", 0))
 	for k in range(1, 5):
 		n += 1000 * s.resets(k)
@@ -635,6 +713,7 @@ func _report() -> int:
 	print("new systems: upgrades bought %d (run-scoped, rebought after wipes; %d defs), launches fired %d, breaking news %d shown, %d caught" % [
 		upgrades_bought, content.get_all("upgrades").size(),
 		int(s.persist["stats"]["launches"]), news_spawned, int(s.persist["stats"]["news"])])
+	_moon_report()
 	print("first resets (game time); gain>=1 and gain>=2 are first reached, ignoring prerequisites:")
 	for k in range(1, 5):
 		var band: Array = BANDS[k]

@@ -1,8 +1,8 @@
-extends Node
+extends SceneTree
 ## Dev harness for the progression panels and the ending screen. Not shipped.
 ## Run (needs a window, so screenshots render):
 ##   /Applications/Godot.app/Contents/MacOS/Godot --path . -s tools/dev_panels.gd
-## Instances each panel at 340x600 and 900x500, drives the game through the panels' own buttons and sliders,
+## Instances each panel at 360x640 and 1280x720, drives the game through the panels' own buttons and sliders,
 ## writes PNGs to SHOTS and prints "DEV OK" or "DEV FAIL: ..." lines. Exit code 0 only on DEV OK.
 ##
 ## Cheats (dev only, every one is marked CHEAT): writing currencies, layer life, owned counts and flags
@@ -12,7 +12,7 @@ extends Node
 
 # Screenshots go to $SL_SHOTS if set, else a dev_shots folder in the OS temp dir.
 var SHOTS := (OS.get_environment("SL_SHOTS") if OS.get_environment("SL_SHOTS") != "" else OS.get_temp_dir().path_join("scaling-laws-dev-shots")).path_join("panels")
-const SIZES := [Vector2i(340, 600), Vector2i(900, 500)]
+const SIZES := [Vector2i(360, 640), Vector2i(1280, 720)]
 const PANELS := ["training", "funding", "generation", "paradigm", "singularity"]
 const GUTTER := 12
 
@@ -22,37 +22,37 @@ var _endings_seen: Array[String] = []
 var _challenges_abandoned := 0
 
 
-func _ready() -> void:
+func _initialize() -> void:
 	_run()
 
 
 func _run() -> void:
-	await get_tree().process_frame
+	await process_frame
 	DirAccess.make_dir_recursive_absolute(SHOTS)
-	Game.save_path = "user://dev_panels_save.json"   # never touch the player's save
-	Game.state.persist["intro_seen"] = true          # skip the first-run intro
-	Game.running = false
-	Game.ending_reached.connect(func(id: String) -> void: _endings_seen.append(id))
-	Game.challenge_abandoned.connect(func(_id: String) -> void: _challenges_abandoned += 1)
+	G().save_path = "user://dev_panels_save.json"   # never touch the player's save
+	G().state.persist["intro_seen"] = true          # skip the first-run intro
+	G().running = false
+	G().ending_reached.connect(func(id: String) -> void: _endings_seen.append(id))
+	G().challenge_abandoned.connect(func(_id: String) -> void: _challenges_abandoned += 1)
 	_make_views()
 	await _settle()
 
 	# Phase 1: a little income on layer 0, then a training run through the panel.
 	_cheat_add("cash", 1e4)
 	_cheat_add("compute", 1e6)
-	for d in Content.get_all("producers"):
-		Game.buy_producer(d.id, -1)
+	for d in C().get_all("producers"):
+		G().buy_producer(d.id, -1)
 	_tick(120.0, 5.0)
 	await _press_run("fine_tune")
 	_tick(61.0)
-	_check(Game.state.persist["stats"]["trainings"] >= 1, "a training run finished")
+	_check(G().state.persist["stats"]["trainings"] >= 1, "a training run finished")
 
 	# Phase 2: Funding Round (layer 1), then hiring with the equity it paid out.
 	_cheat_life(1)
 	await _reset("funding", 1)
 	_cheat_add("equity", 200.0)
-	await _press_each("funding", "Hire 1")
-	await _press_each("funding", "Hire 5")
+	await _press_each("funding", "Hire x1")
+	await _press_each("funding", "Hire x5")
 	_check(_staff_total() >= 1, "at least one hire")
 	_cheat_add("compute", 1e6)
 	await _press_run("standard")
@@ -66,10 +66,10 @@ func _run() -> void:
 	await _press_each("generation", "%")
 	await _set_slider("generation", 0.2)
 	_tick(30.0)
-	_check(Game.state.run["layers"][0]["debt"] > 0.0, "debt accrues below safe alignment")
+	_check(G().state.run["layers"][0]["debt"] > 0.0, "debt accrues below safe alignment")
 	for _pass in 6:
 		await _press_each("generation", "Buy for")
-	_check(Game.state.run["layers"][2]["research"].size() >= 2, "research bought")
+	_check(G().state.run["layers"][2]["research"].size() >= 2, "research bought")
 
 	# Phase 4: Paradigm Shift (layer 3): automation, energy and data.
 	_cheat_life(3)
@@ -80,7 +80,7 @@ func _run() -> void:
 	_cheat_add("compute", 1e6)
 	for _pass in 4:
 		await _press_each("paradigm", "Buy for")
-	_check(Game.state.persist["automation"].size() >= 1, "automation bought")
+	_check(G().state.persist["automation"].size() >= 1, "automation bought")
 	await _press_run("frontier")
 	_tick(61.0)
 
@@ -90,24 +90,26 @@ func _run() -> void:
 	_cheat_add("legacy", 100.0)
 	for _pass in 3:
 		await _press_each("singularity", "Buy for")
-	_check(Game.state.persist["legacy_perks"].size() >= 1, "legacy perk bought")
+	_check(G().state.persist["legacy_perks"].size() >= 1, "legacy perk bought")
 	for i in 6:
 		var p := _p("singularity")
-		if _enabled_buttons(p, "Enter challenge").is_empty() and Game.state.run["layers"][4]["challenge"].is_empty():
+		if _enabled_buttons(p, "Enter challenge").is_empty() and G().state.run["layers"][4]["challenge"].is_empty():
 			break
-		if Game.state.run["layers"][4]["challenge"].is_empty():
+		if G().state.run["layers"][4]["challenge"].is_empty():
 			await _press_first("singularity", "Enter challenge")
 		if i == 1:
 			await _press_first("singularity", "Abandon challenge")
 			await _press_first("singularity", "Enter challenge")
-		var c: Dictionary = Game.state.run["layers"][4]["challenge"]
+		var c: Dictionary = G().state.run["layers"][4]["challenge"]
 		if not c.is_empty():
-			_tick(float(Content.get_def("challenges", c["id"]).duration), 30.0)
-	_check(Game.state.run["challenges_done"].size() >= 1, "a challenge completed")
+			_tick(float(C().get_def("challenges", c["id"]).duration), 30.0)
+	_check(G().state.run["challenges_done"].size() >= 1, "a challenge completed")
 	_check(_challenges_abandoned >= 1, "a challenge was abandoned")
-	_tick(130000.0, 200.0)   # nimbus launches at 36 h on the clock
+	# Rivals race from the AGI stage they target, so the stages are met first (CHEAT), then the race runs to the last launch.
+	_cheat_agi()
+	_tick(130000.0, 200.0)   # nimbus launches at 36 h of race time
 	for id in ["aurora", "helix", "kestrel", "monolith", "nimbus"]:
-		_check(bool(Game.state.run["flags"].get("rival_%s_launched" % id, false)), "rival %s launched" % id)
+		_check(bool(G().state.run["flags"].get("rival_%s_launched" % id, false)), "rival %s launched" % id)
 
 	# Re-populate after the last reset, which wipes everything below layer 4.
 	_cheat_add("compute", 1e6)
@@ -133,20 +135,37 @@ func _run() -> void:
 
 	if _fails.is_empty():
 		print("DEV OK")
-		get_tree().quit(0)
+		quit(0)
 	else:
 		for f in _fails:
 			printerr("DEV FAIL: " + f)
-		get_tree().quit(1)
+		quit(1)
 
 
 # ---------------------------------------------------------------- endings
 
+## Clears every AGI stage by `method` through G().agi_choose, running each evaluation to its end. A failed full suite
+## waits out its cooldown and is tried again. Stops when the run is over.
+func _clear_agi(method: String) -> void:
+	for _i in 40:
+		if String(G().state.run["run_over"]) != "":
+			return
+		var ev: Dictionary = G().state.run["eval"]
+		if not ev.is_empty():
+			_tick(float(ev["left"]) + 1.0, 600.0)
+		elif Endgame.pending_index(G().state) >= 0:
+			var r: Dictionary = G().agi_choose(method)
+			if not r["ok"]:
+				_tick(float(G().state.run["eval_cooldown"]) + 1.0, 600.0)
+		else:
+			_tick(60.0, 60.0)
+
+
 func _drive_ending_aligned() -> void:
-	# Aligned needs alignment >= 70%. The slider is still unlocked: this run has its resets.
+	# Aligned is the full eval suite on every stage. The slider is still unlocked: this run has its resets.
 	await _set_slider("generation", 0.8)
 	_cheat_agi()
-	_tick(1.0)
+	await _clear_agi("full")
 	await _settle()
 	_check(_endings_seen.has("aligned"), "aligned ending reached")
 	await _shoot_all("ending_aligned", "ending@")
@@ -157,17 +176,14 @@ func _drive_ending_aligned() -> void:
 	_check(not is_instance_valid(ov), "overlay dismissed")
 	_restore_ending_views()
 	await _press_first("singularity", "Start a new legacy")
-	_check(Game.state.run["run_over"] == "", "new legacy started")
-	_check(Game.state.persist["stats"]["runs"] >= 2, "run counter advanced")
+	_check(G().state.run["run_over"] == "", "new legacy started")
+	_check(G().state.persist["stats"]["runs"] >= 2, "run counter advanced")
 
 
 func _drive_ending_open_sourced() -> void:
-	# CHEAT: put the Aurora launch event on the pending slot (its flag check is skipped), then pick the real choice.
-	Game.state.run["layers"][0]["pending"] = "rival_launch_aurora"
-	var r: Dictionary = Game.resolve_event(1)   # "Open-source our weights" sets flag open_sourced
-	_check(r.get("ok", false), "resolve open-source event")
+	# Open-sourced is the community red-team on every stage.
 	_cheat_agi()
-	_tick(1.0)
+	await _clear_agi("redteam")
 	await _settle()
 	_check(_endings_seen.has("open_sourced"), "open_sourced ending reached")
 	await _shoot_all("ending_open_sourced", "ending@")
@@ -179,17 +195,17 @@ func _drive_ending_open_sourced() -> void:
 
 
 func _drive_ending_rushed() -> void:
-	# The fresh run has no resets, so the slider stays at its default: below 70%, no flag: rushed.
+	# Rushed is Ship it on every stage: no evaluations, so the ending comes at once.
 	await _press_first("singularity", "Start a new legacy")
 	_cheat_agi()
-	_tick(1.0)
+	await _clear_agi("ship")
 	await _settle()
 	_check(_endings_seen.has("rushed"), "rushed ending reached")
 	await _shoot_all("ending_rushed", "ending@")
 	await _press_first("ending", "Start a new legacy")
 	await _settle()
 	_restore_ending_views()
-	_check(Game.state.run["run_over"] == "", "new legacy after rushed")
+	_check(G().state.run["run_over"] == "", "new legacy after rushed")
 
 
 # ---------------------------------------------------------------- harness: views
@@ -212,17 +228,17 @@ func _make_vp(sz: Vector2i) -> SubViewport:
 	vp.size = sz
 	vp.disable_3d = true
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	get_tree().root.add_child(vp)
+	root.add_child(vp)
 	return vp
 
 
-## The 340x600 instance of a panel: the one the script clicks (the 900x500 instance refreshes from the same state).
+## The 360x640 instance of a panel: the one the script clicks (the 1280x720 instance refreshes from the same state).
 func _p(n: String) -> Control:
-	return _views["%s@340x600" % n]["panel"]
+	return _views["%s@360x640" % n]["panel"]
 
 
 func _ending_view() -> Control:
-	return _views["ending@340x600"]["panel"]
+	return _views["ending@360x640"]["panel"]
 
 
 ## The ending overlay frees itself on "Back to the lab"; give the harness a fresh one for later shots.
@@ -237,8 +253,8 @@ func _restore_ending_views() -> void:
 
 
 func _settle() -> void:
-	await get_tree().create_timer(0.3).timeout   # panels refresh on a 0.25 s timer
-	await get_tree().process_frame
+	await create_timer(0.3).timeout   # panels refresh on a 0.25 s timer
+	await process_frame
 
 
 # ---------------------------------------------------------------- harness: clicks
@@ -258,7 +274,7 @@ func _press_run(id: String) -> void:
 		print("DEV: training: %s not startable" % id)
 		return
 	b.pressed.emit()
-	await get_tree().process_frame
+	await process_frame
 
 
 func _enabled_buttons(p: Node, contains: String) -> Array:
@@ -281,7 +297,7 @@ func _press_each(n: String, contains: String) -> void:
 			continue
 		var label: String = b.text
 		b.pressed.emit()
-		await get_tree().process_frame
+		await process_frame
 		print("DEV: %s click '%s' -> %s" % [n, label, _result(p)])
 
 
@@ -294,7 +310,7 @@ func _press_first(n: String, contains: String) -> void:
 		return
 	var label: String = todo[0].text   # read before the press: the button may belong to an overlay that frees itself
 	todo[0].pressed.emit()
-	await get_tree().process_frame
+	await process_frame
 	print("DEV: %s click '%s' -> %s" % [n, label, _result(p)])
 
 
@@ -312,9 +328,9 @@ func _result(p) -> String:
 func _reset(n: String, k: int) -> void:
 	await _settle()   # cheats and ticks change state without a signal; let the panels refresh
 	var p := _p(n)
-	var card: PanelResetCard = null
+	var card: Control = null  # PanelResetCard, matched by name: naming the class here would compile its Game reference
 	for c in _walk(p):
-		if c is PanelResetCard:
+		if c.get_script() != null and c.get_script().get_global_name() == &"PanelResetCard":
 			card = c
 	if card == null:
 		_fail("%s: no reset card" % n)
@@ -333,12 +349,12 @@ func _reset(n: String, k: int) -> void:
 		_fail("layer %d reset disabled: %s" % [k, btn.text])
 		return
 	btn.pressed.emit()          # opens the confirmation
-	await get_tree().process_frame
+	await process_frame
 	print("DEV: %s dialog '%s'" % [n, dlg.dialog_text])
 	dlg.confirmed.emit()        # the dialog's OK
-	await get_tree().process_frame
+	await process_frame
 	print("DEV: %s reset -> %s" % [n, _result(p)])
-	_check(Game.state.resets(k) >= 1, "layer %d reset ran" % k)
+	_check(G().state.resets(k) >= 1, "layer %d reset ran" % k)
 
 
 func _set_slider(n: String, v: float) -> void:
@@ -346,47 +362,58 @@ func _set_slider(n: String, v: float) -> void:
 	var p := _p(n)
 	for c in _walk(p):
 		if c is HSlider:
-			c.value = v           # emits value_changed, the panel calls Game.set_slider
-			await get_tree().process_frame
+			c.value = v           # emits value_changed, the panel calls G().set_slider
+			await process_frame
 			print("DEV: %s slider -> %.2f: %s" % [n, v, _result(p)])
 			return
 	_fail("%s: no alignment slider" % n)
 
 
+## Autoloads are looked up at runtime: identifiers do not resolve in a -s SceneTree script.
+func G() -> Node:
+	return root.get_node("/root/Game")
+
+
+func C() -> Node:
+	return root.get_node("/root/Content")
+
+
 # ---------------------------------------------------------------- harness: state
 
-## Advances the core in steps of `step` seconds, dispatching events the way Game._process does.
+## Advances the core in steps of `step` seconds, dispatching events the way G()._process does.
 func _tick(seconds: float, step: float = 1.0) -> void:
 	var left := seconds
 	while left > 0.0:
 		var dt := minf(step, left)
-		Game._dispatch(Sim.tick(Game.state, dt))
+		G()._dispatch(Sim.tick(G().state, dt))
 		left -= dt
 
 
 ## CHEAT: adds currency directly.
 func _cheat_add(cur: String, amount: float) -> void:
-	Game.state.add_cur(cur, BigNum.from_float(amount))
+	G().state.add_cur(cur, BigNum.from_float(amount))
 
 
 ## CHEAT: sets layer k's life to four times its threshold, so the reset gains 2.
 func _cheat_life(k: int) -> void:
-	var ld = Sim.layer_def(Game.state, k)
-	Game.state.run["layers"][k]["life"] = BigNum.from_float(float(ld.threshold) * 4.0)
+	var ld = Sim.layer_def(G().state, k)
+	G().state.run["layers"][k]["life"] = BigNum.from_float(float(ld.threshold) * 4.0)
 
 
 ## CHEAT: meets every AGI stage condition at once, so one tick walks the whole road to the ending check.
 func _cheat_agi() -> void:
-	var s: GameState = Game.state
+	var s: GameState = G().state
 	s.run["layers"][2]["best"] = 5.0
 	s.run["layers"][0]["owned"]["server_rack"] = 20
 	s.set_cur("compute", BigNum.from_float(1e31))
 	s.set_cur("energy", BigNum.from_float(100.0))
+	# CHEAT: stage 5 wants a sustained compute rate, which one step cannot build; the stage is set directly.
+	s.run["stage"] = maxi(int(s.run["stage"]), 5)
 
 
 func _staff_total() -> int:
 	var n := 0
-	for v in Game.state.run["layers"][1]["staff"].values():
+	for v in G().state.run["layers"][1]["staff"].values():
 		n += int(v)
 	return n
 

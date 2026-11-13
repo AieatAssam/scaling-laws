@@ -43,7 +43,8 @@ func setup(k: int, on_result: Callable) -> PanelResetCard:
 	v.add_child(head)
 	_gain = PanelKit.label("", PanelKit.GOLD)
 	_holding = PanelKit.label("", PanelKit.TEXT)
-	_eta = PanelKit.label("", PanelKit.MUTED, false)  # one line at 360 px: no wrap, see _eta_text
+	_eta = PanelKit.label("", PanelKit.MUTED, true)  # micro font: the estimate stays on one line at 360 px, see _eta_text
+	_eta.theme_type_variation = &"MicroDim"
 	v.add_child(_gain)
 	v.add_child(_holding)
 	v.add_child(_eta)

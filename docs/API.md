@@ -174,7 +174,7 @@ Automation runs inside `tick` and emits no `producer_bought` for auto-buy, so th
 
 Read helpers also include `staff_cost(role, count=1) -> BigNum`.
 
-Actions (each returns the Sim result dict and emits its signal only on `ok`): `buy_producer(id, count=1)`, `start_training(run_type)`, `hire(role, count=1)`, `research(id)`, `set_slider(value)`, `buy_automation(id)`, `buy_legacy(key)`, `start_challenge(id)`, `abandon_challenge()`, `resolve_event(choice)`, `reset_layer(layer)`, `new_run()`.
+Actions (each returns the Sim result dict and emits its signal only on `ok`): `buy_producer(id, count=1)`, `start_training(run_type)`, `hire(role, count=1)`, `research(id)`, `set_slider(value)`, `buy_automation(id)`, `buy_legacy(key)`, `start_challenge(id)`, `abandon_challenge()`, `resolve_event(choice)`, `reset_layer(layer)`, `new_run()`, `agi_choose(method)` (`ship`, `redteam` or `full`; the last two start an evaluation), `outship(id)`, `acqui_hire(id)`.
 `set_setting(key, value)` writes `persist.settings` and emits `settings_changed`.
 
 Signals:
@@ -199,7 +199,11 @@ Signals:
 | `event_resolved` | `id: String, choice: int` |
 | `benchmark_unlocked` | `id: String, badge: String` |
 | `rival_launched` | `id: String` |
+| `rival_outpaced` | `id: String` |
 | `agi_advanced` | `index: int` |
+| `agi_cleared` | `index: int, method: String` |
+| `agi_failed` | `index: int, method: String` |
+| `race_action` | `id: String, action: String` (`outship` or `acqui`) |
 | `ending_reached` | `id: String` |
 | `layer_reset` | `layer: int, gain: int` |
 | `new_run_started` | |
@@ -340,6 +344,36 @@ Random headlines (`content/news/*.tres`: `NewsDef` with `weight`, `reward` = `ca
 - `News.catch(s)` -> `{ok, id, title, reward, amount?, seconds?}`; one reward per tap; a miss costs nothing. Counts `stats.news`
 - Benchmarks `news_10`, `news_100`, `news_500` count caught headlines
 - `reduce_motion` makes the lab chip static instead of pulsing
+
+## Moonshots (static, pure: `src/core/moonshots.gd`)
+
+Long real-time projects on the Paradigm panel. Defs: `content/moonshots/*.tres` (`MoonshotDef`: `hours`, `breakthroughs`, `cash`, `prereqs`, `conditions`, `effects`). Unlock at the first Paradigm Shift. One running slot (`BAY_SLOTS` = 2 with `second_bay`). Progress is raw game seconds, so offline time runs projects at full speed. Rewards are permanent (`persist`), so they survive every reset.
+
+- `Moonshots.all(s)`, `done(s, id)`, `running(s)`, `is_running(s, id)`, `slots(s)`, `time_left(s, id)`
+- `Moonshots.blocker(s, id)` -> `""` or `"unknown moonshot"`, `"done"`, `"running"`, `"locked"`, `"needs <Title>"`, `"no free project slot"`, `"not enough breakthroughs"`, `"not enough cash"`
+- `Moonshots.start(s, id)` -> `{ok, ...}`; spends breakthroughs and cash; `Game.start_moonshot` wraps it
+- `Moonshots.tick(s, dt, evs)`: counts down; a finished one applies its effects, adds to `persist.stats.moonshots`, and emits `moonshot_done` (`Game.moonshot_finished`)
+- Hooks read by other systems: `producer_cost_mult`, `cooldown_mult`, `staff_cost_mult`, `fail_mult`, `chip_mult`, `desk_slots`, `threshold_for` (Funding and Generation gain), `bonus_gain` (Paradigm, Singularity), `parts` (AGI road compute)
+- `Moonshots.before_wipe(s, k)` / `after_wipe(s, k, keep)`: called by `Sim.perform_reset`. On a Funding Round (k = 1) they keep the training run when `second_cluster` is done, and the early lab upgrades (order ≤ `LAB_KEEP_ORDER`) when `institutional_memory` is done
+
+State: `persist.moonshots` = `{running: [{id, left}], done: [id]}`. `SaveSystem._v5_to_v6` adds it when missing.
+
+## Endgame (static, pure: `src/core/endgame.gd`)
+
+The AGI road, the ending choice, the rival race and the regulation challenge tiers. `sim.gd` calls `Endgame.tick` once per tick and `Endgame.launch_seconds` for rival clocks; nothing else in the core holds this logic.
+
+- Methods: `ship` (instant, Ship it), `redteam` (2 h community red-team), `full` (4 h full eval suite, then a 1 h cooldown after a failure). `start_choice(s, method)` clears the pending stage (`pending_index`), returning `{ok, reason, index, method, events}`.
+- Evaluations: `run.eval = {method, index, left}`. Pass chance: red-team `RED_PASS` (0.7); full suite `FULL_BASE` + `FULL_SLIDER` × alignment slider + `FULL_OPS` per ops staff, capped at `FULL_CAP` (0.97). A pass clears the stage; a fail reopens it (the full suite then cools down).
+- Ending: `majority(choices)` picks the most-used method, ties going to the most recent choice. `ending_for(choices)` maps it to `aligned` (full), `open_sourced` (redteam) or `rushed` (ship). Run ends after the fifth stage clears.
+- Counters: Assurance = full picks, Openness = redteam picks, Recklessness = ship picks. Ship picks add bad-event weight (`RECK_WEIGHT`) and severity (`RECK_SEVERITY`) to the events pool.
+- Rivals: each rival races from its `outpace_stage` (`racing`). Its clock speeds up with `redteam_uses` (`RED_SPEED` per use). Clearing the stage first outpaces it (`rival_outpaced`, recorded in `persist.records.outpaced`). `outship(s, id)` cuts the remaining delay by `OUTSHIP_GAIN` of the gap, costs compute (`OUTSHIP_COST` × `OUTSHIP_COST_GROWTH` per use), cooldown `OUTSHIP_COOLDOWN` (1800 s). `acqui(s, id)` pays `ACQUI_CASH_SECONDS` of cash income into cash and layer 1–4 life, adds a researcher, and slows that rival by `ACQUI_SPEED`; cooldown `ACQUI_COOLDOWN`.
+- Challenge tiers: `tier_blocker(s, id)` requires the tier below to have been passed once ever (`challenge.requires`). `challenge_effect` multiplies the tier reward by `1.05 / 1.08 / 1.12` for tiers I/II/III; `persist.challenge_mult` caps at `CHALLENGE_CAP` (1.4).
+
+`Game` wraps the actions (`agi_choose`, `outship`, `acqui_hire`) and emits `agi_cleared`, `agi_failed`, `rival_outpaced` and `race_action`.
+
+## Save version 7
+
+`SaveSystem.VERSION = 7`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached. `persist` gains `stats.evals_passed`, `stats.ships`, `stats.solo_full/solo_redteam/solo_ship`, `stats.tier_1..3`, `redteam_uses` and `challenge_mult`; run keys `agi_choices`, `eval`, `eval_cooldown` and `race` are wiped by a new run.
 
 ## Save version 5
 

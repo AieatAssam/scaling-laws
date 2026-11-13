@@ -20,6 +20,7 @@ var _last_ms := 0               # time of the last movement
 var _speed := 0.0               # px/s, vertical, smoothed while scrolling
 var _fling := 0.0               # px/s still to coast after a release
 var _victim: BaseButton = null  # the button under the press, cancelled when the press becomes a scroll
+var clock_ms: Callable = Time.get_ticks_msec  # time source for fling speed; the tests replace it to drive time
 
 
 func _ready() -> void:
@@ -84,7 +85,7 @@ func _press(at: Vector2, index: int) -> void:
 	_touch_index = index
 	_from = at
 	_last = at
-	_last_ms = Time.get_ticks_msec()
+	_last_ms = clock_ms.call()
 	_speed = 0.0
 	_victim = _button_at(at)
 	if _fling != 0.0:
@@ -99,7 +100,7 @@ func _move(at: Vector2) -> void:
 			return
 		_begin_scroll()
 		_last = _from
-	var now := Time.get_ticks_msec()
+	var now: int = clock_ms.call()
 	var dt := maxf((now - _last_ms) / 1000.0, 0.008)
 	var step := at - _last
 	scroll_vertical -= int(roundf(step.y))
@@ -116,7 +117,7 @@ func _begin_scroll() -> void:
 
 
 func _release() -> void:
-	if _scrolling and Time.get_ticks_msec() - _last_ms < 120 and absf(_speed) >= FLING_MIN:
+	if _scrolling and int(clock_ms.call()) - _last_ms < 120 and absf(_speed) >= FLING_MIN:
 		_fling = _speed
 	if _scrolling and _victim != null and is_instance_valid(_victim):
 		# The release the GUI sends next must not click the victim. Its signals are muted until the end of the

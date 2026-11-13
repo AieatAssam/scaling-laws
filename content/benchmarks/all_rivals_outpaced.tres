@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BenchmarkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/benchmark_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "all_rivals_outpaced"
+title = "Clean Sweep"
+description = "Outpace all five rival labs."
+icon = "benchmarks"
+badge = "platinum"
+conditions = Array[Dictionary]([{"type": "flag_set", "id": "outpaced_aurora"}, {"type": "flag_set", "id": "outpaced_helix"}, {"type": "flag_set", "id": "outpaced_kestrel"}, {"type": "flag_set", "id": "outpaced_monolith"}, {"type": "flag_set", "id": "outpaced_nimbus"}])
+effects = Array[Dictionary]([{"type": "perm_mult", "key": "compute", "value": 1.01}])

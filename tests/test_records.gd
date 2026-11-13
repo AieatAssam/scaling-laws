@@ -167,3 +167,14 @@ func _part(c: Dictionary, id: String) -> Dictionary:
 		if part["id"] == id:
 			return part
 	return {}
+
+
+func test_absorb_records_outpaced_rivals_and_the_best_agi_stage() -> void:
+	var p := s.persist
+	p["records"] = Records.default(0.0)
+	var rid: String = s.db.get_all("rivals")[0].id
+	s.run["flags"]["outpaced_%s" % rid] = true
+	s.run["stage"] = 3
+	Records.absorb(s)
+	assert_true(p["records"]["outpaced"].has(rid))
+	assert_eq(int(p["records"]["agi_best"]), 3)

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="HelpTopicDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/defs/help_topic_def.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = "moonshots"
+title = "Moonshots"
+icon = "breakthroughs"
+order = 55
+conditions = Array[Dictionary]([{"type": "benchmark_unlocked", "id": "reset_paradigm_1"}])
+hint = "Breakthroughs start a project. It runs in real time, even offline, and pays a reward that lasts through every reset."
+body = "## Starting
+Pick a moonshot on the Paradigm tab and press Start. It spends its breakthroughs up front.
+## Slots
+One project runs at a time. A second slot is a reward.
+## Running
+The bar shows progress and the time left. Projects keep running through every reset and while the game is closed.
+## Rewards
+Each finished moonshot pays once, for good. Some rewards need another moonshot first. The last two wait for the Singularity."

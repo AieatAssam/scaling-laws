@@ -36,6 +36,14 @@ signal upgrade_bought(id: String)
 signal launch_fired(id: String)
 signal news_spawned(id: String)
 signal news_caught(id: String, reward: Dictionary)
+signal moonshot_started(id: String)
+signal moonshot_finished(id: String)
+## AGI stage `index` (1-based) cleared with method ("full", "redteam", "ship"); a failed full or red-team eval.
+signal agi_cleared(index: int, method: String)
+signal agi_failed(index: int, method: String)
+signal rival_outpaced(id: String)
+## Outship ("outship") or Acqui-hire ("acqui") on rival `id`.
+signal race_action(id: String, kind: String)
 
 const AUTOSAVE_SECONDS := 30.0
 ## Offline progress is only reported (the "While you were away" card) for absences at least this long.
@@ -280,10 +288,39 @@ func fire_launch(id: String) -> Dictionary:
 	return r
 
 
+func start_moonshot(id: String) -> Dictionary:
+	var r := Moonshots.start(state, id)
+	if r["ok"]:
+		moonshot_started.emit(id)
+	return r
+
+
 func catch_news() -> Dictionary:
 	var r := News.catch(state)
 	if r["ok"]:
 		news_caught.emit(r["id"], r)
+	return r
+
+
+## Clears the pending AGI stage: "ship" at once, "redteam" or "full" starts an evaluation (see Endgame).
+func agi_choose(method: String) -> Dictionary:
+	var r := Endgame.start_choice(state, method)
+	if r["ok"]:
+		_dispatch(r["events"])
+	return r
+
+
+func outship(id: String) -> Dictionary:
+	var r := Endgame.outship(state, id)
+	if r["ok"]:
+		race_action.emit(id, "outship")
+	return r
+
+
+func acqui_hire(id: String) -> Dictionary:
+	var r := Endgame.acqui(state, id)
+	if r["ok"]:
+		race_action.emit(id, "acqui")
 	return r
 
 
@@ -380,3 +417,11 @@ func _dispatch(evs: Array) -> void:
 				launch_fired.emit(e["id"])
 			"news":
 				news_spawned.emit(e["id"])
+			"moonshot_done":
+				moonshot_finished.emit(e["id"])
+			"agi_cleared":
+				agi_cleared.emit(e["index"], e["method"])
+			"agi_failed":
+				agi_failed.emit(e["index"], e["method"])
+			"rival_outpaced":
+				rival_outpaced.emit(e["id"])

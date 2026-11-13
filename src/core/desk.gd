@@ -4,6 +4,9 @@ extends RefCounted
 const INTERVAL := 1200.0
 const CAP := 3
 
+static func cap(s: GameState) -> int:
+	return CAP + Moonshots.desk_slots(s)
+
 static func state(s: GameState) -> Dictionary:
 	return s.run["layers"][2]["desk"]
 
@@ -14,10 +17,10 @@ static func tick(s: GameState, dt: float, evs: Array) -> void:
 	if not unlocked(s):
 		return
 	var desk := state(s)
-	if desk["slots"].size() >= CAP:
+	if desk["slots"].size() >= cap(s):
 		return
 	desk["timer"] = float(desk["timer"]) - dt
-	while float(desk["timer"]) <= 0.0 and desk["slots"].size() < CAP:
+	while float(desk["timer"]) <= 0.0 and desk["slots"].size() < cap(s):
 		var pool: Array = []
 		var total := 0.0
 		for d in s.db.get_all("papers"):
@@ -42,7 +45,7 @@ static func tick(s: GameState, dt: float, evs: Array) -> void:
 			var result := resolve(s, desk["slots"].size() - 1, best_cash(s, desk["slots"].back()))
 			if result["ok"]:
 				evs.append({"kind": "paper_resolved", "id": pick.id, "choice": result["choice"]})
-	if desk["slots"].size() >= CAP:
+	if desk["slots"].size() >= cap(s):
 		desk["timer"] = INTERVAL
 
 static func best_cash(s: GameState, card: Dictionary) -> int:
