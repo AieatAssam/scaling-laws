@@ -1,1 +1,1 @@
-First release. Build an AI lab from a garage: buy compute, train models, publish papers, hire a team and take your first Funding Round. Works offline, with no ads, no in-app purchases and no account.
+First release. Build an AI lab from a garage: buy compute, train models, publish papers, hire a team and take your first Funding Round, with music and sound effects. Works offline, with no ads, no in-app purchases and no account.
