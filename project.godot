@@ -19,7 +19,7 @@ config/quit_on_go_back=false
 boot_splash/bg_color=Color(0.043, 0.055, 0.102, 1)
 boot_splash/image="res://icon/app_icon.png"
 boot_splash/fullsize=false
-boot_splash/use_filter=false
+boot_splash/use_filter=true
 
 [autoload]
 

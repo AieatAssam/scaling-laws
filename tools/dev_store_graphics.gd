@@ -25,12 +25,12 @@ func _initialize() -> void:
 	quit()
 
 
-## The app icon, nearest-neighbour down to 512 and composited on the game's navy (the icon has transparent corners).
+## The app icon, scaled down to 512 and composited on the game's navy (the icon has transparent corners).
 func _icon(out: String) -> void:
 	var src: Image = (load("res://icon/app_icon.png") as Texture2D).get_image()
 	src.convert(Image.FORMAT_RGBA8)
 	var art := src.duplicate() as Image
-	art.resize(ICON_SIZE, ICON_SIZE, Image.INTERPOLATE_NEAREST)
+	art.resize(ICON_SIZE, ICON_SIZE, Image.INTERPOLATE_LANCZOS)
 	var img := Image.create(ICON_SIZE, ICON_SIZE, false, Image.FORMAT_RGBA8)
 	img.fill(NAVY)
 	img.blend_rect(art, Rect2i(Vector2i.ZERO, Vector2i(ICON_SIZE, ICON_SIZE)), Vector2i.ZERO)
