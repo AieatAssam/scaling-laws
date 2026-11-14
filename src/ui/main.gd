@@ -410,6 +410,8 @@ func open_help(topic: String) -> void:
 func _select(id: String) -> void:
 	if id == "" or not _panels.has(id):
 		return
+	if id != _current:
+		Audio.play("tab_switch")
 	_current = id
 	for k in _panels:
 		_panels[k].visible = k == id

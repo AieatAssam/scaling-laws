@@ -53,6 +53,7 @@ SYSTEMS
 - The HUD shows the Scale headline, current goal rail and Stats screen. Reveal cards appear once as
   systems become available. Touch and mouse can drag-scroll panels; desktop hotkeys select tabs,
   cycle producer quantity and confirm dialogs.
+- Audio uses synthesized original sound effects and optional stage-based music. Settings stores music volume (50 default), SFX volume (70 default), and mute in `persist.settings`. Stage mapping follows the HUD: Garage=0, Funding=1, Models=2, Paradigm=3, Singularity=4. Credits load from `assets/audio/music/tracks.json`; missing tracks remain silent.
 
 TECHNICAL
 - Big-number class (mantissa+exponent); suffix (K, M, B, T, Qa…) then scientific notation.

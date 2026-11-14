@@ -19,6 +19,8 @@ var _saved: Label
 var _result: Label
 var _paste: LineEdit
 var _reset_dialog: ConfirmationDialog
+var _audio_sliders := {}
+var _mute: CheckBox
 
 
 func _ready() -> void:
@@ -36,6 +38,35 @@ func _ready() -> void:
 	Tip.attach(_motion, "Reduce motion\nNo fades or pops; tooltips appear instantly. Saved with your game.")
 	_motion.toggled.connect(func(on: bool) -> void: Game.set_setting("reduce_motion", on))
 	page.add_child(_motion)
+	page.add_child(PanelKit.label("Audio", PanelKit.GOLD))
+	for spec in [["music_volume", "Music volume"], ["sfx_volume", "SFX volume"]]:
+		var setting_key: String = spec[0]
+		var row := HBoxContainer.new()
+		var label := PanelKit.label(spec[1], PanelKit.TEXT, false)
+		label.custom_minimum_size.x = 104
+		row.add_child(label)
+		var slider := HSlider.new()
+		slider.min_value = 0
+		slider.max_value = 100
+		slider.step = 10
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slider.value_changed.connect(_set_audio_volume.bind(setting_key))
+		row.add_child(slider)
+		_audio_sliders[spec[0]] = slider
+		page.add_child(row)
+	_mute = CheckBox.new()
+	_mute.text = "Mute"
+	_mute.toggled.connect(func(on: bool) -> void: Game.set_setting("audio_mute", on))
+	page.add_child(_mute)
+	page.add_child(PanelKit.label("Music credits", PanelKit.GOLD))
+	var credits := Label.new()
+	credits.theme_type_variation = &"MicroDim"
+	credits.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var lines := PackedStringArray()
+	for track in Audio.read_manifest():
+		lines.append("%s - %s (%s)" % [track.get("title", "Unknown"), track.get("author", "Unknown"), track.get("license", "Unknown")])
+	credits.text = "\n".join(lines) if not lines.is_empty() else "No music tracks installed."
+	page.add_child(credits)
 
 	var scale_lbl := Label.new()
 	scale_lbl.text = "UI scale"
@@ -145,6 +176,9 @@ func _ready() -> void:
 func _refresh() -> void:
 	var st: Dictionary = Game.state.persist["settings"]
 	_motion.set_pressed_no_signal(bool(st.get("reduce_motion", false)))
+	for key in _audio_sliders:
+		(_audio_sliders[key] as HSlider).set_value_no_signal(float(st.get(key, 50 if key == "music_volume" else 70)))
+	_mute.set_pressed_no_signal(bool(st.get("audio_mute", false)))
 	var cur := float(st.get("ui_scale", 1.0))
 	for s in _scale_buttons:
 		(_scale_buttons[s] as Button).set_pressed_no_signal(absf(cur - s) < 0.01)
@@ -159,6 +193,10 @@ func _refresh() -> void:
 	]
 	var at := float(Game.state.persist.get("saved_at", 0.0))
 	_saved.text = "Last saved %s" % Time.get_datetime_string_from_unix_time(int(at)) if at > 0.0 else "Not saved yet"
+
+
+func _set_audio_volume(value: float, key: String) -> void:
+	Game.set_setting(key, int(value))
 
 
 func _save_now() -> void:

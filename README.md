@@ -28,6 +28,7 @@ The game has several layers of resets, revealed as you play. Each trades some cu
 
 - Touch or click buttons and tabs.
 - Drag within a panel to scroll it.
+- Adjust music and sound effects in Settings; tracks change as the lab grows.
 - Desktop: `1`-`9` select visible tabs; `B` cycles producer buy amounts; `Space` or `Enter` confirms an open card; `Esc` closes the top dialog.
 
 ## Screenshots

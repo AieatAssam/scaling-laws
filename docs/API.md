@@ -14,6 +14,7 @@ Generated from the code in `src/` (signatures as written). Core files are pure: 
 | `src/autoload/content.gd` | `Content`: loads every `.tres` under `res://content/`. |
 | `src/autoload/save_system.gd` | `SaveSystem`: versioned JSON save file. |
 | `src/autoload/game.gd` | `Game`: owns the state, ticks it, autosaves, emits signals. |
+| `src/autoload/audio.gd` | `Audio`: UI/event SFX, stage-selected crossfading music, and audio preferences. |
 | `src/ui/main.gd`, `src/ui/panels/` | HUD, goal rail, tabs, Stats overlay and game panels. |
 | `content/<type>/*.tres` | All balance data. The folder name is the content type. |
 | `tools/smoke.gd` | Headless smoke test (see bottom). |
@@ -190,6 +191,7 @@ Signals:
 | `save_notice` | `text: String`: the save was damaged or newer and was set aside, or a backup was restored. Emitted once, before `started`. |
 | `producer_bought` | `id: String, count: int` |
 | `training_started` | `run_type: String` (also emitted for auto-training, which starts the run `pick_training` chose) |
+| `training_auto_started` | `run_type: String`: emitted only when automation starts a run. |
 | `training_finished` | `result: Dictionary` |
 | `staff_hired` | `role: String, count: int` |
 | `research_bought` | `id: String` |
@@ -385,6 +387,8 @@ The AGI road, the ending choice, the rival race and the regulation challenge tie
 ## Save version 10
 
 `SaveSystem.VERSION = 10`. `_v6_to_v7` adds `run.agi_choices` (one method per stage). `_v7_to_v8` adds `run.peak_compute_rate` and `run.agi_peaks`. `_v8_to_v9` adds lifetime offline-credit and training-burst cash totals to `persist.records`. `_v9_to_v10` adds Research Programme level and progress to `persist.moonshots`. A finished run gets its ending's method on every stage (`aligned` full, `open_sourced` redteam, `rushed` ship). A run still going gets `ship` for each stage already reached.
+
+Audio preferences (`music_volume`, `sfx_volume`, `audio_mute`) live in `persist.settings`, default to 50, 70, and false, and are filled into older saves by `GameState.from_dict` without a save version change. Audio is an autoload and stays out of `src/core`. Music manifests are arrays in `assets/audio/music/tracks.json`; `from_stage` uses HUD progression indices Garage=0, Funding=1, Models=2, Paradigm=3, Singularity=4. The highest eligible track is selected. Audio is disabled in headless runs.
 
 ## Save version 5
 

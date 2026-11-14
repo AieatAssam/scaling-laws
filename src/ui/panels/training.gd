@@ -48,6 +48,8 @@ func _build() -> void:
 ## Action results (start, or the finished run) go on the status line, in green or amber.
 func report(r: Dictionary, ok_text: String) -> void:
 	var ok: bool = r.get("ok", false)
+	if not ok: Audio.play("cant_afford")
+	else: Audio.play("training_start")
 	_msg = ok_text if ok else str(r.get("reason", "Failed."))
 	_msg_color = PanelKit.GREEN if ok else PanelKit.RED
 	PanelKit.flash(_status)

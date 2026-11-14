@@ -92,6 +92,7 @@ func _open(id: String) -> bool:
 	Reveals.mark_seen(Game.state, id)
 	Game.save_now()
 	_last_ms = Time.get_ticks_msec()
+	Audio.play("unlock_reveal")
 	_topic = String(r["topic"])
 	_head.text = "New: %s" % r["title"]
 	_body.text = String(r["body"])

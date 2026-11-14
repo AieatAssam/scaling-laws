@@ -32,7 +32,7 @@ func _init(content_db = null, seed_value: int = 1) -> void:
 			"challenge_mult": 1.0,   # product of permanent challenge rewards, capped at Endgame.CHALLENGE_CAP
 		"moonshots": {"running": [], "done": [], "programme": {"level": 0, "left": 0.0}},  # survives every reset
 		"lifetime_resets": [0, 0, 0, 0],
-		"settings": {"reduce_motion": false, "notation": "suffix"},
+		"settings": {"reduce_motion": false, "notation": "suffix", "music_volume": 50.0, "sfx_volume": 70.0, "audio_mute": false},
 		"intro_seen": false,
 		"saved_at": 0.0,
 		"records": Records.default(0.0),   # see Records; a v3 save gets one from SaveSystem._v3_to_v4

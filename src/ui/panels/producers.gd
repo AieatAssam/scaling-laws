@@ -432,6 +432,7 @@ func _upgrade_tip(id: String) -> String:
 
 func _buy(id: String, btn: Button) -> void:
 	var r := Game.buy_producer(id, _picker.amount)
+	if not r.get("ok", false): Audio.play("cant_afford")
 	var ok: bool = r.get("ok", false)
 	var n: int = r.get("count", _picker.amount)
 	_report(r, "Bought %d %s." % [n, PanelText.title_of("producers", id)])

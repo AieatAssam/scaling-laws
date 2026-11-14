@@ -26,6 +26,7 @@ boot_splash/use_filter=false
 Content="*res://src/autoload/content.gd"
 SaveSystem="*res://src/autoload/save_system.gd"
 Game="*res://src/autoload/game.gd"
+Audio="*res://src/autoload/audio.gd"
 
 [display]
 

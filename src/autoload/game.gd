@@ -7,6 +7,7 @@ signal started
 signal offline_progress(summary: Dictionary)
 signal producer_bought(id: String, count: int)
 signal training_started(run_type: String)
+signal training_auto_started(run_type: String)
 signal training_finished(result: Dictionary)
 signal staff_hired(role: String, count: int)
 signal research_bought(id: String)
@@ -391,6 +392,9 @@ func set_setting(key: String, value: Variant) -> void:
 ## or after replacing `state` (import, hard reset).
 func apply_settings() -> void:
 	BigNum.notation = BigNum.notation_from_key(String(state.persist["settings"].get("notation", "suffix")))
+	var audio = get_node_or_null("/root/Audio")
+	if audio != null:
+		audio.apply_settings()
 
 
 func _dispatch(evs: Array) -> void:
@@ -401,6 +405,7 @@ func _dispatch(evs: Array) -> void:
 				training_finished.emit(e)
 			"auto_train":
 				training_started.emit(e["id"])
+				training_auto_started.emit(e["id"])
 			"reset":
 				layer_reset.emit(e["layer"], e["gain"])
 			"challenge_done":
