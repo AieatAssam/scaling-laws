@@ -1,6 +1,6 @@
 # Android release builds
 
-The `Android` export preset produces a release-signed APK. `Android AAB` uses Godot's Gradle Android build template to produce the release-signed Android App Bundle for Google Play. Both use package ID `net.aieat.scalinglaws`, min SDK 24, target SDK 36, and arm64-v8a plus armeabi-v7a; the game requests no Android permissions, including `INTERNET`.
+The `Android` export preset produces a release-signed APK. `Android AAB` uses Godot's Gradle Android build template to produce the release-signed Android App Bundle for Google Play. Both use package ID `net.aieat.scaling_laws`, min SDK 24, target SDK 36, and arm64-v8a plus armeabi-v7a; the game requests no Android permissions, including `INTERNET`.
 
 ## Signing keys
 

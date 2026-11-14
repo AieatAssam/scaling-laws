@@ -1,6 +1,6 @@
 # Play Store pack: Scaling Laws
 
-Everything needed to fill in the Google Play Console listing for `net.aieat.scalinglaws`.
+Everything needed to fill in the Google Play Console listing for `net.aieat.scaling_laws`.
 Run `store/listing/check.sh` to verify text limits, ASCII text, image sizes and that no image has an alpha channel.
 
 ## Files
