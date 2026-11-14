@@ -1,4 +1,4 @@
-import {AbsoluteFill, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from "remotion";
+import {AbsoluteFill, Audio, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from "remotion";
 import {PIXEL} from "./font";
 
 // Palette from art/palette.hex
@@ -180,6 +180,10 @@ export const PromoVideo: React.FC = () => {
   const s = (k: keyof typeof SCENES) => ({from: SCENES[k][0] * fps, durationInFrames: (SCENES[k][1] - SCENES[k][0]) * fps});
   return (
     <AbsoluteFill style={{background: BG}}>
+      <Audio
+        src={staticFile("music.ogg")}
+        volume={(f) => interpolate(f, [0, 20, PROMO_FRAMES - 60, PROMO_FRAMES], [0, 0.9, 0.9, 0], {extrapolateLeft: "clamp", extrapolateRight: "clamp"})}
+      />
       <Sequence {...s("title")}>
         <AbsoluteFill>
           <Backdrop />
